@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>IRIS — Dictée</title>
 <meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'">
 <style>
 html,body{margin:0;height:100%}
 body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#fff;background:linear-gradient(160deg,#07121f,#0f2640);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;text-align:center}
@@ -22,19 +23,22 @@ small{color:#8f8366;margin-top:12px;display:block;max-width:400px}
 <body>
 <h1>Dictée du motif</h1>
 <button id="mic" aria-label="Micro">🎤</button>
-<div id="etat">Appuyez sur le micro et parlez.</div>
+<div id="etat" aria-live="polite">Appuyez sur le micro et parlez.</div>
 <div id="txt"></div>
-<div id="err"></div>
+<div id="err" role="alert"></div>
 <small>Appuyez de nouveau sur le micro pour arrêter : le texte est alors inséré dans le motif et cette fenêtre se ferme.</small>
 <script>
 var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 var mic = document.getElementById("mic"), etat = document.getElementById("etat"), txt = document.getElementById("txt"), err = document.getElementById("err");
-var rec = null, on = false, final = "", fin = false;
+var rec = null, on = false, acquis = "", fin = false;
+/* Le tableau de bord indique son adresse (?o=...) : le texte n'est envoyé qu'à cette adresse, jamais à une fenêtre quelconque. */
+var CIBLE = "";
+try { var mo = /[?&]o=([^&]+)/.exec(location.search); if (mo) { var oo = decodeURIComponent(mo[1]); if (/^https:\/\/[a-z0-9.-]+\.googleusercontent\.com$/.test(oo)) CIBLE = oo; } } catch (e) {}
 function envoyer() {
   if (fin) return; fin = true;
-  var t = (final + " " + (txt.getAttribute("data-i") || "")).replace(/\s+/g, " ").trim();
+  var t = (acquis + " " + (txt.getAttribute("data-i") || "")).replace(/\s+/g, " ").trim();
   if (!t) { etat.textContent = "Rien n’a été entendu."; fin = false; return; }
-  try { if (window.opener) { window.opener.postMessage({ type: "iris-dicte", texte: t }, "*"); etat.textContent = "Texte envoyé."; setTimeout(function () { window.close(); }, 350); return; } } catch (e) {}
+  try { if (window.opener && CIBLE) { window.opener.postMessage({ type: "iris-dicte", texte: t }, CIBLE); etat.textContent = "Texte envoyé."; setTimeout(function () { window.close(); }, 350); return; } } catch (e) {}
   etat.textContent = "Copiez ce texte dans le motif."; fin = false;
 }
 if (!SR) {
@@ -43,12 +47,12 @@ if (!SR) {
 } else {
   mic.onclick = function () {
     if (on) { rec.stop(); return; }
-    final = ""; txt.textContent = ""; txt.setAttribute("data-i", ""); err.textContent = "";
+    fin = false; acquis = ""; txt.textContent = ""; txt.setAttribute("data-i", ""); err.textContent = "";
     rec = new SR(); rec.lang = "fr-FR"; rec.continuous = true; rec.interimResults = true;
     rec.onresult = function (e) {
       var f = "", i = "";
       for (var k = 0; k < e.results.length; k++) { if (e.results[k].isFinal) f += e.results[k][0].transcript + " "; else i += e.results[k][0].transcript; }
-      final = f; txt.setAttribute("data-i", i); txt.textContent = (f + i).trim();
+      acquis = f; txt.setAttribute("data-i", i); txt.textContent = (f + i).trim();
     };
     rec.onerror = function (e) {
       if (e.error === "not-allowed" || e.error === "service-not-allowed") err.textContent = "Micro refusé : cliquez sur le cadenas à gauche de l’adresse, autorisez le microphone, puis rouvrez la dictée.";
