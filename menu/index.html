@@ -44,7 +44,7 @@ try {
   KA = localStorage.getItem("iris_admin") || ""; KQ = localStorage.getItem("iris_cle") || "";
 } catch (e) {}
 var ea = document.getElementById("adm"), eq = document.getElementById("qr");
-if (KA) ea.href = URL_APP + "?page=admin&cle=" + KA; else { ea.className += " off"; ea.removeAttribute("href"); }
+if (KA) ea.href = "../admin/"; else { ea.className += " off"; ea.removeAttribute("href"); }
 if (KQ) eq.href = "../index.html"; else { eq.className += " off"; eq.removeAttribute("href"); }
 if (!KA && !KQ) document.getElementById("msg").style.display = "block";
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("../sw.js", { scope: "../" }).catch(function () {});

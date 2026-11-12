@@ -33,7 +33,7 @@ var mic = document.getElementById("mic"), etat = document.getElementById("etat")
 var rec = null, on = false, acquis = "", fin = false;
 /* Le tableau de bord indique son adresse (?o=...) : le texte n'est envoyé qu'à cette adresse, jamais à une fenêtre quelconque. */
 var CIBLE = "";
-try { var mo = /[?&]o=([^&]+)/.exec(location.search); if (mo) { var oo = decodeURIComponent(mo[1]); if (/^https:\/\/[a-z0-9.-]+\.googleusercontent\.com$/.test(oo)) CIBLE = oo; } } catch (e) {}
+try { var mo = /[?&]o=([^&]+)/.exec(location.search); if (mo) { var oo = decodeURIComponent(mo[1]); if (/^https:\/\/[a-z0-9.-]+\.googleusercontent\.com$/.test(oo) || oo === "https://hebara06-ai.github.io") CIBLE = oo; } } catch (e) {}
 function envoyer() {
   if (fin) return; fin = true;
   var t = (acquis + " " + (txt.getAttribute("data-i") || "")).replace(/\s+/g, " ").trim();
