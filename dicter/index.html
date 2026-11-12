@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IRIS — Dictée</title>
+<meta name="robots" content="noindex,nofollow">
+<style>
+html,body{margin:0;height:100%}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#fff;background:linear-gradient(160deg,#07121f,#0f2640);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;text-align:center}
+h1{font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:#cdb88a;font-weight:600;margin:0 0 16px}
+#mic{width:96px;height:96px;border-radius:50%;border:2px solid #c9973f;background:rgba(255,255,255,.06);color:#f1d58a;font-size:40px;cursor:pointer;transition:transform .15s,background .15s}
+#mic.on{background:#c62828;border-color:#f0a5a5;color:#fff;animation:p 1.2s infinite}
+@keyframes p{0%{box-shadow:0 0 0 0 rgba(198,40,40,.6)}100%{box-shadow:0 0 0 22px rgba(198,40,40,0)}}
+#etat{margin:14px 0 10px;font-size:16px;color:#e9e2c5;min-height:22px}
+#txt{width:100%;max-width:400px;min-height:110px;max-height:170px;overflow:auto;text-align:left;background:rgba(255,255,255,.07);border:1px solid #3b4f66;border-radius:14px;padding:12px 14px;font-size:16px;line-height:1.5;box-sizing:border-box;white-space:pre-wrap}
+#txt:empty:before{content:"Ce que vous dites s’écrit ici…";color:#7d8ea3}
+#err{color:#f0a5a5;font-size:15px;margin-top:10px;max-width:400px}
+small{color:#8f8366;margin-top:12px;display:block;max-width:400px}
+</style>
+</head>
+<body>
+<h1>Dictée du motif</h1>
+<button id="mic" aria-label="Micro">🎤</button>
+<div id="etat">Appuyez sur le micro et parlez.</div>
+<div id="txt"></div>
+<div id="err"></div>
+<small>Appuyez de nouveau sur le micro pour arrêter : le texte est alors inséré dans le motif et cette fenêtre se ferme.</small>
+<script>
+var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+var mic = document.getElementById("mic"), etat = document.getElementById("etat"), txt = document.getElementById("txt"), err = document.getElementById("err");
+var rec = null, on = false, final = "", fin = false;
+function envoyer() {
+  if (fin) return; fin = true;
+  var t = (final + " " + (txt.getAttribute("data-i") || "")).replace(/\s+/g, " ").trim();
+  if (!t) { etat.textContent = "Rien n’a été entendu."; fin = false; return; }
+  try { if (window.opener) { window.opener.postMessage({ type: "iris-dicte", texte: t }, "*"); etat.textContent = "Texte envoyé."; setTimeout(function () { window.close(); }, 350); return; } } catch (e) {}
+  etat.textContent = "Copiez ce texte dans le motif."; fin = false;
+}
+if (!SR) {
+  mic.disabled = true; etat.textContent = "";
+  err.textContent = "Ce navigateur ne propose pas la dictée vocale. Utilisez Chrome ou Edge sur ordinateur.";
+} else {
+  mic.onclick = function () {
+    if (on) { rec.stop(); return; }
+    final = ""; txt.textContent = ""; txt.setAttribute("data-i", ""); err.textContent = "";
+    rec = new SR(); rec.lang = "fr-FR"; rec.continuous = true; rec.interimResults = true;
+    rec.onresult = function (e) {
+      var f = "", i = "";
+      for (var k = 0; k < e.results.length; k++) { if (e.results[k].isFinal) f += e.results[k][0].transcript + " "; else i += e.results[k][0].transcript; }
+      final = f; txt.setAttribute("data-i", i); txt.textContent = (f + i).trim();
+    };
+    rec.onerror = function (e) {
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") err.textContent = "Micro refusé : cliquez sur le cadenas à gauche de l’adresse, autorisez le microphone, puis rouvrez la dictée.";
+      else if (e.error === "no-speech") err.textContent = "Aucune voix entendue, réessayez.";
+      else err.textContent = "Dictée interrompue (" + e.error + ").";
+    };
+    rec.onend = function () { on = false; mic.className = ""; etat.textContent = "Dictée terminée."; envoyer(); };
+    try { rec.start(); on = true; mic.className = "on"; etat.textContent = "Je vous écoute… appuyez pour arrêter."; } catch (x) { err.textContent = "Impossible de démarrer le micro."; }
+  };
+  setTimeout(function () { try { mic.click(); } catch (e) {} }, 300);
+}
+</script>
+</body>
+</html>
