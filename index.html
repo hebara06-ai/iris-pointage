@@ -65,6 +65,12 @@ var google = { script: { run: { withSuccessHandler: function (ok) { var o = { wi
   x.onload = function () { try { ok(JSON.parse(x.responseText)); } catch (e) { if (o.ko) o.ko(); } };
   x.onerror = x.ontimeout = function () { if (o.ko) o.ko(); };
   x.timeout = 20000; x.send();
+}, meteoDonnees: function () {
+  var x = new XMLHttpRequest();
+  x.open("GET", URL_APP + "?api=meteo");
+  x.onload = function () { try { ok(JSON.parse(x.responseText)); } catch (e) { if (o.ko) o.ko(); } };
+  x.onerror = x.ontimeout = function () { if (o.ko) o.ko(); };
+  x.timeout = 20000; x.send();
 } }; return o; } } } };
 
 /* Taille du QR et hauteur de page : recalculées à chaque rotation ou changement de taille. */
@@ -167,13 +173,22 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catc
     if (!jour && m[1] === "s") lib = c.weather_code === 0 ? "Nuit dégagée" : "Nuit plutôt dégagée";
     el.innerHTML = ico(m[1], jour) + '<div class="tp">' + Math.round(c.temperature_2m) + '°</div><div class="tx2"><b>' + lib + '</b><span>Paris La Défense</span><span>' + Math.round(d.daily.temperature_2m_min[0]) + '° / ' + Math.round(d.daily.temperature_2m_max[0]) + '°</span></div>';
   }
-  function go() {
+  function garde(d) { try { localStorage.setItem("iris_meteo", JSON.stringify(d)); } catch (e) {} }
+  function direct() {
     var x = new XMLHttpRequest();
     x.open("GET", "https://api.open-meteo.com/v1/forecast?latitude=48.892&longitude=2.236&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min&timezone=Europe%2FParis&forecast_days=1");
-    x.onload = function () { try { rend(JSON.parse(x.responseText)); } catch (e) {} };
+    x.onload = function () { try { var d = JSON.parse(x.responseText); rend(d); garde(d); } catch (e) {} };
     x.send();
   }
-  go(); setInterval(go, 900000);
+  function go() {
+    try {
+      google.script.run.withSuccessHandler(function (d) { if (d && d.current) { rend(d); garde(d); } else direct(); }).withFailureHandler(direct).meteoDonnees();
+    } catch (e) { direct(); }
+  }
+  /* Dernière météo connue affichée tout de suite ; message d'attente si rien n'est disponible. */
+  try { var memo = localStorage.getItem("iris_meteo"); if (memo) rend(JSON.parse(memo)); } catch (e) {}
+  setTimeout(function () { if (!el.innerHTML) el.innerHTML = '<div class="tx2"><b>Météo</b><span>Paris La Défense</span><span>en attente de connexion</span></div>'; }, 15000);
+  go(); setInterval(go, 600000); setTimeout(go, 30000);
 })();
 </script>
 </body>
