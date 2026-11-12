@@ -48,6 +48,8 @@ h1 em{font-style:normal;background:linear-gradient(180deg,#f1d58a,#c9973f 55%,#a
 <script>
 /* Adresse du script Google qui fournit les codes tournants. */
 var URL_APP = "https://script.google.com/macros/s/AKfycbzAc5Ge9XGmOE5bBbOxkN528oSBNvgw3MZEGRZVH15HxMZnVB_MwputipQMebgHXAxO/exec";
+/* Page que les agents ouvrent en scannant le QR : hébergée ici, sans passer par une page Google. */
+var URL_SCAN = "https://hebara06-ai.github.io/iris-pointage/p/";
 
 /* La clé de l'écran est dans le lien après « # » (jamais envoyée au serveur d'hébergement) ; elle est gardée sur l'appareil. */
 var CLE = "";
@@ -104,7 +106,7 @@ function tic() {
   if (!t) { if (dern) { dern = ""; e.innerHTML = '<div class="att">Reconnexion…</div>'; } return; }
   if (t !== dern) {
     dern = t; e.innerHTML = "";
-    new QRCode(e, { text: URL_APP + "?t=" + t, width: TAILLE, height: TAILLE, correctLevel: QRCode.CorrectLevel.H });
+    new QRCode(e, { text: URL_SCAN + "?t=" + t, width: TAILLE, height: TAILLE, correctLevel: QRCode.CorrectLevel.H });
     logoqr(e);
   }
 }
