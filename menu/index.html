@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>IRIS</title>
+<meta name="theme-color" content="#07121f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="IRIS">
+<meta name="robots" content="noindex,nofollow">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="../icon-192.png">
+<link rel="apple-touch-icon" href="../icon-192.png">
+<style>
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#fff;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;background:radial-gradient(1200px 700px at 12% 6%,rgba(212,175,55,.16),transparent 60%),radial-gradient(900px 700px at 100% 100%,rgba(63,111,168,.25),transparent 60%),linear-gradient(160deg,#07121f,#0f2640)}
+.pg{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4vh 5vw;box-sizing:border-box}
+.ch{display:flex;flex-wrap:wrap;align-items:center;justify-content:center}
+.ic{display:flex;flex-direction:column;align-items:center;text-decoration:none;color:inherit;margin:2vh 5vw;cursor:pointer;-webkit-user-select:none;user-select:none}
+.ic img{display:block;width:34vmin;width:clamp(150px,34vmin,300px);height:auto;border-radius:22%;box-shadow:0 0 0 1px rgba(212,175,55,.55),0 30px 70px rgba(0,0,0,.55);transition:transform .18s ease,box-shadow .18s ease}
+.ic:active img{transform:scale(.94)}
+.ic span{margin-top:2.2vh;font-size:20px;font-size:clamp(17px,2.6vmin,26px);letter-spacing:.16em;text-transform:uppercase;color:#cdb88a;font-weight:600;text-align:center}
+.ic small{display:block;margin-top:.5vh;font-size:14px;font-size:clamp(12px,1.8vmin,17px);letter-spacing:.08em;text-transform:none;color:#8f8366;font-weight:400}
+.off{opacity:.35}
+.msg{display:none;position:fixed;left:0;right:0;bottom:4vh;text-align:center;font-size:18px;color:#cdb88a;padding:0 24px}
+</style>
+</head>
+<body>
+<div class="pg"><div class="ch">
+<a class="ic" id="adm" href="#"><img src="../icon-512.png" alt="IRIS"><span>Tableau de bord<small>Administrateur</small></span></a>
+<a class="ic" id="qr" href="#"><img src="../icon-512.png" alt="IRIS"><span>Écran de pointage<small>Agents</small></span></a>
+</div></div>
+<div class="msg" id="msg">Menu non configuré : ouvrez le lien complet fourni par l’administrateur.</div>
+<script>
+var URL_APP = "https://script.google.com/macros/s/AKfycbzAc5Ge9XGmOE5bBbOxkN528oSBNvgw3MZEGRZVH15HxMZnVB_MwputipQMebgHXAxO/exec";
+/* Les clés sont dans le lien après « # » (jamais envoyées à l'hébergeur) ; elles sont gardées sur l'appareil. */
+var KA = "", KQ = "";
+try {
+  var h = location.hash || "", a = h.match(/admin=([0-9a-f]+)/), q = h.match(/qr=([0-9a-f]+)/);
+  if (a) localStorage.setItem("iris_admin", a[1]);
+  if (q) localStorage.setItem("iris_cle", q[1]);
+  if ((a || q) && history.replaceState) history.replaceState(null, "", location.pathname + location.search);
+  KA = localStorage.getItem("iris_admin") || ""; KQ = localStorage.getItem("iris_cle") || "";
+} catch (e) {}
+var ea = document.getElementById("adm"), eq = document.getElementById("qr");
+if (KA) ea.href = URL_APP + "?page=admin&cle=" + KA; else { ea.className += " off"; ea.removeAttribute("href"); }
+if (KQ) eq.href = "../index.html"; else { eq.className += " off"; eq.removeAttribute("href"); }
+if (!KA && !KQ) document.getElementById("msg").style.display = "block";
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("../sw.js", { scope: "../" }).catch(function () {});
+</script>
+</body>
+</html>
