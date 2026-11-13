@@ -48,7 +48,7 @@ var ea = document.getElementById("adm"), eq = document.getElementById("qr");
 if (KA) ea.href = "../admin/"; else { ea.className += " off"; ea.removeAttribute("href"); }
 if (KQ) eq.href = "../index.html"; else { eq.className += " off"; eq.removeAttribute("href"); }
 var em = document.getElementById("moi");
-if (KA) { em.href = "../p/"; em.style.display = ""; }
+if (KA) { em.href = "../p/?conges=1"; em.style.display = ""; }
 if (!KA && !KQ) document.getElementById("msg").style.display = "block";
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("../sw.js", { scope: "../" }).catch(function () {});
 </script>
