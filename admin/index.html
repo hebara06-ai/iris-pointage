@@ -193,14 +193,15 @@
     c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Reformulation par IA (Gemini)" }), h("p", { c: "ed-vide", t: "Créez une clé gratuite sur aistudio.google.com/apikey, collez-la ici une seule fois, puis cliquez sur Enregistrer. Le texte du motif est envoyé à Google seulement quand vous cliquez sur « Reformuler (IA) »." }), h("div", { c: "ed-row" }, [lab("Clé Gemini", ci), cb])]));
     c.appendChild(liste);
   }
+  function finEff(a, b, type) { var d = new Date((b || a) + "T12:00:00"); if (type !== "Absence exceptionnelle" && d.getDay() === 5) d.setDate(d.getDate() + 1); return d; }
   function nbJ(a, b, type, ag) {
     if (!a) return 0;
-    var d = new Date(a + "T12:00:00"), e = new Date((b || a) + "T12:00:00"), n = 0, low = String((ag && ag.jours) || "").toLowerCase().trim(), J = ["dim", "lun", "mar", "mer", "jeu", "ven", "sam"];
+    var d = new Date(a + "T12:00:00"), e = finEff(a, b, type), n = 0, low = String((ag && ag.jours) || "").toLowerCase().trim(), J = ["dim", "lun", "mar", "mer", "jeu", "ven", "sam"];
     if (e < d) return 0;
     for (; d <= e; d.setDate(d.getDate() + 1)) { var w = d.getDay(); if (type === "Absence exceptionnelle") { if (low ? low.indexOf(J[w]) >= 0 : (w >= 1 && w <= 5)) n++; } else if (w !== 0) n++; }
     return n;
   }
-  function retourLe(a, b) { var d = new Date((b || a) + "T12:00:00"); do { d.setDate(d.getDate() + 1); } while (d.getDay() === 0); return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }); }
+  function retourLe(a, b, type) { var d = finEff(a, b, type); do { d.setDate(d.getDate() + 1); } while (d.getDay() === 0); return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }); }
   function fmt(n) { return String(Math.round(Number(n || 0) * 100) / 100).replace(".", ","); }
   function paneCg(c) {
     var L = DATA.conges || [], att = L.filter(function (x) { return x.statut === "En attente"; });
@@ -224,7 +225,7 @@
     [["Congés payés", "Congés payés"], ["Sans solde", "Congé sans solde"], ["Absence exceptionnelle", "Absence autorisée"]].forEach(function (o) { ty.appendChild(h("option", { value: o[0], t: o[1] })); });
     function calc() {
       var a = DATA.agents[sel.selectedIndex], n = nbJ(d1.value, d2.value, ty.value, a);
-      info.textContent = !d1.value ? "" : n ? n + " jour" + (n > 1 ? "s" : "") + (ty.value === "Absence exceptionnelle" ? " (selon le planning de l’agent)" : " (du lundi au samedi)") + " · retour le " + retourLe(d1.value, d2.value) : "Aucun jour à compter sur cette période.";
+      info.textContent = !d1.value ? "" : n ? n + " jour" + (n > 1 ? "s" : "") + (ty.value === "Absence exceptionnelle" ? " (selon le planning de l’agent)" : " (du lundi au samedi)") + " · retour le " + retourLe(d1.value, d2.value, ty.value) + (ty.value !== "Absence exceptionnelle" && new Date((d2.value || d1.value) + "T12:00:00").getDay() === 5 ? " (le samedi est compté avec le vendredi)" : "") : "Aucun jour à compter sur cette période.";
     }
     sel.onchange = d1.onchange = d2.onchange = ty.onchange = calc; calc();
     var fi = h("input", { type: "file", accept: "image/*,.pdf,.doc,.docx,.odt,.txt,.heic,.heif" }), pj = h("button", { c: "ed-b", t: "📎 Joindre un fichier", type: "button" });
@@ -249,14 +250,14 @@
     };
     c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Enregistrer un congé ou une absence autorisée" }), h("div", { c: "ed-row" }, [lab("Agent", sel), lab("Type", ty), lab("Premier jour", d1), lab("Dernier jour (facultatif)", d2), lab("Agence", age)]), info, h("div", { style: "margin-top:12px" }, [lab("Motif", mo)]), h("div", { c: "ed-row", style: "margin-top:14px" }, [lab("Justificatif", h("div", {}, [pj, fi])), ad])]));
     var an = DATA.agents[0] && DATA.agents[0].solde ? DATA.agents[0].solde.annee : "";
-    var so = h("div", { c: "ed-card" }, [h("h3", { t: "Soldes de congés payés — " + an }), h("p", { c: "ed-vide", t: "Reliquat N-1 : jours restant au 1er janvier. Acquis N : 2,5 jours par mois, estimé tant que la valeur de la fiche de paie n’est pas saisie. Les jours pris s’imputent d’abord sur le reliquat." })]);
+    var so = h("div", { c: "ed-card" }, [h("h3", { t: "Soldes de congés payés — " + an }), h("p", { c: "ed-vide", t: "Droit annuel : 30 jours + reliquat N-1 (jours restant au 1er janvier). Disponible à ce jour = reliquat + acquis − pris ; l’acquis est de 2,5 jours par mois, estimé tant que la valeur de la fiche de paie n’est pas saisie. Les jours pris s’imputent d’abord sur le reliquat." })]);
     DATA.agents.forEach(function (a) {
       var s = a.solde, ri = h("input", { type: "text", placeholder: "0" }), ai = h("input", { type: "text", placeholder: s.auto ? fmt(s.acquis) + " (estimé)" : "" });
       ri.value = a.relS || ""; ai.value = a.acqS || ""; ri.style.width = "130px"; ai.style.width = "130px";
       var sv = h("button", { c: "ed-b ed-p", t: "Enregistrer", type: "button" });
       sv.onclick = function () { action("adminConges", { action: "solde", l: a.l, av: [a.nom, a.prenom], reliquat: ri.value, acquis: ai.value }); };
       so.appendChild(h("div", { c: "ed-l" }, [h("b", { t: a.nom + " " + a.prenom }),
-        h("div", { c: "ed-row" }, [h("span", { t: "Reliquat N-1 restant : " + fmt(s.reliquatRestant) }), h("span", { t: "Acquis N : " + fmt(s.acquis) + (s.auto ? " (estimé)" : "") }), h("span", { t: "Pris : " + fmt(s.pris) + (s.attente ? " (+" + fmt(s.attente) + " en attente)" : "") }), h("b", { t: "Reste : " + fmt(s.reste) })]),
+        h("div", { c: "ed-row" }, [h("span", { t: "Reliquat N-1 restant : " + fmt(s.reliquatRestant) }), h("span", { t: "Acquis N : " + fmt(s.acquis) + (s.auto ? " (estimé)" : "") }), h("span", { t: "Pris : " + fmt(s.pris) + (s.attente ? " (+" + fmt(s.attente) + " en attente)" : "") }), h("b", { t: "Reste sur l’année : " + fmt(s.resteAnnuel) + " (disponible à ce jour : " + fmt(s.reste) + ")" })]),
         h("div", { c: "ed-row" }, [lab("Reliquat N-1 saisi", ri), lab("Acquis N (fiche de paie)", ai), sv])]));
     });
     var tout = h("div", { c: "ed-card" }, [h("h3", { t: "Toutes les demandes" })]);
