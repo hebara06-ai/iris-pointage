@@ -627,4 +627,4 @@ g("tbDel").onclick=function(){var ks=cles(),D=this;if(!ks.length||occ)return;
    var p=sel[i++];google.script.run.withSuccessHandler(function(z){if(z&&z.ok){ok++;suite()}else{occ=false;msg((z&&z.msg)||"Échec de la suppression.");if(ok){try{maj();admMaj()}catch(e){}}}}).withFailureHandler(function(){occ=false;msg("Connexion impossible : suppression interrompue après "+ok+".")}).adminPointage(CLE,{action:"sup",l:p.l,av:[p.date,p.nom,p.prenom,p.tel,p.arrivee,p.depart]})}
   suite()}).withFailureHandler(function(){occ=false;msg("Connexion impossible, réessayez.");maj2()}).adminLire(CLE,"")};
 if(DERN)window.tbDraw(DERN);else maj2();
-})();</script></body></html>
+})();</script><link rel="stylesheet" href="../iris.css"><script src="../iris.js"></script></body></html>
