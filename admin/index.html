@@ -265,6 +265,30 @@
   }
   function retourLe(a, b, type) { var d = finEff(a, b, type); do { d.setDate(d.getDate() + 1); } while (d.getDay() === 0); return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }); }
   function fmt(n) { return String(Math.round(Number(n || 0) * 100) / 100).replace(".", ","); }
+  // Outils d'écriture réutilisables (mêmes boutons que dans « Absences et retards ») : corriger l'orthographe, reformuler (IA), dicter, rétablir
+  function outilsTexte(ta, nom) {
+    var avant = "", cor = h("button", { c: "ed-b", t: "✓ Corriger l’orthographe", type: "button" }), ref = h("button", { c: "ed-b", t: "✨ Reformuler (IA)", type: "button" }), ann = h("button", { c: "ed-b", t: "↩ Rétablir mon texte", type: "button" }), mic = h("button", { c: "ed-b", t: "🎤 Dicter", type: "button" });
+    ann.style.display = "none";
+    if (!window.__dl) { window.__dl = 1; window.addEventListener("message", function (e) { if (e.origin !== "https://hebara06-ai.github.io" || !e.data || e.data.type !== "iris-dicte") return; var t = String(e.data.texte || "").trim().slice(0, 1000); if (t && window.__dicte) window.__dicte(t); }); }
+    mic.onclick = function () {
+      window.__dicte = function (t) { var fin = ta.value.slice(-1); ta.value += (ta.value && fin !== " " && fin !== "\n" ? " " : "") + t; ta.focus(); };
+      var w = window.open("https://hebara06-ai.github.io/iris-pointage/dicter/?o=" + encodeURIComponent(location.origin), "iris-dicte", "width=460,height=460,left=200,top=100");
+      if (!w) msg("La fenêtre de dictée a été bloquée : autorisez les fenêtres pop-up pour ce site.", true);
+    };
+    function lance(bt, lib, attente, fonction, apres, indispo) {
+      if (!ta.value.trim()) { msg("Écrivez d’abord le " + nom + ".", true); return; }
+      bt.disabled = true; bt.textContent = lib[1]; avant = ta.value;
+      var libre = setTimeout(function () { bt.disabled = false; bt.textContent = lib[0]; }, attente);
+      appel(fonction, ta.value, function (r) {
+        clearTimeout(libre); bt.disabled = false; bt.textContent = lib[0];
+        if (r && r.ok) apres(r); else msg((r && r.msg) || indispo, true);
+      });
+    }
+    cor.onclick = function () { lance(cor, ["✓ Corriger l’orthographe", "Correction…"], 25000, "corrigerTexte", function (r) { ta.value = r.texte; ann.style.display = r.n ? "" : "none"; msg(r.n ? r.n + " correction(s) appliquée(s). Relisez avant d’enregistrer." : "Aucune faute trouvée."); }, "Correction indisponible."); };
+    ref.onclick = function () { lance(ref, ["✨ Reformuler (IA)", "Reformulation…"], 40000, "reformulerTexte", function (r) { ta.value = r.texte; ann.style.display = ""; msg("Texte reformulé. Relisez avant d’enregistrer."); }, "Reformulation indisponible."); };
+    ann.onclick = function () { ta.value = avant; ann.style.display = "none"; };
+    return [cor, ref, mic, ann];
+  }
   function paneCg(c) {
     var L = DATA.conges || [], att = L.filter(function (x) { return x.statut === "En attente"; });
     function ligne(x) {
@@ -275,6 +299,7 @@
       no.onclick = function () { pan.style.display = "none"; };
       pan.appendChild(h("label", { t: "Commentaire pour l’agent" })); pan.appendChild(ta);
       pan.appendChild(h("small", { t: "Vous pouvez laisser ce champ vide. S’il est rempli, l’agent verra votre commentaire dans « Mes demandes »." }));
+      pan.appendChild(h("div", { c: "ed-row", style: "margin-top:8px" }, outilsTexte(ta, "commentaire")));
       pan.appendChild(h("div", { c: "ed-row" }, [ok, no]));
       [["Autorisé", "Autoriser", true], ["Refusé", "Refuser", false], ["En attente", "Remettre en attente", false]].forEach(function (o) {
         if (o[0] === st || st === "Annulé") return;
@@ -322,7 +347,7 @@
       rd.onerror = function () { msg("Lecture du fichier impossible.", true); };
       rd.readAsDataURL(f);
     };
-    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Enregistrer un congé ou une absence autorisée" }), h("div", { c: "ed-row" }, [lab("Agent", sel), lab("Type", ty), lab("Premier jour", d1), lab("Dernier jour (facultatif)", d2), lab("Agence", age)]), info, h("div", { style: "margin-top:12px" }, [lab("Motif", mo)]), h("div", { c: "ed-row", style: "margin-top:14px" }, [lab("Justificatif", h("div", {}, [pj, fi])), ad])]));
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Enregistrer un congé ou une absence autorisée" }), h("div", { c: "ed-row" }, [lab("Agent", sel), lab("Type", ty), lab("Premier jour", d1), lab("Dernier jour (facultatif)", d2), lab("Agence", age)]), info, h("div", { style: "margin-top:12px" }, [lab("Motif", mo)]), h("div", { c: "ed-row", style: "margin-top:10px" }, outilsTexte(mo, "motif")), h("div", { c: "ed-row", style: "margin-top:14px" }, [lab("Justificatif", h("div", {}, [pj, fi])), ad])]));
     var an = DATA.agents[0] && DATA.agents[0].solde ? DATA.agents[0].solde.annee : "";
     function ico(p) { var e = document.createElement("span"); e.className = "cg-ic"; e.innerHTML = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\">" + p + "</svg>"; return e; }
     var ICN = { cal: "<rect width=\"18\" height=\"18\" x=\"3\" y=\"4\" rx=\"2\"/><path d=\"M16 2v4M8 2v4M3 10h18\"/>", user: "<path d=\"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2\"/><circle cx=\"12\" cy=\"7\" r=\"4\"/>", ok: "<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m9 12 2 2 4-4\"/>", gift: "<rect x=\"3\" y=\"8\" width=\"18\" height=\"4\" rx=\"1\"/><path d=\"M12 8v13\"/><path d=\"M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7\"/><path d=\"M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5\"/>", sync: "<path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\"/><path d=\"M21 3v5h-5\"/><path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\"/><path d=\"M8 16H3v5\"/>", bar: "<line x1=\"12\" x2=\"12\" y1=\"20\" y2=\"10\"/><line x1=\"18\" x2=\"18\" y1=\"20\" y2=\"4\"/><line x1=\"6\" x2=\"6\" y1=\"20\" y2=\"16\"/>", gear: "<circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1\"/>" };
