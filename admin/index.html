@@ -356,7 +356,7 @@
         w.appendChild(ca);
       });
       var T = s.totaux || {};
-      w.appendChild(h("div", { c: "acd acw", t: "Droits acquis à ce jour : " + (T.fiable === false ? "À vérifier" : fmt(T.acquis) + " j") + " · Restant à acquérir (théorique, non disponible) : " + fmt(T.aAcquerir) + " j · Utilisable immédiatement : à vérifier" + (s.perime ? " · La dernière fiche de paie date d’une période précédente : rien n’est reporté automatiquement." : "") }));
+      w.appendChild(h("div", { c: "acd acw", t: "Disponible à ce jour : " + (T.fiable === false || T.utilisable === null || T.utilisable === undefined ? "À vérifier" : fmt(T.utilisable) + " j") + " (reliquat + légaux) · En cours d’acquisition : " + fmt((s.cats && s.cats[2] ? s.cats[2].solde : 0)) + " j, utilisable à partir du 1er juin " + (new Date().getMonth() >= 5 ? new Date().getFullYear() + 1 : new Date().getFullYear()) + " · Restant à acquérir (théorique) : " + fmt(T.aAcquerir) + " j" + (s.perime ? " · La dernière fiche de paie date d’une période précédente : rien n’est reporté automatiquement." : "") }));
       return w;
     }
     var ouverte = null;
