@@ -1,0 +1,107 @@
+/* IRIS  feuille de style commune (design system + regles responsive).
+   Chargee APRES les styles propres a chaque page : elle ne change ni les donnees ni la logique.
+   Seuils : 480 / 768 / 1024 / 1440 px. Reference graphique : l'interface ordinateur. */
+
+/* ---------- 1. Jetons de design ---------- */
+:root{
+  --iris-nuit:#07152e;--iris-nuit-2:#0f2a4c;--iris-or:#c9a24d;--iris-or-clair:#e9d9a8;
+  --iris-fond:#f5f2ea;--iris-carte:#fff;--iris-texte:#07152e;--iris-texte-doux:#4a463d;
+  --iris-rayon:14px;--iris-rayon-g:26px;
+  --iris-esp-1:6px;--iris-esp-2:10px;--iris-esp-3:14px;--iris-esp-4:22px;
+  --iris-safe-g:env(safe-area-inset-left,0px);--iris-safe-d:env(safe-area-inset-right,0px);
+  --iris-safe-h:env(safe-area-inset-top,0px);--iris-safe-b:env(safe-area-inset-bottom,0px);
+}
+
+/* ---------- 2. Base commune : zoom du texte, debordements, accessibilite ---------- */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+img,svg,canvas{max-width:100%}
+:where(a,button,input,select,textarea,[tabindex]):focus-visible{outline:3px solid #d9b15f;outline-offset:2px}
+:where(button,.btn,[role=button],select,input[type=checkbox]){touch-action:manipulation}
+@media(max-width:768px){:where(button,select,input:not([type=checkbox]):not([type=radio])){min-height:44px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+
+/* ---------- 3. Zones de securite iPhone ----------
+   Les pages sans viewport-fit=cover (admin, espace agent) sont deja inserees par le navigateur hors de l'encoche.
+   Les pages plein ecran (pointage, menu) utilisent les variables --iris-safe-* ci-dessus. */
+
+/* ---------- 4. Administration : cartes de statistiques (5 cartes) ---------- */
+/* Tablette : 3 + 2, la 2e ligne est centree. */
+@media(min-width:561px) and (max-width:1100px){
+  .st{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .st>div{grid-column:span 2}
+  .st>div:nth-child(4){grid-column:2/4}
+  .st>div:nth-child(5){grid-column:4/6}
+}
+/* Telephone : 2 colonnes, la 5e carte est centree a la meme largeur que les autres. */
+@media(max-width:560px){
+  .st{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .st>div:last-child:nth-child(odd){grid-column:1/-1;justify-self:center;width:calc(50% - 5px)}
+  .st>div{padding:16px 8px 14px}
+  .st b{font-size:34px}
+  .st span.lb{font-size:13.5px}
+}
+
+/* ---------- 5. En-tete identique a l'ordinateur sur tous les ecrans ----------
+   Meteo a gauche, logo au centre, heure + date en dessous a droite, en portrait comme en paysage.
+   Les tailles suivent la largeur de l'ecran (vw) avec un minimum et un maximum. */
+@media(max-width:899px){
+  /* Administration */
+  .e{grid-template-columns:1fr auto 1fr;justify-items:stretch;align-items:center;gap:clamp(6px,2vw,16px);padding-top:12px;padding-bottom:12px}
+  .e #lgl,.e .e1,.e .e3{grid-row:auto;grid-column:auto}
+  .e #lgl{justify-self:center}
+  .e .e1{justify-self:start;min-width:0}
+  .e .e3{justify-self:end;gap:clamp(3px,1vw,8px);align-items:center}
+  .e .lg{height:clamp(58px,14vw,110px)}
+  .e .mt>*+*{margin-left:clamp(4px,1.2vw,10px)}
+  .e .mt svg{width:clamp(26px,7vw,52px);height:clamp(26px,7vw,52px)}
+  .e .mt .tp{font-size:clamp(22px,6.5vw,44px)}
+  .e .mt .tx2{font-size:clamp(9px,2.7vw,15px)}
+  .e .mt .tx2 b{font-size:clamp(10px,3.1vw,17px)}
+  .e .flip.sm{font-size:clamp(17px,5.4vw,40px)}
+  .e #dt{font-size:clamp(7.5px,2vw,12px);letter-spacing:.03em;white-space:normal;line-height:1.25;min-width:calc(100% + 24px);margin-left:-12px;margin-right:-12px}
+  /* Espace agent */
+  .top{grid-template-columns:1fr auto 1fr;gap:clamp(6px,2vw,16px);padding:12px clamp(14px,2.5vw,24px);align-items:center}
+  .top .mt,.top .lgo,.top .flip{grid-row:auto;grid-column:auto}
+  .top .lgo{justify-self:center;height:clamp(58px,14vw,110px)}
+  .top .mt{justify-self:start;gap:clamp(4px,1.2vw,10px)}
+  .top .mt svg{width:clamp(26px,7vw,52px);height:clamp(26px,7vw,52px)}
+  .top .mt .tp{font-size:clamp(22px,6.5vw,44px)}
+  .top .mt .tx2{display:flex;font-size:clamp(9px,2.7vw,15px)}
+  .top .mt .tx2 b{font-size:clamp(10px,3.1vw,17px)}
+  .top .mt .tx2 b,.top .mt .tx2 span{overflow:visible;text-overflow:clip}
+  .hz{display:flex;flex-direction:column;align-items:center;justify-self:end;grid-row:auto;grid-column:auto;gap:clamp(3px,1vw,8px)}
+  .top .flip{font-size:clamp(17px,5.4vw,40px)}
+  .hz small{grid-column:auto;width:0;min-width:calc(100% + 24px);margin-left:-12px;margin-right:-12px;justify-self:auto;margin-top:0;font-size:clamp(7.5px,2vw,12px);letter-spacing:.03em;white-space:normal;line-height:1.25;text-align:center}
+}
+/* Telephone en paysage : en-tete plus bas pour laisser la place au contenu. */
+@media(max-height:500px) and (orientation:landscape){
+  .e,.top{padding-top:6px;padding-bottom:6px}
+  .e .lg,.top .lgo{height:clamp(48px,16vh,72px)}
+  .e .flip.sm,.top .flip{font-size:clamp(20px,7vh,30px)}
+}
+
+/* ---------- 7. Petits ecrans : aucun debordement horizontal (QR et cartes adaptes a la largeur) ---------- */
+@media(max-width:480px){
+  .w{padding-left:12px;padding-right:12px;gap:14px}
+  .b.q{padding:20px 12px 22px;flex-basis:100%;max-width:100%;box-sizing:border-box}
+  .qk{max-width:100%;box-sizing:border-box}
+  #qr{max-width:100%}
+  #qr img,#qr canvas{max-width:100%;height:auto}
+  .m{min-width:0;max-width:100%}
+  .cap{white-space:normal}
+}
+
+/* ---------- 8. Tableaux en cartes empilees sous 768 px (les intitules viennent de iris.js) ---------- */
+@media(max-width:768px){
+  table.rc{min-width:0!important;width:100%!important;border-collapse:separate!important;border-spacing:0!important}
+  table.rc thead{position:absolute!important;left:-9999px!important;top:auto!important;width:1px;height:1px;overflow:hidden}
+  table.rc,table.rc tbody{display:block!important;box-sizing:border-box}
+  table.rc tr{display:grid!important;grid-template-columns:1fr 1fr;gap:2px 12px;border:1px solid #e6e8ec;border-radius:12px;margin:10px 0;padding:10px 12px;background:#fff;box-sizing:border-box}
+  table.rc td{display:block!important;text-align:left!important;white-space:normal!important;min-width:0!important;width:auto!important;padding:5px 0!important;border:0!important;font-size:14px;overflow-wrap:anywhere}
+  table.rc td::before{content:attr(data-l);display:block;font-weight:600;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#6b7787;margin-bottom:1px}
+  table.rc td:first-child{grid-column:1/-1;font-weight:700;font-size:15px;padding-bottom:7px!important;border-bottom:1px solid #f1ebdb!important;margin-bottom:4px}
+  table.rc td:first-child::before{display:none}
+  table.rc td[data-l=""]{grid-column:1/-1}
+  table.rc td[data-l=""]::before{display:none}
+  table.rc td:empty{display:none!important}
+}
