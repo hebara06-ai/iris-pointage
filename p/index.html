@@ -18,10 +18,10 @@
  var cs=el("div","cs",fmt(p.solde));cs.appendChild(el("small","","jour"+(Math.abs(p.solde)>1?"s":"")+" "+(p.cle==="encours"?"acquis":"restant"+(Math.abs(p.solde)>1?"s":""))));d.appendChild(cs);
  var den=base||p.droit||0,fr=den>0?Math.max(0,Math.min(1,p.solde/den)):0,bar=el("div","bar"),i=el("i");i.style.background=col;bar.appendChild(i);d.appendChild(bar);setTimeout(function(){i.style.width=(fr*100).toFixed(1)+"%"},80);
  var cd=el("div","cdl");[[p.cle==="encours"?"Droits acquis":"Droits",fmt(p.droit)],["Pris",fmt(p.pris)],["Solde",fmt(p.solde)]].forEach(function(x){var s=el("span","",x[0]+" : ");s.appendChild(el("b","",x[1]));cd.appendChild(s)});if(p.cle==="encours")cd.appendChild(el("span","","Base annuelle : "+fmt(base)));d.appendChild(cd);return d}
-function corpsCongesN(r){var s=r.solde||{},T=s.totaux||{},cats=s.cats||[],ok=T.fiable!==false&&isFinite(T.acquis),COL2={vi:"#7c3aed",gr:"#9ca3af"},col,fr=0,ac=T.acquis;
- if(!ok)col=COL2.gr;else if(ac<0)col=COL2.vi;else if(ac===0)col=COL.r;else col=ac>10?COL.v:ac>5?COL.j:COL.o;
+function corpsCongesN(r){var s=r.solde||{},T=s.totaux||{},cats=s.cats||[],ok=T.fiable!==false&&isFinite(T.acquis),SIX={vt:"#16a34a",ja:"#facc15",or:"#f97316",ro:"#dc2626",vi:"#7c3aed",gr:"#9ca3af"},col,fr=0,ac=T.acquis;
+ if(!ok)col=SIX.gr;else if(ac<0)col=SIX.vi;else if(ac===0)col=SIX.ro;else col=ac>10?SIX.vt:ac>5?SIX.ja:SIX.or;
  if(ok&&T.droits>0)fr=Math.max(0,Math.min(1,ac/T.droits));
- c.appendChild(jauge(fr,col,ok?fmt(ac):"À vérifier",ok?"jours acquis restants":"solde non vérifié"));
+ c.appendChild(jauge(fr,col,ok?(ac===0?"0 jour":fmt(ac)):"À vérifier",ok?(ac===0?"CONGÉS ÉPUISÉS":ac<0?"dépassement à vérifier":"jours acquis restants"):"solde non vérifié"));
  c.appendChild(el("div","gc",ok?"sur "+fmt(T.droits)+" jours de droits (3 périodes)":"Fiche de paie non saisie ou à jour : voir les périodes ci-dessous"));
  var CC={reliquat:"#b8902a",legaux:"#1d3c6e",encours:"#4a8fb5"};cats.forEach(function(p){c.appendChild(carteCat(p,CC[p.cle]||"#1d3c6e",p.cle==="encours"?(s.droit||30):0))});
  var t=el("div","tot"),L=[["Droits acquis à ce jour",ok?fmt(ac)+" j":"À vérifier","reliquat + légaux + en cours d’acquisition"],["Restant à acquérir (théorique)",fmt(T.aAcquerir)+" j","jusqu’au 31 mai, sur 30 jours par an : ce n’est pas un solde disponible"],["Utilisable immédiatement","À vérifier","selon les règles de prise de congés applicables dans l’entreprise"]];
