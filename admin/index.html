@@ -333,7 +333,7 @@
     [["Agent", "user"], ["Congés acquis", "cal"], ["Congés pris", "ok"], ["Disponible", "gift"], ["Reliquat N-1", "sync"], ["Jauge", "bar"], ["Actions", "gear"]].forEach(function (t) { var d = h("div", { c: "thi" }); d.innerHTML = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\">" + ICN[t[1]] + "</svg>"; d.appendChild(h("span", { t: t[0] })); trh.appendChild(h("th", {}, [d])); });
     th.appendChild(trh); tb.appendChild(th); tb.appendChild(tbd);
     function catsAdmin(s) {
-      var niv = function (x) { return x === null || x === undefined || !isFinite(x) ? "#9ca3af" : x < 0 ? "#7c3aed" : x === 0 ? "#dc2626" : x > 10 ? "#16a34a" : x > 5 ? "#facc15" : "#f97316"; };
+      var niv = function (x, f) { return x === null || x === undefined || !isFinite(x) ? "#9ca3af" : x < 0 ? "#7c3aed" : f >= .75 ? "#16a34a" : f >= .5 ? "#facc15" : f >= .25 ? "#f97316" : "#dc2626"; };
       var anneau = function (frac, col, t1, t2) {
         var C = 2 * Math.PI * 52, f = Math.max(0, Math.min(1, frac)), d = h("div", { c: "anr" });
         d.innerHTML = '<svg viewBox="0 0 130 130"><circle cx="65" cy="65" r="52" fill="none" stroke="#e6e0cf" stroke-width="11"/><circle class="pg" cx="65" cy="65" r="52" fill="none" stroke="' + col + '" stroke-width="11" stroke-linecap="round" transform="rotate(-90 65 65)" stroke-dasharray="0 ' + C.toFixed(1) + '" style="transition:stroke-dasharray 1s cubic-bezier(.2,.7,.2,1)"/></svg>';
@@ -349,7 +349,7 @@
         if (p.solde === null || p.solde === undefined) { body.appendChild(anneau(0, "#9ca3af", "À vérifier", "non renseigné")); body.appendChild(h("div", { c: "acd", t: "Droits de cette période non renseignés : saisissez la fiche de paie." })); }
         else {
           var base = p.cle === "encours" ? (s.droit || 30) : (p.droit || 0), fr = base > 0 ? Math.max(0, Math.min(1, p.solde / base)) : 0;
-          body.appendChild(anneau(fr, niv(p.solde), fmt(p.solde), p.cle === "encours" ? "jours acquis" : "jours restants"));
+          body.appendChild(anneau(fr, niv(p.solde, fr), fmt(p.solde), p.cle === "encours" ? "jours acquis" : "jours restants"));
           body.appendChild(h("div", { c: "acd", t: (p.cle === "encours" ? "Droits acquis " : "Droits ") + fmt(p.droit) + " · Pris " + fmt(p.pris) + " · Solde " + fmt(p.solde) + (p.cle === "encours" ? " · Base annuelle " + fmt(base) : "") }));
           if (p.cle === "encours" && p.droit + 2.5 <= base) body.appendChild(h("div", { c: "acd", t: "Fin " + new Date().toLocaleDateString("fr-FR", { month: "long", year: "numeric" }) + " : " + fmt(p.droit + 2.5) + " jours (+2,5 acquis ce mois-ci)" }));
         }
