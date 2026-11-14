@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://script.google.com https://script.googleusercontent.com https://api.open-meteo.com; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width, initial-scale=1"><title>IRIS — Tableau de bord</title><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#0b1a2b"><link rel="icon" href="../icon-192.png"><link rel="apple-touch-icon" href="../icon-192.png"><link rel="manifest" href="manifest.webmanifest"><script>(function shim(){
+<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://script.google.com https://script.googleusercontent.com https://api.open-meteo.com https://api-bdc.io; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width, initial-scale=1"><title>IRIS — Tableau de bord</title><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#0b1a2b"><link rel="icon" href="../icon-192.png"><link rel="apple-touch-icon" href="../icon-192.png"><link rel="manifest" href="manifest.webmanifest"><script>(function shim(){
   var URL_APP = "https://script.google.com/macros/s/AKfycbzAc5Ge9XGmOE5bBbOxkN528oSBNvgw3MZEGRZVH15HxMZnVB_MwputipQMebgHXAxO/exec";
   window.URL_APP = URL_APP;
   window.URL_SCAN = "https://hebara06-ai.github.io/iris-pointage/p/";
@@ -130,10 +130,22 @@
     x.onload = function () { try { var d = JSON.parse(x.responseText); rend(d); garde(d); } catch (e) {} };
     x.send();
   }
-  function go() {
+  function goSite() {
     try {
       google.script.run.withSuccessHandler(function (d) { if (d && d.current) { rend(d); garde(d); } else direct(); }).withFailureHandler(direct).meteoDonnees();
     } catch (e) { direct(); }
+  }
+  /* Météo localisée automatiquement selon la position de l'appareil (précision arrondie à ~1 km) ; repli sur la météo du site si la position est refusée ou indisponible. */
+  function jg(u, cb) { var x = new XMLHttpRequest(); x.open("GET", u); x.onload = function () { try { cb(JSON.parse(x.responseText)); } catch (e) {} }; x.send(); }
+  function go() {
+    if (!navigator.geolocation) { goSite(); return; }
+    try { var m = JSON.parse(localStorage.getItem("iris_meteo_geo") || "null"); if (m && m.d && m.d.current) { m.d.site = m.l || "Votre position"; rend(m.d); } } catch (e) {}
+    navigator.geolocation.getCurrentPosition(function (p) {
+      var la = Math.round(p.coords.latitude * 100) / 100, lo = Math.round(p.coords.longitude * 100) / 100, dat = null, nom = null;
+      function aff() { if (!dat) return; dat.site = nom || "Votre position"; rend(dat); try { localStorage.setItem("iris_meteo_geo", JSON.stringify({ d: dat, l: nom })); } catch (e) {} }
+      jg("https://api.open-meteo.com/v1/forecast?latitude=" + la + "&longitude=" + lo + "&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1", function (d) { if (d && d.current && d.daily) { dat = d; aff(); } });
+      jg("https://api-bdc.io/data/reverse-geocode-client?latitude=" + la + "&longitude=" + lo + "&localityLanguage=fr", function (g) { var n = g && (g.city || g.locality || g.principalSubdivision); if (n) { nom = String(n); aff(); } });
+    }, function () { goSite(); }, { maximumAge: 600000, timeout: 10000 });
   }
   try { var memo = localStorage.getItem("iris_meteo_ivry"); if (memo) rend(JSON.parse(memo)); } catch (e) {}
   setTimeout(function () { if (!el.innerHTML) el.innerHTML = '<div class="tx2"><b>Météo</b><span>Ivry-sur-Seine</span><span>en attente de connexion</span></div>'; }, 15000);
