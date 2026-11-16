@@ -654,6 +654,18 @@
     });
     return z;
   }
+  function paneParam(c) {
+    var an = h("input", { type: "password", autocomplete: "current-password", placeholder: "Ancien mot de passe" }), nv = h("input", { type: "password", autocomplete: "new-password", placeholder: "Nouveau mot de passe (8 caractères minimum)" }), cf = h("input", { type: "password", autocomplete: "new-password", placeholder: "Confirmer le nouveau mot de passe" });
+    var ok = h("button", { c: "ed-b ed-p", t: "Modifier mon mot de passe", type: "button" });
+    ok.onclick = function () {
+      if (!an.value || !nv.value) { msg("Remplissez les champs.", true); return; }
+      if (nv.value.length < 8) { msg("Le nouveau mot de passe doit faire 8 caractères minimum.", true); return; }
+      if (nv.value !== cf.value) { msg("La confirmation est différente du nouveau mot de passe.", true); return; }
+      ok.disabled = true;
+      appel("adminChangerMotDePasse", { ancien: an.value, nouveau: nv.value }, function (r) { ok.disabled = false; if (r && r.ok) { an.value = nv.value = cf.value = ""; msg(r.msg); } else msg((r && r.msg) || "Échec.", true); });
+    };
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Modifier mon mot de passe" }), h("p", { c: "ed-vide", t: "Vous pouvez le changer à tout moment. Il faut saisir l’ancien mot de passe." }), lab("Ancien mot de passe", an), lab("Nouveau mot de passe", nv), lab("Confirmer", cf), h("div", { c: "ed-row", style: "margin-top:14px" }, [ok])]));
+  }
   function paneAg(c) {
     c.appendChild(carteAg({ nom: "", prenom: "", tel: "", jours: "" }, true));
     DATA.agents.forEach(function (a) { c.appendChild(carteAg(a, false)); });
@@ -727,11 +739,11 @@
   function dessiner() {
     var y = ov.scrollTop; ov.textContent = "";
     var np = ((DATA && DATA.conges) || []).filter(function (x) { return x.statut === "En attente"; }).length;
-    var seg = h("div", { c: "ed-seg" }, [["pt", "Pointages"], ["ab", "Absences et retards"], ["cg", "Congés" + (np ? " (" + np + ")" : "")], ["sg", "Signalements" + (SG ? (function () { var n = SG.signalements.filter(function (x) { return ["Correction acceptée", "Correction refusée", "Clôturée"].indexOf(x.statut) < 0; }).length; return n ? " (" + n + ")" : ""; })() : "")], ["ag", "Agents"]].map(function (o) { var b = h("button", { t: o[1], type: "button" }); if (o[0] === onglet) b.className = "on"; b.onclick = function () { onglet = o[0]; dessiner(); }; return b; }));
+    var seg = h("div", { c: "ed-seg" }, [["pt", "Pointages"], ["ab", "Absences et retards"], ["cg", "Congés" + (np ? " (" + np + ")" : "")], ["sg", "Signalements" + (SG ? (function () { var n = SG.signalements.filter(function (x) { return ["Correction acceptée", "Correction refusée", "Clôturée"].indexOf(x.statut) < 0; }).length; return n ? " (" + n + ")" : ""; })() : "")], ["ag", "Agents"], ["pa", "Paramètres"]].map(function (o) { var b = h("button", { t: o[1], type: "button" }); if (o[0] === onglet) b.className = "on"; b.onclick = function () { onglet = o[0]; dessiner(); }; return b; }));
     var x = h("button", { c: "ed-x", t: "Fermer", type: "button" }); x.onclick = fermer;
     ov.appendChild(h("div", { c: "ed-top" }, [h("h2", { t: "Corrections" }), seg, x]));
     var corps = h("div", { c: "ed-body" }); ov.appendChild(corps);
-    if (!DATA) corps.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); else (onglet === "pt" ? panePt : onglet === "ab" ? paneAb : onglet === "cg" ? paneCg : onglet === "sg" ? paneSg : paneAg)(corps);
+    if (!DATA) corps.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); else (onglet === "pt" ? panePt : onglet === "ab" ? paneAb : onglet === "cg" ? paneCg : onglet === "sg" ? paneSg : onglet === "pa" ? paneParam : paneAg)(corps);
     ov.scrollTop = y;
   }
   function fermer() { ov.className = ""; document.body.style.overflow = ""; }
