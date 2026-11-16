@@ -105,3 +105,18 @@ img,svg,canvas{max-width:100%}
   table.rc td[data-l=""]::before{display:none}
   table.rc td:empty{display:none!important}
 }
+
+/* Correctif en-tete telephone : colonnes bornees (minmax 0), meteo sur deux lignes sous l'icone, plus aucun chevauchement avec le logo */
+@media(max-width:899px){
+  .e,.top{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}
+  .e .mt,.top .mt{min-width:0;max-width:100%;display:grid;grid-template-columns:auto auto;justify-content:start;align-items:center;column-gap:clamp(4px,1.2vw,10px);row-gap:2px}
+  .e .mt>*+*,.top .mt>*+*{margin-left:0}
+  .e .mt .tx2,.top .mt .tx2{grid-column:1/-1;min-width:0;display:block;line-height:1.2}
+  .e .mt .tx2 b,.e .mt .tx2 span,.top .mt .tx2 b,.top .mt .tx2 span{display:block;white-space:normal;overflow:hidden;text-overflow:ellipsis;overflow-wrap:anywhere}
+  .e .mt .tx2 b,.top .mt .tx2 b{font-size:clamp(9px,2.6vw,14px)}
+  .e .mt .tx2 span,.top .mt .tx2 span{font-size:clamp(8px,2.3vw,12px)}
+}
+@media(max-width:359px){
+  .e .mt .tx2 b,.top .mt .tx2 b{display:none}
+  .e .mt .tx2 span,.top .mt .tx2 span{font-size:8px}
+}
