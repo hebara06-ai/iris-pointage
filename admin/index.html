@@ -197,11 +197,28 @@
     return b;
   }
   function agentSelect() { var s = h("select"); DATA.agents.forEach(function (a) { s.appendChild(h("option", { t: a.nom + " " + a.prenom })); }); return s; }
+  function carteTest() {
+    var ci = h("input", { type: "password", autocomplete: "off", placeholder: "Clé de test (réservée au propriétaire)" }), sortie = h("div", { c: "ed-det" }), ban = h("div", { c: "ed-tag", t: "MODE TEST ADMINISTRATEUR" });
+    ban.style.cssText = "background:#7a1f1f;color:#fff;font-weight:700;letter-spacing:.08em;margin-bottom:10px;display:inline-block";
+    sortie.style.display = "none";
+    function lance(act, label) {
+      var b = h("button", { c: "ed-b", t: label, type: "button" });
+      b.onclick = function () {
+        b.disabled = true; appel("adminSimulation", { action: act, cleTest: ci.value }, function (r) {
+          b.disabled = false; sortie.style.display = "";
+          var l = h("div", {}, [h("b", { t: "[TEST] " + label + " : " }), h("span", { t: r && r.ok ? r.etapes.join(" · ") : ((r && r.msg) || "Refusé.") })]); sortie.insertBefore(l, sortie.firstChild);
+        });
+      };
+      return b;
+    }
+    return h("div", { c: "ed-card" }, [ban, h("h3", { t: "Simulation de pointage" }), h("p", { c: "ed-vide", t: "Simulations illimitées, isolées des données réelles : aucun pointage, retard, absence, congé ni rapport n’est modifié. Réservé au titulaire de la clé de test ; chaque simulation est journalisée." }),
+      lab("Clé de test", ci), h("div", { c: "ed-row", style: "margin-top:10px" }, [lance("arrivee", "Simuler une arrivée"), lance("depart", "Simuler un départ"), lance("expire", "Expiration à 60 s"), lance("double", "Double validation"), lance("qrInvalide", "QR invalide"), lance("fraude", "Fraude (QR ou autorisation transmis)")]), sortie]);
+  }
   function panePt(c) {
     var di = h("input", { type: "date" }); di.value = jourSel; di.onchange = function () { jourSel = di.value; charger(); };
     var tous = h("button", { c: "ed-b", t: "150 derniers pointages", type: "button" }); tous.onclick = function () { jourSel = ""; charger(); };
     var auj = h("button", { c: "ed-b", t: "Aujourd’hui", type: "button" }); auj.onclick = function () { jourSel = iso(); charger(); };
-    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Pointages" }), h("div", { c: "ed-row" }, [lab("Jour", di), auj, tous])]));
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Pointages" }), h("div", { c: "ed-row" }, [lab("Jour", di), auj, tous])])); c.appendChild(carteTest());
     var sel = agentSelect(), da = h("input", { type: "date" }), ia = h("input", { type: "time", step: "1" }), ip = h("input", { type: "time", step: "1" });
     da.value = jourSel || iso();
     var ad = h("button", { c: "ed-b ed-p", t: "Ajouter", type: "button" });
