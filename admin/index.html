@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://script.google.com https://script.googleusercontent.com https://api.open-meteo.com https://api-bdc.io; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width, initial-scale=1"><title>IRIS — Tableau de bord</title><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#0b1a2b"><link rel="icon" href="../icon-192.png"><link rel="apple-touch-icon" href="../icon-192.png"><link rel="manifest" href="manifest.webmanifest"><script>(function shim(){
+<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; frame-src blob:; connect-src https://script.google.com https://script.googleusercontent.com https://api.open-meteo.com https://api-bdc.io; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width, initial-scale=1"><title>IRIS — Tableau de bord</title><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#0b1a2b"><link rel="icon" href="../icon-192.png"><link rel="apple-touch-icon" href="../icon-192.png"><link rel="manifest" href="manifest.webmanifest"><script>(function shim(){
   var URL_APP = "https://script.google.com/macros/s/AKfycbzAc5Ge9XGmOE5bBbOxkN528oSBNvgw3MZEGRZVH15HxMZnVB_MwputipQMebgHXAxO/exec";
   window.URL_APP = URL_APP;
   window.URL_SCAN = "https://hebara06-ai.github.io/iris-pointage/p/";
@@ -159,6 +159,29 @@
   var onglet = "pt", DATA = null, jourSel = "", tt = null, NJ = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
   function h(t, a, k) { var e = document.createElement(t); if (a) for (var x in a) { if (x === "c") e.className = a[x]; else if (x === "t") e.textContent = a[x]; else e.setAttribute(x, a[x]); } (k || []).forEach(function (c) { if (c) e.appendChild(c); }); return e; }
   function tl(t) { var l = String(t || "").toLowerCase(), n = l.indexOf("non") >= 0; return l.indexOf("retard") === 0 ? (n ? "Retard non excusé" : "Retard excusé") : (n ? "Absence non justifiée" : "Absence justifiée"); }
+
+  (function () { var st = document.createElement("style"); st.textContent = ".ed-nm{border:0;background:none;padding:0;font:inherit;font-weight:700;color:#0e1b2a;text-align:left;cursor:pointer;text-decoration:underline dotted #c9a24d;text-underline-offset:4px}.ed-nm:hover{color:#8a6a1f}.ed-pjb{border:1px solid #e6dfcf;background:#f6f0dd;color:#7a5d00;border-radius:999px;padding:4px 12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}.ed-det{grid-column:1/-1;background:#faf9f5;border:1px solid #e6dfcf;border-radius:14px;padding:14px 16px;font-size:14px;line-height:1.6}.ed-det dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px;margin:0 0 10px}.ed-det dt{color:#7a6c4c;font-weight:600}.ed-det dd{margin:0;white-space:pre-wrap}.ovp{position:fixed;inset:0;background:rgba(7,18,31,.93);z-index:100000;display:flex;flex-direction:column}.ovp .bar{display:flex;gap:8px;justify-content:center;align-items:center;padding:12px;flex-wrap:wrap;color:#fff;font-size:14px}.ovp .bar button{border:0;background:#fff;color:#0b1a2b;border-radius:999px;padding:8px 16px;font:inherit;font-weight:600;cursor:pointer}.ovp .vue{flex:1;overflow:auto;text-align:center}.ovp img{display:block;margin:0 auto;width:100%;max-width:none}.ovp iframe{width:100%;height:100%;border:0;background:#fff}.ovp .nf{color:#fff;padding:40px 20px}.ed-code{font-family:ui-monospace,Consolas,monospace;font-weight:700;letter-spacing:.08em}"; document.head.appendChild(st); })();
+  function visionneuse(p) {
+    var o = h("div", { c: "ovp" }), bar = h("div", { c: "bar" }), vue = h("div", { c: "vue" }), url = "", z = 100;
+    function ferme() { if (url) URL.revokeObjectURL(url); document.removeEventListener("keydown", esc); if (o.parentNode) o.parentNode.removeChild(o); }
+    function esc(e) { if (e.key === "Escape") ferme(); }
+    try { var bin = atob(p.b64), a = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); url = URL.createObjectURL(new Blob([a], { type: p.mime || "application/octet-stream" })); } catch (e) { }
+    bar.appendChild(h("span", { t: p.nom || "Justificatif" }));
+    if (/^image\/(jpeg|png|gif|webp)/.test(p.mime || "") && url) {
+      var im = h("img", { alt: p.nom || "Justificatif", src: url }); vue.appendChild(im);
+      var pl = h("button", { t: "Zoom +", type: "button" }), mo = h("button", { t: "Zoom −", type: "button" });
+      pl.onclick = function () { z = Math.min(500, z + 50); im.style.width = z + "%"; }; mo.onclick = function () { z = Math.max(50, z - 50); im.style.width = z + "%"; };
+      bar.appendChild(pl); bar.appendChild(mo);
+    } else if (p.mime === "application/pdf" && url) { vue.appendChild(h("iframe", { src: url, title: p.nom || "PDF" })); var ou = h("button", { t: "Ouvrir dans un onglet", type: "button" }); ou.onclick = function () { window.open(url, "_blank"); }; bar.appendChild(ou); }
+    else vue.appendChild(h("div", { c: "nf", t: "Aperçu indisponible pour ce format (" + (p.mime || "inconnu") + ")." }));
+    var fe = h("button", { t: "Fermer", type: "button" }); fe.onclick = ferme; bar.appendChild(fe);
+    o.appendChild(bar); o.appendChild(vue); document.body.appendChild(o); document.addEventListener("keydown", esc);
+  }
+  function btnPiece(type, ref, label) {
+    var b = h("button", { c: "ed-pjb", t: label || "📎 Justificatif disponible", type: "button" });
+    b.onclick = function () { b.disabled = true; var t0 = b.textContent; b.textContent = "Ouverture…"; appel("adminPiece", { type: type, ref: ref }, function (r) { b.disabled = false; b.textContent = t0; if (r && r.ok) visionneuse(r); else msg((r && r.msg) || "Document indisponible.", true); }); };
+    return b;
+  }
   function lab(t, i) { return h("label", { c: "ed-lab" }, [h("span", { t: t }), i]); }
   function iso() { return new Date().toLocaleDateString("fr-CA", { timeZone: "Europe/Paris" }); }
   function fr(i) { return i ? i.slice(8, 10) + "/" + i.slice(5, 7) + "/" + i.slice(0, 4) : ""; }
@@ -196,6 +219,38 @@
         h("div", { c: "ed-row" }, [sv, sure("Supprimer", true, function () { action("adminPointage", { action: "sup", l: p.l, av: av }); })])]));
     });
     c.appendChild(liste);
+  }
+  function ligneDemAbs(x) {
+    var ag = null; DATA.agents.forEach(function (a) { if (a.nom === x.nom && a.prenom === x.prenom) ag = a; });
+    var det = h("div", { c: "ed-det", style: "display:none" }), ouvert = false, st = x.statut;
+    function dl(k, v) { return [h("dt", { t: k }), h("dd", { t: v || "—" })]; }
+    function remplir() {
+      det.textContent = "";
+      var l = h("dl"); [].concat(
+        dl("Agent", x.nom + " " + x.prenom), dl("Date de l’absence", x.debut + (x.fin !== x.debut ? " → " + x.fin : "") + " (" + x.jours + " j)"),
+        dl("Horaires concernés", ag && ag.debut ? ag.debut + " – " + ag.fin + (ag.jours ? " · " + ag.jours : "") : "Horaire non renseigné"), dl("Motif", x.motif),
+        dl("Demande reçue le", x.depot), dl("Statut", x.etat || st),
+        dl("Justificatif transmis", x.pjNom ? x.pjNom + (x.pjRecu ? " · reçu le " + x.pjRecu : "") : (x.pj ? "Pièce jointe" : "Aucun")),
+        dl("Décision", st === "En attente" ? "En attente de décision" : (st + (x.reponse ? " le " + x.reponse : ""))), dl("Motif de la décision", x.commentaire)
+      ).forEach(function (e) { l.appendChild(e); });
+      det.appendChild(l);
+      if (x.cpl) det.appendChild(h("div", { c: "ed-rc", t: "Demande envoyée à l’agent : " + x.cpl.msg }));
+      var bar = h("div", { c: "ed-row" });
+      if (x.pj) bar.appendChild(btnPiece("conge", x.id, "📎 Ouvrir le justificatif"));
+      if (st === "En attente") {
+        var ok = h("button", { c: "ed-b ed-p", t: "Valider l’absence", type: "button" }); ok.onclick = function () { action("adminConges", { action: "statut", l: x.l, id: x.id, statut: "Autorisé", commentaire: ta.value }); };
+        var ko = h("button", { c: "ed-b ed-d", t: "Refuser", type: "button" }); ko.onclick = function () { if (!ta.value.trim() && !confirm("Refuser sans motif ?")) return; action("adminConges", { action: "statut", l: x.l, id: x.id, statut: "Refusé", commentaire: ta.value }); };
+        var dp = h("button", { c: "ed-b", t: "Demander un justificatif", type: "button" }); dp.onclick = function () { action("adminConges", { action: "complement", l: x.l, id: x.id, kind: "piece", message: ta.value }); };
+        var di = h("button", { c: "ed-b", t: "Demander une information", type: "button" }); di.onclick = function () { action("adminConges", { action: "complement", l: x.l, id: x.id, kind: "info", message: ta.value }); };
+        det.appendChild(h("label", { c: "ed-lab" }, [h("span", { t: "Motif de la décision / message à l’agent" }), ta]));
+        [ok, ko, dp, di].forEach(function (b) { bar.appendChild(b); });
+      }
+      det.appendChild(bar);
+    }
+    var ta = h("textarea", { rows: "3", maxlength: "300", placeholder: "Facultatif pour une validation. Visible par l’agent." });
+    var nm = h("button", { c: "ed-nm", t: x.nom + " " + x.prenom, type: "button", "aria-expanded": "false" });
+    nm.onclick = function () { ouvert = !ouvert; det.style.display = ouvert ? "" : "none"; nm.setAttribute("aria-expanded", ouvert ? "true" : "false"); if (ouvert) remplir(); };
+    return h("div", { c: "ed-la" }, [nm, h("span", { t: x.debut + (x.fin !== x.debut ? " → " + x.fin : "") + " · " + x.jours + " j" }), h("span", { t: x.motif || "", style: "white-space:pre-wrap" }), x.pj ? btnPiece("conge", x.id) : h("span", {}), h("span", { c: "ed-tag", t: x.etat || st }), det]);
   }
   function paneAb(c) {
     var sel = agentSelect(), da = h("input", { type: "date" }), ty = h("select"), mo = h("textarea", { placeholder: "Motif (obligatoire) : écrivez ici, le texte passe à la ligne et vous pouvez remonter pour relire", rows: "4", maxlength: "1000", spellcheck: "true", lang: "fr", autocapitalize: "sentences" });
@@ -249,10 +304,15 @@
       rd.readAsDataURL(f);
     };
     c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Justifier une absence ou excuser un retard" }), h("div", { c: "ed-row" }, [lab("Agent", sel), lab("Jour", da), lab("Type", ty), lab("Justificatif", h("div", {}, [pj, fi]))]), h("div", { style: "margin-top:16px" }, [lab("Motif", mo)]), h("div", { c: "ed-row", style: "margin-top:14px" }, [cor, ref, ann, mic, ad])]));
+    var dem = ((DATA && DATA.conges) || []).filter(function (x) { return x.type === "Absence exceptionnelle"; });
+    var cdm = h("div", { c: "ed-card" }, [h("h3", { t: "Demandes d’absence des agents" })]);
+    if (!dem.length) cdm.appendChild(h("p", { c: "ed-vide", t: "Aucune demande d’absence." }));
+    dem.slice(0, 60).forEach(function (x) { cdm.appendChild(ligneDemAbs(x)); });
+    c.appendChild(cdm);
     var liste = h("div", { c: "ed-card" }, [h("h3", { t: "Justificatifs enregistrés" })]);
     if (!DATA.absences.length) liste.appendChild(h("p", { c: "ed-vide", t: "Aucun justificatif." }));
     DATA.absences.forEach(function (x) {
-      liste.appendChild(h("div", { c: "ed-la" }, [h("b", { t: x.nom + " " + x.prenom }), h("span", { t: x.date }), h("span", { t: tl(x.type) }), h("span", { t: x.motif, style: "white-space:pre-wrap" }), (x.pj && x.pj.indexOf("https://drive.google.com/") === 0) ? h("a", { href: x.pj, target: "_blank", rel: "noopener", c: "ed-pj", t: "📎 Voir" }) : h("span", {}),
+      liste.appendChild(h("div", { c: "ed-la" }, [h("b", { t: x.nom + " " + x.prenom }), h("span", { t: x.date }), h("span", { t: tl(x.type) }), h("span", { t: x.motif, style: "white-space:pre-wrap" }), (x.pj && x.pj.indexOf("https://drive.google.com/") === 0) ? btnPiece("absence", x.l) : h("span", {}),
         sure("Supprimer", true, function () { action("adminAbsence", { action: "sup", l: x.l, av: [x.date, x.nom, x.prenom, x.type, x.motif] }); })]));
     });
     var ci = h("input", { type: "password", placeholder: "Clé Gemini (AIza… ou AQ.…)", autocomplete: "off" }), cb = h("button", { c: "ed-b ed-p", t: "Enregistrer la clé", type: "button" });
@@ -323,8 +383,8 @@
         bar.appendChild(b);
       });
       bar.appendChild(sure("Supprimer", true, function () { action("adminConges", { action: "supprimer", l: x.l, id: x.id }); }));
-      var kids = [h("b", { t: x.nom + " " + x.prenom }), h("span", { t: x.debut + (x.fin !== x.debut ? " → " + x.fin : "") + " · " + x.jours + " j" }), h("span", { t: (x.type === "Absence exceptionnelle" ? "Absence" : x.type) + (x.agence ? " · " + x.agence : "") }), h("span", { t: x.motif || "", style: "white-space:pre-wrap" }), (x.pj && x.pj.indexOf("https://drive.google.com/") === 0) ? h("a", { href: x.pj, target: "_blank", rel: "noopener", c: "ed-pj", t: "📎 Voir" }) : h("span", {}), h("span", { c: "ed-tag", t: st }), bar];
-      if (x.commentaire) kids.push(h("div", { c: "ed-rc", t: "Votre commentaire : " + x.commentaire }));
+      var kids = [h("b", { t: x.nom + " " + x.prenom }), h("span", { t: x.debut + (x.fin !== x.debut ? " → " + x.fin : "") + " · " + x.jours + " j" }), h("span", { t: (x.type === "Absence exceptionnelle" ? "Absence" : x.type) + (x.agence ? " · " + x.agence : "") }), h("span", { t: x.motif || "", style: "white-space:pre-wrap" }), (x.pj && x.pj.indexOf("https://drive.google.com/") === 0) ? btnPiece("conge", x.id) : h("span", {}), h("span", { c: "ed-tag", t: x.etat || st }), bar];
+      if (x.pjRecu) kids.push(h("div", { c: "ed-rc", t: "Justificatif transmis : " + (x.pjNom || "pièce jointe") + " · reçu le " + x.pjRecu }));if (x.cpl) kids.push(h("div", { c: "ed-rc", t: "Demande envoyée à l’agent : " + x.cpl.msg }));if (x.commentaire) kids.push(h("div", { c: "ed-rc", t: "Votre commentaire : " + x.commentaire }));
       kids.push(pan);
       return h("div", { c: "ed-la" }, kids);
     }
@@ -504,11 +564,12 @@
   function carteAg(a, neuf) {
     var f = {}, g = h("div", { c: "ed-g" }), cb = [], low = String(a.jours || "").toLowerCase(), ch = h("div", { c: "ed-ch" });
     function champ(k, l, typ, v) { var i = h("input", { type: typ || "text" }); i.value = v || ""; f[k] = i; g.appendChild(lab(l, i)); }
-    champ("nom", "Nom", "text", a.nom); champ("prenom", "Prénom", "text", a.prenom); champ("tel", "Téléphone", "tel", a.tel);
+    champ("nom", "Nom", "text", a.nom); champ("prenom", "Prénom", "text", a.prenom); champ("tel", "Téléphone", "tel", a.tel); champ("email", "Adresse e-mail (facultatif)", "email", a.email);
     champ("service", "Service dédié", "text", a.service || "Samsic Propreté"); champ("badge", "N° de badge", "text", a.badge); champ("carte", "N° d’accès", "text", a.carte);
+    champ("codeServeur", "Code serveur (confidentiel)", "password", ""); f.codeServeur.autocomplete = "off"; f.codeServeur.placeholder = a.codeSet ? "Masqué — laisser vide pour conserver" : "Non renseigné"; f.codeServeur.setAttribute("aria-label", "Code serveur, masqué");
     champ("debut", "Début", "time", hm(a.debut)); champ("fin", "Fin", "time", hm(a.fin));
     NJ.forEach(function (n, i) { var x = h("input", { type: "checkbox" }); x.checked = a.jours ? low.indexOf(n.toLowerCase()) >= 0 : i < 5; cb.push(x); ch.appendChild(h("label", { c: "ed-cj" }, [x, h("span", { t: n })])); });
-    function vals() { return { nom: f.nom.value, prenom: f.prenom.value, tel: f.tel.value, service: f.service.value, badge: f.badge.value, carte: f.carte.value, debut: f.debut.value, fin: f.fin.value, jours: NJ.filter(function (n, i) { return cb[i].checked; }).join(" ") }; }
+    function vals() { return { nom: f.nom.value, prenom: f.prenom.value, tel: f.tel.value, email: f.email.value, codeServeur: f.codeServeur.value, service: f.service.value, badge: f.badge.value, carte: f.carte.value, debut: f.debut.value, fin: f.fin.value, jours: NJ.filter(function (n, i) { return cb[i].checked; }).join(" ") }; }
     function avec(o) { var v = vals(); for (var k in o) v[k] = o[k]; return v; }
     var bar = h("div", { c: "ed-row" }), av = [a.nom, a.prenom];
     if (neuf) { var ad = h("button", { c: "ed-b ed-p", t: "Ajouter l’agent", type: "button" }); ad.onclick = function () { action("adminAgent", avec({ action: "ajout" })); }; bar.appendChild(ad); }
@@ -516,13 +577,57 @@
       var sv = h("button", { c: "ed-b ed-p", t: "Enregistrer", type: "button" }); sv.onclick = function () { action("adminAgent", avec({ action: "maj", l: a.l, av: av })); }; bar.appendChild(sv);
       if (a.appareil) bar.appendChild(sure("Libérer le téléphone", false, function () { action("adminAgent", { action: "liberer", l: a.l, av: av }); }));
       bar.appendChild(sure("Supprimer l’agent", true, function () { action("adminAgent", { action: "sup", l: a.l, av: av }); }));
+      if (a.codeSet) { var vc = h("button", { c: "ed-b", t: "Afficher le code serveur", type: "button" }), sp = h("span", { c: "ed-code" }); vc.onclick = function () { vc.disabled = true; appel("adminCodeServeur", { l: a.l, av: av }, function (r) { vc.disabled = false; if (r && r.ok) { sp.textContent = r.code || "(vide)"; setTimeout(function () { sp.textContent = ""; }, 15000); } else msg((r && r.msg) || "Refusé.", true); }); }; bar.appendChild(vc); bar.appendChild(sp); }
+      if (a.email) { var ev = h("button", { c: "ed-b", t: a.emailOk ? "Retirer la vérification de l’e-mail" : "Marquer l’e-mail comme vérifié", type: "button" }); ev.onclick = function () { action("adminEmailVerifie", { l: a.l, av: av, oui: !a.emailOk }); }; bar.appendChild(ev); }
     }
-    return h("div", { c: "ed-card" }, [h("div", { c: "ed-ah" }, [h("b", { t: neuf ? "Nouvel agent" : a.nom + " " + a.prenom }), neuf ? null : h("span", { c: "ed-tag", t: a.appareil ? "Téléphone associé" : "Aucun téléphone associé" })]), g, h("div", { c: "ed-lab" }, [h("span", { t: "Jours travaillés" }), ch]), h("div", { style: "height:16px" }), bar]);
+    return h("div", { c: "ed-card" }, [h("div", { c: "ed-ah" }, [h("b", { t: neuf ? "Nouvel agent" : a.nom + " " + a.prenom }), neuf ? null : h("span", { c: "ed-tag", t: a.appareil ? "Téléphone associé" : "Aucun téléphone associé" }), (!neuf && a.email) ? h("span", { c: "ed-tag", t: a.emailOk ? "E-mail vérifié" : "E-mail non vérifié" }) : null]), g, h("div", { c: "ed-lab" }, [h("span", { t: "Jours travaillés" }), ch]), h("div", { style: "height:16px" }), bar]);
+  }
+  function carteImport() {
+    var ta = h("textarea", { rows: "5", placeholder: "Une ligne par agent : NOM;Prénom;Code serveur\nExemple : DUPONT;Marie;0123456", autocomplete: "off", spellcheck: "false" });
+    var res = h("div", {}), btn = h("button", { c: "ed-b", t: "Aperçu avant enregistrement", type: "button" }), lignes = [];
+    function parse() { return ta.value.split(/\r?\n/).map(function (l) { var p = l.split(/[;\t]/); return { nom: (p[0] || "").trim(), prenom: (p[1] || "").trim(), code: (p[2] || "").trim() }; }).filter(function (x) { return x.nom || x.prenom || x.code; }); }
+    btn.onclick = function () {
+      lignes = parse(); if (!lignes.length) { msg("Aucune ligne à traiter.", true); return; }
+      btn.disabled = true; appel("adminImportCodes", { action: "apercu", lignes: lignes }, function (r) {
+        btn.disabled = false; res.textContent = "";
+        if (!r || !r.ok) { msg((r && r.msg) || "Aperçu impossible.", true); return; }
+        var cases = [], t = h("table", { style: "width:100%;border-collapse:collapse;font-size:14px;margin-top:12px" });
+        r.resultats.forEach(function (x) {
+          var tr = h("tr"), cb = h("input", { type: "checkbox" });
+          if (x.statut === "À enregistrer") { cb.checked = true; cases.push([cb, x.l]); } else cb.disabled = true;
+          [h("td", {}, [cb]), h("td", { t: x.nom + " " + x.prenom }), h("td", { c: "ed-code", t: x.masque }), h("td", { t: x.statut })].forEach(function (td) { td.style.padding = "6px 8px"; td.style.borderTop = "1px solid #f1ebdb"; tr.appendChild(td); }); t.appendChild(tr);
+        });
+        res.appendChild(t);
+        res.appendChild(h("p", { c: "ed-vide", t: "Rien n’est enregistré tant que vous ne validez pas. Une valeur existante différente n’est jamais écrasée automatiquement ; les ambiguïtés et agents introuvables sont signalés." }));
+        var ok = h("button", { c: "ed-b ed-p", t: "Enregistrer les lignes cochées", type: "button" });
+        ok.onclick = function () { var ret = cases.filter(function (z) { return z[0].checked; }).map(function (z) { return z[1]; }); if (!ret.length) { msg("Aucune ligne cochée.", true); return; } ok.disabled = true; appel("adminImportCodes", { action: "valider", lignes: lignes, retenus: ret }, function (r2) { if (r2 && r2.ok) { ta.value = ""; res.textContent = ""; msg(r2.ecrits + " code(s) enregistré(s)."); charger(); } else { ok.disabled = false; msg((r2 && r2.msg) || "Échec.", true); } }); };
+        res.appendChild(ok);
+      });
+    };
+    ta.style.width = "100%";
+    return h("div", { c: "ed-card" }, [h("h3", { t: "Importer des codes serveur (fiches de paie)" }), h("p", { c: "ed-vide", t: "Collez uniquement nom, prénom et code serveur lus sur les fiches. Ne collez aucune donnée salariale ou bancaire. Les zéros initiaux sont conservés." }), ta, h("div", { c: "ed-row" }, [btn]), res]);
+  }
+  function carteRecup() {
+    var z = h("div", { c: "ed-card" }, [h("h3", { t: "Récupérations de compte" })]), box = h("div", {}, [h("p", { c: "ed-vide", t: "Chargement…" })]);
+    z.appendChild(box);
+    z.appendChild(h("p", { c: "ed-vide", t: "Avant d’approuver, vérifiez l’identité de la personne par un autre moyen (en personne ou appel à un numéro connu). L’approbation relie le nouvel appareil et déconnecte les anciens." }));
+    appel("adminRecuperations", { action: "liste" }, function (r) {
+      box.textContent = "";
+      if (!r || !r.ok) { box.appendChild(h("p", { c: "ed-vide", t: "Liste indisponible." })); return; }
+      var att = r.liste.filter(function (x) { return x.statut === "En attente"; });
+      if (!att.length) box.appendChild(h("p", { c: "ed-vide", t: "Aucune demande en attente." }));
+      att.forEach(function (x) {
+        var ok = sure("Approuver", false, function () { action("adminRecuperations", { action: "approuver", l: x.l, id: x.id }); }), no = sure("Refuser", true, function () { action("adminRecuperations", { action: "refuser", l: x.l, id: x.id }); });
+        box.appendChild(h("div", { c: "ed-la" }, [h("b", { t: x.nom + " " + x.prenom }), h("span", { t: x.date }), h("span", { c: "ed-tag", t: x.statut }), ok, no]));
+      });
+    });
+    return z;
   }
   function paneAg(c) {
     c.appendChild(carteAg({ nom: "", prenom: "", tel: "", jours: "" }, true));
     DATA.agents.forEach(function (a) { c.appendChild(carteAg(a, false)); });
     c.appendChild(h("p", { c: "ed-vide", t: "Modifier un nom met aussi à jour son historique de pointages et de justificatifs." }));
+    c.appendChild(carteRecup()); c.appendChild(carteImport());
   }
   var SG = null;
   function chargerSg(cb) { appel("adminSignalements", "", function (r) { if (!r) { msg("Accès refusé.", true); return; } SG = r; if (cb) cb(); }); }
