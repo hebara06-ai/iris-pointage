@@ -190,6 +190,22 @@
   function msg(t, ko) { toast.textContent = t; toast.className = ko ? "ko" : ""; toast.style.display = "block"; clearTimeout(tt); tt = setTimeout(function () { toast.style.display = "none"; }, ko ? 6500 : 2800); }
   function appel(nom, arg, ok) { google.script.run.withSuccessHandler(ok).withFailureHandler(function () { msg("Connexion impossible, réessayez.", true); })[nom](CLE, arg); }
   function charger() { appel("adminLire", jourSel ? fr(jourSel) : "", function (r) { if (!r) { msg("Accès refusé.", true); return; } DATA = r; dessiner(); }); }
+  // Synchronisation rapide : repère de changement interrogé toutes les ~1,5 s (onglet visible) ; données rechargées seulement si le repère change
+  var STAMPA = null, SYNCA = null;
+  window.__sync = { n: 0, dernier: 0 };
+  function syncA() {
+    clearTimeout(SYNCA);
+    if (window.DEMO || document.hidden) { SYNCA = setTimeout(syncA, document.hidden ? 5000 : 1500); return; }
+    var t0 = performance.now();
+    google.script.run.withSuccessHandler(function (r) {
+      var s = r && r.s;
+      if (STAMPA === null) STAMPA = s;
+      else if (s !== STAMPA) { STAMPA = s; window.__sync.n++; window.__sync.dernier = Math.round(performance.now() - t0); if (typeof maj === "function") maj(); if (DATA) charger(); }
+      SYNCA = setTimeout(syncA, 1500);
+    }).withFailureHandler(function () { SYNCA = setTimeout(syncA, 6000); }).stampDonnees("adm");
+  }
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) syncA(); });
+  syncA();
   function action(nom, o) { appel(nom, o, function (r) { if (r && r.ok) { msg(r.msg || "Enregistré"); charger(); if (typeof maj === "function") maj(); } else { msg((r && r.msg) || "Échec.", true); if (r && r.rafraichir) charger(); } }); }
   function sure(label, danger, fn) {
     var b = h("button", { c: "ed-b" + (danger ? " ed-d" : ""), t: label, type: "button" }), armed = false, tm;
