@@ -253,9 +253,56 @@
     });
     c.appendChild(liste);
   }
+  function blocAjoutDem() {
+    var zone = h("div", { c: "ed-det", style: "display:none" }), bt = h("button", { c: "ed-b ed-p", t: "＋ Ajouter une demande", type: "button" });
+    bt.onclick = function () { if (zone.style.display === "") { zone.style.display = "none"; return; } zone.style.display = ""; formAjout(); };
+    function formAjout() {
+      zone.textContent = "";
+      var sel = agentSelect(), ty = h("select"), d1 = h("input", { type: "date" }), d2 = h("input", { type: "date" }), mo = h("textarea", { rows: "3", maxlength: "1000", placeholder: "Motif (obligatoire pour une absence)" });
+      ["Absence exceptionnelle", "Congés payés", "Sans solde"].forEach(function (t) { ty.appendChild(h("option", { t: t })); });
+      d1.value = iso();
+      var ok = h("button", { c: "ed-b ed-p", t: "Enregistrer (autorisé)", type: "button" }), no = h("button", { c: "ed-b", t: "Annuler", type: "button" });
+      no.onclick = function () { zone.style.display = "none"; };
+      ok.onclick = function () {
+        var a = DATA.agents[sel.selectedIndex]; if (!a) return;
+        if (!d1.value) { msg("Choisissez le premier jour.", true); return; }
+        if (ty.value === "Absence exceptionnelle" && mo.value.trim().length < 3) { msg("Le motif est obligatoire pour une absence.", true); return; }
+        action("adminConges", { action: "ajout", nom: a.nom, prenom: a.prenom, debut: fr(d1.value), fin: fr(d2.value || d1.value), type: ty.value, motif: mo.value, agence: "Samsic, Champéret 3" });
+      };
+      zone.appendChild(h("div", { c: "ed-row" }, [lab("Agent", sel), lab("Type", ty), lab("Premier jour", d1), lab("Dernier jour (facultatif)", d2)]));
+      zone.appendChild(h("div", { style: "margin-top:10px" }, [lab("Motif", mo)]));
+      zone.appendChild(h("div", { c: "ed-row", style: "margin-top:12px" }, [ok, no]));
+    }
+    return h("div", {}, [h("div", { c: "ed-row", style: "margin:6px 0 10px" }, [bt]), zone]);
+  }
   function ligneDemAbs(x) {
     var ag = null; DATA.agents.forEach(function (a) { if (a.nom === x.nom && a.prenom === x.prenom) ag = a; });
     var det = h("div", { c: "ed-det", style: "display:none" }), ouvert = false, st = x.statut;
+    var fm = h("div", { c: "ed-det", style: "display:none" });
+    function formModif() {
+      fm.textContent = "";
+      var ty = h("select"), d1 = h("input", { type: "date" }), d2 = h("input", { type: "date" }), dr = h("input", { type: "date" }), hr = h("input", { type: "time" }),
+        mo = h("textarea", { rows: "3", maxlength: "1000" }), stt = h("select"), cm = h("textarea", { rows: "2", maxlength: "500", placeholder: "Facultatif. Visible par l’agent." });
+      ["Absence exceptionnelle", "Congés payés", "Sans solde"].forEach(function (t) { var o = h("option", { t: t }); if (t === x.type) o.selected = true; ty.appendChild(o); });
+      var sts = ["En attente", "Autorisé", "Refusé"]; if (sts.indexOf(x.statut) < 0) sts.unshift(x.statut);
+      sts.forEach(function (t) { var o = h("option", { t: t }); if (t === x.statut) o.selected = true; stt.appendChild(o); });
+      d1.value = en(x.debut); d2.value = en(x.fin);
+      var md = /^([0-9]{2}\/[0-9]{2}\/[0-9]{4})\s+([0-9]{1,2}:[0-9]{2})/.exec(x.depot || ""); dr.value = md ? en(md[1]) : ""; hr.value = md ? ("0" + md[2]).slice(-5) : "";
+      mo.value = x.motif || ""; cm.value = x.commentaire || "";
+      var ok = h("button", { c: "ed-b ed-p", t: "Enregistrer les modifications", type: "button" }), no = h("button", { c: "ed-b", t: "Annuler", type: "button" });
+      no.onclick = function () { fm.style.display = "none"; };
+      ok.onclick = function () {
+        if (!d1.value) { msg("Choisissez le premier jour.", true); return; }
+        if (ty.value === "Absence exceptionnelle" && mo.value.trim().length < 3) { msg("Le motif est obligatoire pour une absence.", true); return; }
+        if ((dr.value && !hr.value) || (!dr.value && hr.value)) { msg("Indiquez la date ET l’heure de la demande, ou aucune des deux.", true); return; }
+        action("adminConges", { action: "modifier", l: x.l, id: x.id, type: ty.value, debut: fr(d1.value), fin: fr(d2.value || d1.value), depot: dr.value ? fr(dr.value) + " " + hr.value : "", motif: mo.value, statut: stt.value, commentaire: cm.value });
+      };
+      fm.appendChild(h("div", { c: "ed-row" }, [lab("Type", ty), lab("Premier jour", d1), lab("Dernier jour", d2), lab("Demande reçue le", dr), lab("à (heure)", hr), lab("Statut", stt)]));
+      fm.appendChild(h("div", { style: "margin-top:10px" }, [lab("Motif", mo)]));
+      fm.appendChild(h("div", { style: "margin-top:10px" }, [lab("Commentaire pour l’agent", cm)]));
+      fm.appendChild(h("div", { c: "ed-row", style: "margin-top:12px" }, [ok, no]));
+    }
+
     function dl(k, v) { return [h("dt", { t: k }), h("dd", { t: v || "—" })]; }
     function remplir() {
       det.textContent = "";
@@ -278,7 +325,12 @@
         det.appendChild(h("label", { c: "ed-lab" }, [h("span", { t: "Motif de la décision / message à l’agent" }), ta]));
         [ok, ko, dp, di].forEach(function (b) { bar.appendChild(b); });
       }
+      var mod = h("button", { c: "ed-b", t: "Modifier", type: "button" });
+      mod.onclick = function () { if (fm.style.display === "") { fm.style.display = "none"; return; } fm.style.display = ""; formModif(); };
+      bar.appendChild(mod);
+      bar.appendChild(sure("Supprimer", true, function () { action("adminConges", { action: "supprimer", l: x.l, id: x.id }); }));
       det.appendChild(bar);
+      det.appendChild(fm);
     }
     var ta = h("textarea", { rows: "3", maxlength: "300", placeholder: "Facultatif pour une validation. Visible par l’agent." });
     var nm = h("button", { c: "ed-nm", t: x.nom + " " + x.prenom, type: "button", "aria-expanded": "false" });
@@ -339,7 +391,7 @@
     c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Justifier une absence ou excuser un retard" }), h("div", { c: "ed-row" }, [lab("Agent", sel), lab("Jour", da), lab("Type", ty), lab("Justificatif", h("div", {}, [pj, fi]))]), h("div", { style: "margin-top:16px" }, [lab("Motif", mo)]), h("div", { c: "ed-row", style: "margin-top:14px" }, [cor, ref, ann, mic, ad])]));
     var dem = ((DATA && DATA.conges) || []).filter(function (x) { return x.type === "Absence exceptionnelle"; });
     var cdm = h("div", { c: "ed-card" }, [h("h3", { t: "Demandes d’absence des agents" })]);
-    if (!dem.length) cdm.appendChild(h("p", { c: "ed-vide", t: "Aucune demande d’absence." }));
+    cdm.appendChild(blocAjoutDem()); if (!dem.length) cdm.appendChild(h("p", { c: "ed-vide", t: "Aucune demande d’absence." }));
     dem.slice(0, 60).forEach(function (x) { cdm.appendChild(ligneDemAbs(x)); });
     c.appendChild(cdm);
     var liste = h("div", { c: "ed-card" }, [h("h3", { t: "Justificatifs enregistrés" })]);
