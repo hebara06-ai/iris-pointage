@@ -787,6 +787,173 @@
     z.appendChild(h("p", { c: "ed-vide", t: "Une alerte e-mail est envoyée à chaque blocage. Le déblocage est réservé au propriétaire (clé propriétaire) ; l’agent peut ensuite réessayer immédiatement." }));
     z.appendChild(lab("Clé propriétaire (pour débloquer)", ci)); z.appendChild(box); charge(); return z;
   }
+  /* IRIS — onglet administrateur « Gestion administrative » (ajout isolé, inséré avant paneSg dans admin/index.html).
+     Réutilise : h, lab, appel, msg, visionneuse, dessiner, fr, iso. Aucun autre onglet n'est modifié. */
+  var GA = { err: null, fl: { periode: "", agent: "", categorie: "", statut: "", page: 0 }, st: null, ls: null, ds: null, cf: null, det: null, chargement: false };
+  var GA_COUL = { "Titres de transport": "#0b1a2b", "RIB": "#b8963e", "Documents et justificatifs": "#2f9e8f", "En attente de vérification": "#d4a017", "En vérification": "#3b6fd4", "Validé": "#16a34a", "Refusé": "#c9453b", "Complément demandé": "#e8872b" };
+  var GA_AG = ["#0b1a2b", "#b8963e", "#2f9e8f", "#3b6fd4", "#c9453b", "#8a7b57", "#7c3aed", "#16a34a"];
+  (function () { var s = document.createElement("style"); s.textContent = ".ga-k{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:6px}.ga-k button{border:1px solid #e7e2d6;background:#faf8f3;border-radius:16px;padding:12px 8px;cursor:pointer;text-align:center;font:inherit;color:#0b1a2b}.ga-k button b{display:block;font-size:26px;line-height:1.1}.ga-k button span{font-size:12px;color:#6e6a60}.ga-k button.on{border-color:#0b1a2b;box-shadow:0 0 0 1px #0b1a2b}.ga-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}.ga-g>div{text-align:center}.ga-g h4{margin:0 0 6px;font-size:14px}.ga-g svg{width:170px;height:170px;max-width:100%}.ga-g svg circle.sg{cursor:pointer;transition:stroke-width .15s}.ga-g svg circle.sg:hover{stroke-width:20}.ga-lg{list-style:none;margin:6px 0 0;padding:0;font-size:12px;text-align:left;display:inline-block}.ga-lg li{cursor:pointer;margin:2px 0}.ga-lg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}.ga-bd{display:inline-block;font-size:12px;font-weight:600;border-radius:999px;padding:3px 10px;color:#fff}.ga-l{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 0;border-top:1px solid #eee9dd}.ga-l:first-of-type{border-top:0}.ga-l>div{min-width:0}.ga-l .m{font-size:13px;color:#6e6a60}.ga-md{position:fixed;inset:0;background:rgba(11,26,43,.55);z-index:150;overflow:auto;padding:24px 12px}.ga-md>div{max-width:760px;margin:0 auto;background:#fff;border-radius:24px;padding:22px 26px 26px;position:relative}.ga-md h3{margin:0 0 4px}.ga-md h4{margin:18px 0 6px;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:#8a7b57}.ga-md .ga-c{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}.ga-md textarea{font:inherit;font-size:15px;width:100%;border:1px solid #ddd6c6;border-radius:12px;padding:10px 12px;min-height:60px;margin-top:6px}.ga-md .ga-h{font-size:13px;border-left:2px solid #e7e2d6;padding:2px 0 2px 10px;margin:6px 0;color:#3a3a3a}.ga-md .ga-h span{color:#8a7b57}.ga-pjl{display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap}.ga-ok{background:#dcf3e4;border-radius:12px;padding:8px 12px;font-size:13px;margin-top:8px}.ga-ko{background:#fdebd0;border-radius:12px;padding:8px 12px;font-size:13px;margin-top:8px}"; document.head.appendChild(s); })();
+  function gaDonut(titre, parts, onClic) {
+    var tot = parts.reduce(function (a, p) { return a + p.v; }, 0), C = 2 * Math.PI * 60, off = 0, NS = "http://www.w3.org/2000/svg";
+    var d = h("div", {}, [h("h4", { t: titre })]), svg = document.createElementNS(NS, "svg"); svg.setAttribute("viewBox", "0 0 160 160");
+    var bg = document.createElementNS(NS, "circle"); bg.setAttribute("cx", 80); bg.setAttribute("cy", 80); bg.setAttribute("r", 60); bg.setAttribute("fill", "none"); bg.setAttribute("stroke", "#e6e0cf"); bg.setAttribute("stroke-width", 16); svg.appendChild(bg);
+    parts.forEach(function (p) { if (!p.v) return; var l = C * p.v / tot, ci = document.createElementNS(NS, "circle"); ci.setAttribute("class", "sg"); ci.setAttribute("cx", 80); ci.setAttribute("cy", 80); ci.setAttribute("r", 60); ci.setAttribute("fill", "none"); ci.setAttribute("stroke", p.c); ci.setAttribute("stroke-width", 16); ci.setAttribute("stroke-dasharray", l.toFixed(2) + " " + (C - l).toFixed(2)); ci.setAttribute("stroke-dashoffset", (-off).toFixed(2)); ci.setAttribute("transform", "rotate(-90 80 80)"); var tt = document.createElementNS(NS, "title"); tt.textContent = p.n + " : " + p.v; ci.appendChild(tt); ci.onclick = function () { onClic(p); }; svg.appendChild(ci); off += l; });
+    var t = document.createElementNS(NS, "text"); t.setAttribute("x", 80); t.setAttribute("y", 88); t.setAttribute("text-anchor", "middle"); t.setAttribute("font-size", 28); t.setAttribute("font-weight", 700); t.setAttribute("fill", "#0b1a2b"); t.textContent = tot; svg.appendChild(t);
+    d.appendChild(svg); var ul = h("ul", { c: "ga-lg" }); parts.forEach(function (p) { var li = h("li", {}, [h("i", { style: "background:" + p.c }), document.createTextNode(p.n + " — " + p.v)]); li.onclick = function () { onClic(p); }; ul.appendChild(li); }); d.appendChild(ul); return d;
+  }
+  function gaCharge(complet) {
+    GA.chargement = true; GA.err = null; var f = JSON.parse(JSON.stringify(GA.fl)), n = 0;
+    function fin() { if (++n === (complet ? 4 : 2)) { GA.chargement = false; dessiner(); } }
+    function bon(r) { if (!(r && r.ok)) GA.err = (r && r.msg) || "Données indisponibles."; return !!(r && r.ok); }   // en cas de refus : message + bouton, jamais de rechargement en boucle
+    appel("gaAdminStats", f, function (r) { GA.st = bon(r) ? r.stats : null; fin(); });
+    appel("gaAdminListe", f, function (r) { GA.ls = bon(r) ? r : null; fin(); });
+    if (complet) { appel("gaAdminDestinataires", { action: "liste" }, function (r) { GA.ds = bon(r) ? r : null; fin(); }); appel("gaAdminConfig", "", function (r) { GA.cf = bon(r) ? r.config : null; fin(); }); }
+  }
+  function gaFiltre(o) { for (var k in o) GA.fl[k] = o[k]; GA.fl.page = o.page || 0; GA.ls = null; GA.st = null; gaCharge(false); dessiner(); }
+  function gaStatCoul(st) { return GA_COUL[st] || "#94a3b8"; }
+  function gaLireFichier(f, cb, er) {
+    var ext = (f.name.split(".").pop() || "").toLowerCase(); if (!/^(pdf|jpe?g|png|heic|heif)$/.test(ext)) { er("Format non accepté : PDF, JPG, PNG."); return; } if (f.size > 8000000) { er("Fichier trop lourd (8 Mo maximum)."); return; }
+    var fr2 = new FileReader(); fr2.onload = function () { cb({ nom: f.name, b64: String(fr2.result).split(",")[1] }); }; fr2.onerror = function () { er("Fichier illisible."); }; fr2.readAsDataURL(f);
+  }
+  function paneGa(c) {
+    if (GA.err && !GA.chargement) { var re = h("button", { c: "ed-b", t: "Réessayer", type: "button" }); re.onclick = function () { GA.err = null; GA.st = GA.ls = null; dessiner(); }; c.appendChild(h("div", { c: "ed-card" }, [h("p", { c: "ed-vide", t: GA.err }), re])); return; }
+    if (GA.st === null && GA.ls === null && !GA.chargement) { c.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); gaCharge(true); return; }
+    if (!GA.st || !GA.ls) { c.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); return; }
+    var S = GA.st, F = GA.fl;
+    // Filtres
+    var sel = function (lbl, cle, opts) { var s = h("select", {}); opts.forEach(function (o) { var op = h("option", { t: o[1], value: o[0] }); if (F[cle] === o[0]) op.selected = true; s.appendChild(op); }); s.onchange = function () { var o = {}; o[cle] = s.value; gaFiltre(o); }; return lab(lbl, s); };
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Gestion administrative — tableau de bord" }), h("div", { c: "ed-row" }, [
+      sel("Période", "periode", [["", "Toutes"], ["jour", "Aujourd’hui"], ["semaine", "Cette semaine"], ["mois", "Ce mois"], ["annee", "Année"]]),
+      sel("Agent", "agent", [["", "Tous"]].concat(S.agentsListe.map(function (a) { return [a, a]; }))),
+      sel("Catégorie", "categorie", [["", "Toutes"], ["Titres de transport", "Titres de transport"], ["RIB", "RIB"], ["Documents et justificatifs", "Documents et justificatifs"]]),
+      sel("Statut", "statut", [["", "Tous"], ["En attente de vérification", "En attente"], ["En vérification", "En vérification"], ["Validé", "Validés"], ["Refusé", "Refusés"], ["Complément demandé", "Compléments demandés"]])])]));
+    // Tuiles
+    var T = [["Total reçus", S.total, {}], ["Titres de transport", S.categories["Titres de transport"] || 0, { categorie: "Titres de transport" }], ["RIB", S.categories["RIB"] || 0, { categorie: "RIB" }], ["Documents", S.categories["Documents et justificatifs"] || 0, { categorie: "Documents et justificatifs" }],
+      ["En attente", S.statuts["En attente de vérification"] || 0, { statut: "En attente de vérification" }], ["En vérification", S.statuts["En vérification"] || 0, { statut: "En vérification" }], ["Validés", S.statuts["Validé"] || 0, { statut: "Validé" }], ["Refusés", S.statuts["Refusé"] || 0, { statut: "Refusé" }], ["Compléments demandés", S.statuts["Complément demandé"] || 0, { statut: "Complément demandé" }],
+      ["E-mails autorisés", S.emailsAutorises, null], ["E-mails envoyés", S.emailsEnvoyes, null], ["Échecs d’envoi", S.echecs, null]];
+    var kb = h("div", { c: "ga-k" }); T.forEach(function (t) { var b = h("button", { type: "button" }, [h("b", { t: String(t[1]) }), h("span", { t: t[0] })]); if (t[2]) { b.onclick = function () { gaFiltre(Object.assign({ categorie: "", statut: "" }, t[2])); }; if ((t[2].categorie && F.categorie === t[2].categorie) || (t[2].statut && F.statut === t[2].statut)) b.className = "on"; } else b.style.cursor = "default"; kb.appendChild(b); });
+    c.appendChild(h("div", { c: "ed-card" }, [kb, h("p", { c: "ed-note", t: "Titres de transport : " + S.transport.depots + " dépôt(s), soit " + S.transport.jours + " jour(s) de couverture cumulés (le nombre de titres et la durée couverte sont deux mesures distinctes)." })]));
+    // Graphiques
+    var g1 = Object.keys(S.categories).map(function (k) { return { n: k, v: S.categories[k], c: GA_COUL[k], f: { categorie: k, statut: "" } }; });
+    var g2 = Object.keys(S.statuts).map(function (k) { return { n: k, v: S.statuts[k], c: GA_COUL[k], f: { statut: k, categorie: "" } }; });
+    var ag = Object.keys(S.agents).sort(function (a, b) { return S.agents[b] - S.agents[a]; }).slice(0, 8), g3 = ag.map(function (a, i) { return { n: a, v: S.agents[a], c: GA_AG[i % GA_AG.length], f: { agent: a } }; });
+    c.appendChild(h("div", { c: "ed-card" }, [h("div", { c: "ga-g" }, [gaDonut("Répartition des documents", g1, function (p) { gaFiltre(p.f); }), gaDonut("Statuts de traitement", g2, function (p) { gaFiltre(p.f); }), gaDonut("Activité des agents", g3, function (p) { gaFiltre(p.f); })])]));
+    // Liste
+    var L = GA.ls, carte = h("div", { c: "ed-card" }, [h("h3", { t: "Dossiers (" + L.total + ")" })]);
+    if (!L.dossiers.length) carte.appendChild(h("p", { c: "ed-vide", t: "Aucun dossier pour ces filtres." }));
+    L.dossiers.forEach(function (d) {
+      var b = h("button", { c: "ed-b", t: "Détails", type: "button" }); b.onclick = function () { gaDetails(d.id); };
+      carte.appendChild(h("div", { c: "ga-l" }, [h("div", {}, [h("b", { t: d.prenom + " " + d.nom + " — " + d.motif }), h("div", { c: "m", t: d.categorie + " · déposé le " + d.depose + (d.debut ? " · " + d.debut + (d.fin && d.fin !== d.debut ? " → " + d.fin : "") : "") + " · " + d.pieces.length + " pièce(s)" })]), h("span", { c: "ga-bd", style: "background:" + gaStatCoul(d.statut), t: d.statut }), b]));
+    });
+    if (L.total > 30) { var pg = h("div", { c: "ed-row" }); [["Précédent", -1], ["Suivant", 1]].forEach(function (x) { var b = h("button", { c: "ed-b", t: x[0], type: "button" }); b.disabled = (x[1] < 0 && L.page === 0) || (x[1] > 0 && (L.page + 1) * 30 >= L.total); b.onclick = function () { GA.fl.page = L.page + x[1]; GA.ls = null; gaCharge(false); dessiner(); }; pg.appendChild(b); }); carte.appendChild(pg); }
+    c.appendChild(carte);
+    c.appendChild(gaCarteDest());
+  }
+  function gaCarteDest() {
+    var z = h("div", { c: "ed-card" }, [h("h3", { t: "Destinataires officiels des notifications" })]), D = GA.ds, cf = GA.cf;
+    z.appendChild(h("p", { c: "ed-note", t: "Réservé à l’administrateur principal. Ces adresses ne sont jamais visibles par les agents et ne donnent aucun accès aux dossiers ni aux comptes IRIS." }));
+    if (cf) z.appendChild(h("p", { c: cf.possible ? "ga-ok" : "ga-ko", t: "Expéditeur souhaité : " + cf.expediteurSouhaite + " — " + (cf.possible ? "envoi réel possible." : cf.raison) }));
+    if (!D) { z.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); return z; }
+    D.destinataires.forEach(function (x) {
+      var em = h("input", { type: "email", value: x.email }), sv = h("button", { c: "ed-b", t: "Enregistrer", type: "button" }), ac = h("button", { c: "ed-b", t: x.actif ? "Désactiver" : "Activer", type: "button" }), su = h("button", { c: "ed-b", t: "Supprimer", type: "button" });
+      var act = function (o) { o.id = x.id; appel("gaAdminDestinataires", o, function (r) { if (r && r.ok) { GA.ds = r; msg("Enregistré."); dessiner(); } else msg((r && r.msg) || "Refusé.", true); }); };
+      sv.onclick = function () { act({ action: "modifier", email: em.value }); }; ac.onclick = function () { act({ action: "activer", actif: !x.actif }); };
+      su.onclick = function () { if (confirm("Supprimer ce destinataire ? Les e-mails déjà envoyés ne sont pas rappelés.")) act({ action: "supprimer" }); };
+      z.appendChild(h("div", { c: "ga-l" }, [h("div", {}, [h("b", { t: x.nom }), h("span", { c: "ed-tag", t: x.actif ? "Actif" : "Désactivé" })]), h("div", { c: "ed-row" }, [em, sv, ac, su])]));
+    });
+    var nn = h("input", { type: "text", placeholder: "Nom" }), ne = h("input", { type: "email", placeholder: "adresse@samsic.fr" }), na = h("button", { c: "ed-b ed-p", t: "Ajouter un destinataire", type: "button" });
+    na.onclick = function () { appel("gaAdminDestinataires", { action: "ajouter", nom: nn.value, email: ne.value }, function (r) { if (r && r.ok) { GA.ds = r; msg("Destinataire ajouté."); dessiner(); } else msg((r && r.msg) || "Refusé.", true); }); };
+    z.appendChild(h("div", { c: "ed-row" }, [nn, ne, na]));
+    if (D.historique.length) { z.appendChild(h("h4", { t: "Historique des changements" })); D.historique.slice(0, 8).forEach(function (x) { z.appendChild(h("div", { c: "sg-m", t: x.date + " — " + x.action + " : " + x.detail })); }); }
+    return z;
+  }
+  // Fenêtre « Détails » d'un dossier : informations, pièces, historique, décisions (étape 2) et autorisation d'e-mail (étape 3)
+  function gaModal() { var o = h("div", { c: "ga-md" }), box = h("div", {}); o.appendChild(box); var x = h("button", { c: "ed-x", t: "Fermer", type: "button", style: "position:absolute;top:16px;right:16px" }); x.onclick = function () { if (o.parentNode) o.parentNode.removeChild(o); }; box.appendChild(x); document.body.appendChild(o); return { o: o, box: box, ferme: x.onclick }; }
+  function gaDetails(id) {
+    var M = gaModal(); M.box.appendChild(h("p", { c: "ed-vide", t: "Chargement…" }));
+    function rendre() {
+      appel("gaAdminDetail", id, function (r) {
+        M.box.textContent = ""; var x = h("button", { c: "ed-x", t: "Fermer", type: "button", style: "position:absolute;top:16px;right:16px" }); x.onclick = function () { M.ferme(); gaCharge(false); }; M.box.appendChild(x);
+        if (!r || !r.ok) { M.box.appendChild(h("p", { c: "ed-vide", t: (r && r.msg) || "Dossier introuvable." })); return; }
+        var d = r.dossier;
+        M.box.appendChild(h("h3", { t: d.prenom + " " + d.nom + " — " + d.motif })); M.box.appendChild(h("span", { c: "ga-bd", style: "background:" + gaStatCoul(d.statut), t: d.statut }));
+        var info = [["Identifiant", d.id], ["Site", d.site || "—"], ["Catégorie", d.categorie], ["Déposé le", d.depose + " (heure du serveur)"], ["Date du document", d.dateDoc || "—"], ["Période concernée", d.debut ? d.debut + (d.fin && d.fin !== d.debut ? " → " + d.fin : "") : "—"], ["Commentaire de l’agent", d.commentaire || "—"], ["Réponse à l’agent", d.reponse || "—"], ["Motif de décision", d.motifDecision || "—"], ["Décidé le", d.decideLe || "—"], ["Autorisation e-mail", d.email === "non" || !d.email ? "Non autorisé" : d.email], ["Mode d’envoi", d.mode === "piece" ? "Pièce jointe" : "Lien sécurisé"], ["Destinataires notifiés", d.notifies || "—"], ["Résultat de l’envoi", (d.resultat || "—") + (d.envoyeLe ? " · " + d.envoyeLe : "")]];
+        info.forEach(function (i) { M.box.appendChild(h("div", { c: "ga-h" }, [h("span", { t: i[0] + " : " }), document.createTextNode(i[1])])); });
+        var bf = h("button", { c: "ed-b", t: "Fiche récapitulative de l’agent", type: "button", style: "margin-top:8px" }); bf.onclick = function () { gaFiche(d.prenom + " " + d.nom.replace(/^$/, "")); }; bf.onclick = function () { gaFiche(d.nom + " " + d.prenom); }; M.box.appendChild(bf);
+        M.box.appendChild(h("h4", { t: "Pièces jointes" }));
+        d.pieces.forEach(function (p, n) { var b = h("button", { c: "ed-b", t: "Voir", type: "button" }); b.onclick = function () { b.disabled = true; appel("gaAdminPiece", { id: d.id, n: n }, function (q) { b.disabled = false; if (q && q.ok) visionneuse(q); else msg((q && q.msg) || "Pièce indisponible.", true); }); }; M.box.appendChild(h("div", { c: "ga-pjl" }, [h("span", { t: p.nom + " (" + Math.round(p.taille / 1024) + " Ko, ajoutée par " + (p.par === "admin" ? "l’administrateur" : "l’agent") + ")" }), b])); });
+        var fi = h("input", { type: "file", accept: "image/*,application/pdf", style: "display:none" }), fc = h("input", { type: "file", accept: "image/*", capture: "environment", style: "display:none" });
+        var ajout = function (e) { var f = e.target.files[0]; e.target.value = ""; if (!f) return; gaLireFichier(f, function (p) { appel("gaAdminAjouterPiece", { id: d.id, fichier: p }, function (q) { if (q && q.ok) { msg("Pièce ajoutée."); rendre(); } else msg((q && q.msg) || "Refusé.", true); }); }, function (m) { msg(m, true); }); };
+        fi.onchange = ajout; fc.onchange = ajout; var b1 = h("button", { c: "ed-b", t: "Prendre une photo", type: "button" }), b2 = h("button", { c: "ed-b", t: "Ajouter un fichier", type: "button" }); b1.onclick = function () { fc.click(); }; b2.onclick = function () { fi.click(); };
+        M.box.appendChild(h("div", { c: "ga-c" }, [b1, b2, fi, fc]));
+        // Étape 2 : vérification
+        M.box.appendChild(h("h4", { t: "Étape 2 — Vérification administrative" })); M.box.appendChild(h("p", { c: "ed-note", t: "La validation signifie « vérifié dans IRIS » : elle ne modifie ni la paie, ni les coordonnées bancaires, ni les absences ou congés." }));
+        var mo = h("textarea", { placeholder: "Motif (obligatoire pour refuser ou demander un complément)" }), rp = h("textarea", { placeholder: "Réponse à l’agent (facultatif, visible par l’agent)" }); M.box.appendChild(mo); M.box.appendChild(rp);
+        var bar = h("div", { c: "ga-c" });
+        [["Valider", "valider", "ed-b ed-p"], ["Refuser", "refuser", "ed-b"], ["Demander un complément", "complement", "ed-b"], ["En vérification", "verification", "ed-b"], ["Laisser en attente", "attente", "ed-b"]].forEach(function (a) { var b = h("button", { c: a[2], t: a[0], type: "button" }); b.onclick = function () { b.disabled = true; appel("gaAdminDecision", { id: d.id, action: a[1], motif: mo.value, reponse: rp.value }, function (q) { b.disabled = false; if (q && q.ok) { msg("Statut : " + q.dossier.statut); rendre(); } else msg((q && q.msg) || "Refusé.", true); }); }; bar.appendChild(b); }); M.box.appendChild(bar);
+        // Étape 3 : e-mail
+        M.box.appendChild(h("h4", { t: "Étape 3 — Autorisation d’e-mail (décision distincte)" }));
+        if (d.statut !== "Validé") M.box.appendChild(h("p", { c: "ed-note", t: "Validez d’abord le dossier : aucun e-mail ne part sans votre autorisation, et jamais avant la vérification." }));
+        else gaEmail(M, d, rendre);
+        // Commentaire / correction / archivage
+        M.box.appendChild(h("h4", { t: "Autres actions" }));
+        var ct = h("textarea", { placeholder: "Commentaire interne (non visible par l’agent)" }), bc = h("button", { c: "ed-b", t: "Ajouter le commentaire", type: "button" }); bc.onclick = function () { appel("gaAdminCommenter", { id: d.id, commentaire: ct.value }, function (q) { if (q && q.ok) { msg("Commentaire ajouté."); rendre(); } else msg((q && q.msg) || "Refusé.", true); }); }; M.box.appendChild(ct); M.box.appendChild(bc);
+        var cm = h("input", { type: "text", value: d.commentaire, placeholder: "Corriger le commentaire de l’agent" }), bm = h("button", { c: "ed-b", t: "Corriger le commentaire", type: "button" }); bm.onclick = function () { appel("gaAdminModifier", { id: d.id, commentaire: cm.value }, function (q) { if (q && q.ok) { msg("Corrigé (version précédente conservée dans l’historique)."); rendre(); } else msg((q && q.msg) || "Refusé.", true); }); }; M.box.appendChild(h("div", { c: "ga-c" }, [cm, bm]));
+        var ba = h("button", { c: "ed-b", t: d.archive ? "Désarchiver" : "Archiver", type: "button" }), bs = h("button", { c: "ed-b", t: "Supprimer…", type: "button" });
+        ba.onclick = function () { appel("gaAdminArchiver", { id: d.id, archiver: !d.archive }, function (q) { if (q && q.ok) { msg("Fait."); M.ferme(); gaCharge(false); } }); };
+        bs.onclick = function () { if (confirm("Supprimer ce dossier de l’interface ? Les fichiers vont à la corbeille Drive, la trace d’audit est conservée, et les e-mails déjà envoyés ne sont PAS rappelés.") && prompt("Tapez SUPPRIMER pour confirmer.") === "SUPPRIMER") appel("gaAdminSupprimer", { id: d.id, confirmation: "SUPPRIMER" }, function (q) { if (q && q.ok) { msg("Dossier supprimé."); M.ferme(); gaCharge(false); } else msg((q && q.msg) || "Refusé.", true); }); };
+        M.box.appendChild(h("div", { c: "ga-c" }, [ba, bs]));
+        M.box.appendChild(h("h4", { t: "Historique des actions" })); r.historique.slice().reverse().forEach(function (x) { M.box.appendChild(h("div", { c: "ga-h" }, [h("span", { t: x.date + " · " + x.acteur + " · " }), document.createTextNode(x.action + (x.detail ? " — " + x.detail : ""))])); });
+        if (r.envois.length) { M.box.appendChild(h("h4", { t: "Envois d’e-mails" })); r.envois.forEach(function (x) { M.box.appendChild(h("div", { c: "ga-h" }, [h("span", { t: x.date + " · " + x.destinataire + " · " + x.mode + " · " }), document.createTextNode(x.resultat)])); }); }
+      });
+    }
+    rendre();
+  }
+  function gaEmail(M, d, rendre) {
+    var mode = "lien", dest = (GA.ds ? GA.ds.destinataires : []).filter(function (x) { return x.actif; }).map(function (x) { return x.id; }), pj = [];
+    var zone = h("div", {}); M.box.appendChild(zone);
+    function ui() {
+      zone.textContent = "";
+      var r1 = h("input", { type: "radio", name: "gam" }), r2 = h("input", { type: "radio", name: "gam" }); r1.checked = mode === "lien"; r2.checked = mode === "piece"; r1.onchange = function () { mode = "lien"; ui(); }; r2.onchange = function () { mode = "piece"; ui(); };
+      zone.appendChild(h("div", { c: "ga-c" }, [h("label", {}, [r1, document.createTextNode(" Mode A — notification avec lien sécurisé (par défaut, aucune pièce jointe)")])]));
+      zone.appendChild(h("div", { c: "ga-c" }, [h("label", {}, [r2, document.createTextNode(" Mode B — e-mail avec pièce jointe (soumis aux autorisations de Samsic)")])]));
+      zone.appendChild(h("div", { c: "ed-note", t: "Destinataires actifs :" }));
+      (GA.ds ? GA.ds.destinataires : []).filter(function (x) { return x.actif; }).forEach(function (x) { var cb = h("input", { type: "checkbox" }); cb.checked = dest.indexOf(x.id) >= 0; cb.onchange = function () { dest = dest.filter(function (i) { return i !== x.id; }); if (cb.checked) dest.push(x.id); }; zone.appendChild(h("label", { style: "display:block;margin:4px 0" }, [cb, document.createTextNode(" " + x.nom)])); });
+      if (mode === "piece") { zone.appendChild(h("div", { c: "ed-note", t: "Pièces à joindre :" })); d.pieces.forEach(function (p, n) { var cb = h("input", { type: "checkbox" }); cb.checked = pj.indexOf(n) >= 0; cb.onchange = function () { pj = pj.filter(function (i) { return i !== n; }); if (cb.checked) pj.push(n); }; zone.appendChild(h("label", { style: "display:block;margin:4px 0" }, [cb, document.createTextNode(" " + p.nom)])); }); }
+      var bp = h("button", { c: "ed-b ed-p", t: "Prévisualiser le message", type: "button" }), bn = h("button", { c: "ed-b", t: "Ne pas envoyer d’e-mail", type: "button" });
+      bp.onclick = function () { appel("gaAdminEmailApercu", { id: d.id, mode: mode, destinataires: dest, pieces: pj }, function (a) { if (a && a.ok) gaApercu(d, a, mode, dest, rendre); else msg((a && a.msg) || "Refusé.", true); }); };
+      bn.onclick = function () { appel("gaAdminEmailRefuser", { id: d.id }, function (q) { if (q && q.ok) { msg("Aucun e-mail ne sera envoyé."); rendre(); } }); };
+      zone.appendChild(h("div", { c: "ga-c" }, [bp, bn]));
+    }
+    ui();
+  }
+  // Prévisualisation obligatoire avant confirmation ; les pièces peuvent encore être retirées
+  function gaApercu(d, a, mode, dest, rendre) {
+    var M = gaModal(), pj = a.pieces.map(function (p) { return p.n; });
+    function ui(ap) {
+      M.box.textContent = ""; var x = h("button", { c: "ed-x", t: "Annuler", type: "button", style: "position:absolute;top:16px;right:16px" }); x.onclick = M.ferme; M.box.appendChild(x);
+      M.box.appendChild(h("h3", { t: "Prévisualisation de l’e-mail" }));
+      [["De", ap.expediteur], ["À", ap.destinataires.map(function (q) { return q.nom + " <" + q.email + ">"; }).join(", ")], ["Objet", ap.objet]].forEach(function (i) { M.box.appendChild(h("div", { c: "ga-h" }, [h("span", { t: i[0] + " : " }), document.createTextNode(i[1])])); });
+      M.box.appendChild(h("div", { c: "ga-h", style: "white-space:pre-wrap", t: ap.corps }));
+      if (ap.pieces.length) { M.box.appendChild(h("h4", { t: "Pièces jointes" })); ap.pieces.forEach(function (p) { var b = h("button", { c: "ed-b", t: "Retirer", type: "button" }); b.onclick = function () { pj = pj.filter(function (i) { return i !== p.n; }); appel("gaAdminEmailApercu", { id: d.id, mode: mode, destinataires: dest, pieces: pj }, function (r2) { if (r2 && r2.ok) ui(r2); }); }; M.box.appendChild(h("div", { c: "ga-pjl" }, [h("span", { t: p.nom }), b])); }); }
+      if (ap.avertissement) M.box.appendChild(h("div", { c: "ga-ko", t: ap.avertissement }));
+      M.box.appendChild(h("div", { c: ap.envoiReelPossible ? "ga-ok" : "ga-ko", t: ap.envoiReelPossible ? "Envoi réel possible depuis " + ap.expediteur + "." : "Aucun e-mail réel ne sera envoyé : " + ap.raisonEnvoi + " L’opération sera consignée comme simulation." }));
+      var ok = h("button", { c: "ed-b ed-p", t: "Confirmer l’envoi", type: "button" }); if (!ap.destinataires.length || (mode === "piece" && !ap.pieces.length)) ok.disabled = true;
+      var env = false; ok.onclick = function () { if (env) return; env = true; ok.disabled = true; appel("gaAdminEmailEnvoyer", { id: d.id, mode: mode, destinataires: dest, pieces: pj, confirmation: true, reel: ap.envoiReelPossible }, function (q) { if (q && q.ok) { msg(q.reel ? "E-mail envoyé." : "Simulation enregistrée : aucun e-mail réel."); M.ferme(); rendre(); } else { env = false; ok.disabled = false; msg((q && q.msg) || "Refusé.", true); } }); };
+      M.box.appendChild(h("div", { c: "ga-c" }, [ok]));
+    }
+    ui(a);
+  }
+  function gaFiche(agent) {
+    var M = gaModal(); appel("gaAdminFicheAgent", { agent: agent }, function (r) {
+      if (!r || !r.ok) { M.box.appendChild(h("p", { c: "ed-vide", t: "Fiche indisponible." })); return; }
+      var k = r.compteurs; M.box.appendChild(h("h3", { t: "Fiche — " + agent }));
+      var traite = k.total ? k.traites : 0;
+      M.box.appendChild(h("div", { c: "ga-g" }, [gaDonut("Dossiers traités", [{ n: "Traités (validés ou refusés)", v: traite, c: "#16a34a" }, { n: "Non traités", v: k.total - traite, c: "#d4a017" }], function () { })]));
+      M.box.appendChild(h("p", { c: "ed-note", t: k.total + " dossier(s) · " + k.attente + " en attente/vérification · " + k.refuses + " refusé(s) · " + k.complements + " complément(s) demandé(s) · " + k.transportJours + " jour(s) de transport couverts." }));
+      r.dossiers.forEach(function (d) { var b = h("button", { c: "ed-b", t: "Détails", type: "button" }); b.onclick = function () { M.ferme(); gaDetails(d.id); }; M.box.appendChild(h("div", { c: "ga-l" }, [h("div", {}, [h("b", { t: d.motif }), h("div", { c: "m", t: d.depose + " · " + d.statut })]), b])); });
+    });
+  }
   function paneSg(c) {
     if (!SG) { c.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); chargerSg(dessiner); return; }
     c.appendChild(carteBlocages());
@@ -807,11 +974,11 @@
   function dessiner() {
     var y = ov.scrollTop; ov.textContent = "";
     var np = ((DATA && DATA.conges) || []).filter(function (x) { return x.statut === "En attente"; }).length;
-    var seg = h("div", { c: "ed-seg" }, [["pt", "Pointages"], ["ab", "Absences et retards"], ["cg", "Congés" + (np ? " (" + np + ")" : "")], ["sg", "Signalements" + (SG ? (function () { var n = SG.signalements.filter(function (x) { return ["Correction acceptée", "Correction refusée", "Clôturée"].indexOf(x.statut) < 0; }).length; return n ? " (" + n + ")" : ""; })() : "")], ["ag", "Agents"], ["pa", "Paramètres"]].map(function (o) { var b = h("button", { t: o[1], type: "button" }); if (o[0] === onglet) b.className = "on"; b.onclick = function () { onglet = o[0]; dessiner(); }; return b; }));
+    var seg = h("div", { c: "ed-seg" }, [["pt", "Pointages"], ["ab", "Absences et retards"], ["cg", "Congés" + (np ? " (" + np + ")" : "")], ["sg", "Signalements" + (SG ? (function () { var n = SG.signalements.filter(function (x) { return ["Correction acceptée", "Correction refusée", "Clôturée"].indexOf(x.statut) < 0; }).length; return n ? " (" + n + ")" : ""; })() : "")], ["ag", "Agents"], ["ga", "Gestion administrative"], ["pa", "Paramètres"]].map(function (o) { var b = h("button", { t: o[1], type: "button" }); if (o[0] === onglet) b.className = "on"; b.onclick = function () { onglet = o[0]; dessiner(); }; return b; }));
     var x = h("button", { c: "ed-x", t: "Fermer", type: "button" }); x.onclick = fermer;
     ov.appendChild(h("div", { c: "ed-top" }, [h("h2", { t: "Corrections" }), seg, x]));
     var corps = h("div", { c: "ed-body" }); ov.appendChild(corps);
-    if (!DATA) corps.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); else (onglet === "pt" ? panePt : onglet === "ab" ? paneAb : onglet === "cg" ? paneCg : onglet === "sg" ? paneSg : onglet === "pa" ? paneParam : paneAg)(corps);
+    if (!DATA) corps.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); else (onglet === "pt" ? panePt : onglet === "ab" ? paneAb : onglet === "cg" ? paneCg : onglet === "sg" ? paneSg : onglet === "pa" ? paneParam : onglet === "ga" ? paneGa : paneAg)(corps);
     ov.scrollTop = y;
   }
   function fermer() { ov.className = ""; document.body.style.overflow = ""; }
