@@ -9,7 +9,7 @@
   }
   function make(ok, ko) {
     var o = { withSuccessHandler: function (f) { return make(f, ko); }, withFailureHandler: function (f) { return make(ok, f); } };
-    ["etat", "verifier", "pointer", "ouvrirScan", "congesEtat", "congesDemander", "congesAnnuler","congesConnexion","congesPiece","congesAjouterPiece","stampDonnees","recupDemander","recupVerifier","recupStatut","agentBilan","agentDetails","agentSignaler","agentSignalements","meteoDonnees"].forEach(function (n) { o[n] = function () { appelle(n, Array.prototype.slice.call(arguments), ok, ko); }; });
+    ["etat", "verifier", "pointer", "ouvrirScan", "congesEtat", "congesDemander", "congesAnnuler","congesConnexion","congesPiece","congesAjouterPiece","stampDonnees","recupDemander","recupVerifier","recupStatut","agentBilan","agentDetails","agentSignaler","agentSignalements","meteoDonnees","gaMesDossiers","gaDeposer","gaMaPiece","gaAjouterPieces"].forEach(function (n) { o[n] = function () { appelle(n, Array.prototype.slice.call(arguments), ok, ko); }; });
     return o;
   }
   window.google = { script: { run: make(null, null) } };
@@ -51,7 +51,124 @@ function estAdmin(){return !!REEL&&String(REEL.nom).trim().toUpperCase()==="HEBA
 function espace(r){if(!r.__demo)REEL=r;if(!estAdmin())DEMOP=false;espaceRendu(r.__demo?r:(DEMOP?demoData():r))}
 function demoPresume(){return{d:frD(new Date()),h:"06:00 – 09:00",dur:180,site:"Site fictif",ctrl:"09:02"}}
 function bandeauPresume(r){var P=r.presume||(DEMOP?demoPresume():null);if(!P)return;var b=el("div","pre");b.setAttribute("role","status");b.appendChild(el("b","","Présence non confirmée — absence présumée"));b.appendChild(el("p","","Service du "+dLong(P.d)+" · Horaire prévu : "+(P.h||"Non renseigné")+" · Durée prévue : "+dureeTxt(P.dur)));b.appendChild(el("p","","Arrivée : non enregistrée · Départ : non enregistré · Contrôle à "+hhmm(P.ctrl)));b.appendChild(el("div","prn","Statut provisoire : ce n’est pas une décision. Un responsable doit le confirmer. Si vous étiez présent, prévenez-le."));c.appendChild(b)}
-function espaceRendu(r){vide();c.className="c l";if(DEMOP)c.appendChild(el("div","dban","Mode démonstration · données fictives · rien n’est enregistré"));c.appendChild(el("div","t","Mon espace"));c.appendChild(el("div","nom",r.prenom+" "+r.nom));var ids=el("div","ids");[["N° de badge",fmtBadge(r.badge)||"—"],["N° d’accès",fmtCarte(r.carte)||"—"]].forEach(function(x){var d=el("div","");d.appendChild(el("span","",x[0]));d.appendChild(el("b","",x[1]));ids.appendChild(d)});c.appendChild(ids);bandeauPresume(r);if(TK){var pb=el("button","","Pointer");pb.onclick=function(){envoyer("","")};c.appendChild(pb)}var nv=el("div","seg");[["c","Mes congés"],["a","Mes absences"]].forEach(function(o){var b=el("button",o[0]===VUE?"on":"",o[1]);b.type="button";b.onclick=function(){VUE=o[0];espace(r)};nv.appendChild(b)});c.appendChild(nv);if(estAdmin()){var db=el("button","dbtn"+(DEMOP?" on":""),DEMOP?"Quitter la démonstration":"Mode démonstration");db.type="button";db.onclick=function(){DEMOP=!DEMOP;espace(REEL||r)};c.appendChild(db)};if(VUE==="c")corpsConges(r);else corpsAbs(r)}function niv(x,f){return x===null||x===undefined||!isFinite(x)?"#9ca3af":x<0?"#7c3aed":f>=.75?"#16a34a":f>=.5?"#facc15":f>=.25?"#f97316":"#dc2626"}
+function espaceRendu(r){vide();c.className="c l";if(DEMOP)c.appendChild(el("div","dban","Mode démonstration · données fictives · rien n’est enregistré"));c.appendChild(el("div","t","Mon espace"));c.appendChild(el("div","nom",r.prenom+" "+r.nom));var ids=el("div","ids");[["N° de badge",fmtBadge(r.badge)||"—"],["N° d’accès",fmtCarte(r.carte)||"—"]].forEach(function(x){var d=el("div","");d.appendChild(el("span","",x[0]));d.appendChild(el("b","",x[1]));ids.appendChild(d)});c.appendChild(ids);bandeauPresume(r);if(TK){var pb=el("button","","Pointer");pb.onclick=function(){envoyer("","")};c.appendChild(pb)}var nv=el("div","seg gnav");[["c","Mes congés"],["a","Mes absences"],["g","Gestion administrative"]].forEach(function(o){var b=el("button",o[0]===VUE?"on":"",o[1]);b.type="button";b.onclick=function(){VUE=o[0];espace(r)};nv.appendChild(b)});c.appendChild(nv);if(estAdmin()){var db=el("button","dbtn"+(DEMOP?" on":""),DEMOP?"Quitter la démonstration":"Mode démonstration");db.type="button";db.onclick=function(){DEMOP=!DEMOP;espace(REEL||r)};c.appendChild(db)};if(VUE==="c")corpsConges(r);else if(VUE==="g")corpsGA(r);else corpsAbs(r)}/* IRIS — onglet agent « Gestion administrative » (ajout isolé).
+   Réutilise les composants de p/index.html : el, c, vide, run, runK, toastD, visionneuse, lirePJ, jetonPJ, DEV, REEL, espace.
+   Intégration (après accord) : coller ce bloc avant « function niv », ajouter ["g","Gestion administrative"] au sélecteur d'onglets et « else if(VUE==="g")corpsGA(r) » dans espaceRendu. */
+var GAC = {
+  "Titres de transport": ["Ticket ponctuel", "Abonnement mensuel", "Abonnement trimestriel", "Abonnement semestriel", "Abonnement annuel"],
+  "RIB": ["Premier dépôt", "Nouveau RIB", "Changement de coordonnées bancaires"],
+  "Documents et justificatifs": ["Arrêt de travail", "Accident du travail", "Accident de trajet", "Justificatif d’absence", "Attestation administrative", "Contrat de travail", "Justificatif de domicile", "Convocation officielle", "Justificatif médical destiné à l’employeur", "Autre document administratif"]
+};
+var GA_PERIODE = ["Arrêt de travail", "Accident du travail", "Accident de trajet", "Justificatif d’absence"], GA_MOIS = { "Abonnement mensuel": 1, "Abonnement trimestriel": 3, "Abonnement semestriel": 6, "Abonnement annuel": 12 };
+var GA_NOTE = { "Titres de transport": "Indiquez la période de validité : un abonnement annuel couvre toute l’année, rien à redéposer chaque mois.", "RIB": "Un RIB n’est à déposer qu’une fois (premier dépôt) ou en cas de changement.", "Documents et justificatifs": "Déposez votre document : il est enregistré immédiatement, même avant vérification." };
+(function () { if (document.getElementById("ga-css")) return; var s = document.createElement("style"); s.id = "ga-css"; s.textContent = ".seg.gnav button{padding:11px 2px;font-size:12.5px;white-space:normal;line-height:1.15}.seg.gnav button:nth-child(3){flex:1.5}.ga .rub{display:block;width:100%;text-align:left;background:#f6f4ef;color:#04112c;border:1px solid #e7e2d6;padding:15px 16px;margin-top:10px;font-size:16px;font-weight:600}.ga .rub small{display:block;font-weight:400;font-size:13px;color:#6e6a60;margin-top:3px}.ga .gh{margin:22px 0 4px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8a7b57;font-weight:600}.ga .dos{background:#f6f4ef;border:1px solid #e7e2d6;border-radius:14px;padding:12px 14px;margin-top:10px;text-align:left}.ga .dos b{display:block;font-size:15px}.ga .dos .m{font-size:13px;color:#6e6a60;margin-top:3px;line-height:1.4}.ga .bd{display:inline-block;font-size:12px;font-weight:600;border-radius:999px;padding:3px 10px;margin-top:6px;background:#e7e2d6;color:#04112c}.ga .bd.v{background:#dcf3e4;color:#166534}.ga .bd.r{background:#f8dcdc;color:#a02c2c}.ga .bd.c{background:#fdebd0;color:#b45309}.ga .bd.a{background:#e8edf7;color:#1e3a8a}.ga .pj{display:flex;align-items:center;gap:8px;margin-top:8px;background:#fff;border:1px solid #e7e2d6;border-radius:12px;padding:6px 8px;text-align:left}.ga .pj img{width:44px;height:44px;object-fit:cover;border-radius:8px}.ga .pj span{flex:1;font-size:13px;word-break:break-all}.ga .pj button{width:auto;margin:0;padding:6px 12px;font-size:13px;background:#fff;color:#a02c2c;border:1px solid #e3c3c3;border-radius:10px}.ga .mini{width:auto;font-size:13px;padding:7px 12px;margin:8px 8px 0 0;background:#fff;color:#04112c;border:1px solid #d8d2c4}.ga .prv{text-align:center;padding:6px 0}.ga .prv .id{font-size:20px;font-weight:700;letter-spacing:.03em;margin:8px 0}.ga textarea{font-family:inherit;font-size:16px;width:100%;border-radius:14px;margin-top:10px;padding:12px 14px;border:1px solid #d8d2c4;background:#fff;min-height:70px;resize:vertical}"; document.head.appendChild(s); })();
+function gaBadge(st) { return st === "Validé" ? "v" : st === "Refusé" ? "r" : st === "Complément demandé" ? "c" : st === "En vérification" ? "a" : ""; }
+function gaIso(d) { var p = function (n) { return ("0" + n).slice(-2); }; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); }
+function gaFinAbo(iso, mois) { var a = iso.split("-").map(Number), d = new Date(a[0], a[1] - 1 + mois, a[2], 12); if (d.getDate() !== a[2]) d = new Date(a[0], a[1] - 1 + mois + 1, 0, 12); d.setDate(d.getDate() - 1); return gaIso(d); }
+function gaFr(iso) { return iso ? iso.split("-").reverse().join("/") : ""; }
+function corpsGA(r) {
+  var z = el("div", "ga"); c.appendChild(z);
+  z.appendChild(el("div", "gh", "Nouvelle démarche"));
+  [["Titres de transport", "Ticket ou abonnement : dates de validité"], ["RIB", "Premier dépôt, nouveau RIB, changement"], ["Documents et justificatifs", "Arrêt, accident, attestation, contrat…"]].forEach(function (o) {
+    var b = el("button", "rub", o[0]); b.type = "button"; b.appendChild(el("small", "", o[1])); b.onclick = function () { gaFormulaire(r, o[0]); }; z.appendChild(b);
+  });
+  z.appendChild(el("div", "gh", "Mes dépôts"));
+  var lst = el("div", ""); lst.textContent = "Chargement…"; z.appendChild(lst);
+  run(function (res) {
+    lst.textContent = "";
+    if (!res || !res.ok) { lst.textContent = (res && res.msg) || "Historique indisponible."; return; }
+    if (!res.dossiers.length) { lst.appendChild(el("div", "g2", "Aucun dépôt pour le moment.")); return; }
+    res.dossiers.forEach(function (d) { lst.appendChild(gaCarte(r, d)); });
+  }).gaMesDossiers(DEV);
+}
+function gaCarte(r, d) {
+  var x = el("div", "dos"); x.appendChild(el("b", "", d.motif));
+  x.appendChild(el("div", "m", d.categorie + " · déposé le " + d.depose + " · " + d.id));
+  if (d.debut) x.appendChild(el("div", "m", "Période : " + d.debut + (d.fin && d.fin !== d.debut ? " → " + d.fin : "")));
+  if (d.commentaire) x.appendChild(el("div", "m", "Mon commentaire : " + d.commentaire));
+  x.appendChild(el("span", "bd " + gaBadge(d.statut), d.statut));
+  if (d.motifDecision) x.appendChild(el("div", "m", "Motif : " + d.motifDecision));
+  if (d.reponse) x.appendChild(el("div", "m", "Réponse de l’administration : " + d.reponse));
+  var bar = el("div", "");
+  d.pieces.forEach(function (p, n) { var b = el("button", "mini", "Voir " + (d.pieces.length > 1 ? "la pièce " + (n + 1) : "le document")); b.type = "button"; b.onclick = function () { b.disabled = true; run(function (res) { b.disabled = false; if (!res || !res.ok) { toastD(res && res.msg || "Document indisponible."); return; } visionneuse(res); }).gaMaPiece(DEV, d.id, n); }; bar.appendChild(b); });
+  if (d.statut === "Complément demandé") { var a = el("button", "mini", "Ajouter des pièces"); a.type = "button"; a.onclick = function () { gaComplement(r, d); }; bar.appendChild(a); }
+  x.appendChild(bar); return x;
+}
+// Sélecteur multi-pièces : photo, fichier, aperçu, retrait avant envoi (PDF, JPG, JPEG, PNG, HEIC)
+function gaPieces(zone, max, onChange) {
+  var L = [], cam = el("input"), fic = el("input"), er = el("div", "err"), pv = el("div", "");
+  cam.type = "file"; cam.accept = "image/*"; cam.setAttribute("capture", "environment"); fic.type = "file"; fic.multiple = true; fic.accept = "image/jpeg,image/png,image/heic,image/heif,application/pdf,.jpg,.jpeg,.png,.heic,.heif,.pdf"; cam.style.display = fic.style.display = "none";
+  var ch = el("div", "chips"), b1 = el("button", "", "Prendre une photo"), b2 = el("button", "", "Joindre un fichier"); b1.type = b2.type = "button";
+  b1.onclick = function () { cam.click(); }; b2.onclick = function () { fic.click(); }; ch.appendChild(b1); ch.appendChild(b2);
+  zone.appendChild(ch); zone.appendChild(cam); zone.appendChild(fic); zone.appendChild(pv); zone.appendChild(er);
+  function aff() { pv.textContent = ""; L.forEach(function (p, i) { var l = el("div", "pj"); if (p.url) { var im = el("img"); im.alt = ""; im.src = p.url; l.appendChild(im); } l.appendChild(el("span", "", p.nom)); var q = el("button", "", "Retirer"); q.type = "button"; q.onclick = function () { L.splice(i, 1); aff(); onChange(L); }; l.appendChild(q); pv.appendChild(l); }); onChange(L); }
+  function lire(e) { var fs = Array.prototype.slice.call(e.target.files || []); e.target.value = ""; er.textContent = ""; var i = 0; (function suite() { if (i >= fs.length) return; if (L.length >= max) { er.textContent = max + " pièces au maximum."; return; } var f = fs[i++]; er.textContent = "Lecture du fichier…"; lirePJ(f, function (p) { er.textContent = ""; if (p) { L.push(p); aff(); } suite(); }, function (m) { er.textContent = m; suite(); }); })(); }
+  cam.onchange = lire; fic.onchange = lire; aff();
+  return { liste: function () { return L; }, erreur: function (m) { er.textContent = m; } };
+}
+function gaFormulaire(r, cat) {
+  vide(); c.className = "c l"; var z = el("div", "ga"); c.appendChild(z);
+  z.appendChild(el("div", "t", cat)); z.appendChild(el("div", "g2", GA_NOTE[cat]));
+  var aujourdhui = r.aujourdhui || gaIso(new Date());
+  z.appendChild(el("div", "lab", cat === "RIB" ? "Type de dépôt" : cat === "Titres de transport" ? "Type de titre" : "Type de document"));
+  var ms = el("select"), o0 = el("option", "", "Choisir…"); o0.value = ""; ms.appendChild(o0);
+  GAC[cat].forEach(function (t) { var o = el("option", "", t); o.value = t; ms.appendChild(o); }); z.appendChild(ms);
+  var zone = el("div", ""); z.appendChild(zone);
+  var dd, a, f, fb = el("div", "sum");
+  function raccourcis(inp, apres) { var rp = el("div", "chips"); [["Aujourd’hui", 0], ["Demain", 1]].forEach(function (x) { var k = el("button", "", x[0]); k.type = "button"; k.onclick = function () { var d = new Date(aujourdhui + "T12:00:00"); d.setDate(d.getDate() + x[1]); inp.value = gaIso(d); if (apres) apres(); }; rp.appendChild(k); }); return rp; }
+  function dessiner() {
+    zone.textContent = ""; var m = ms.value; dd = a = f = null; if (!m) return;
+    if (cat === "Titres de transport") {
+      var abo = !!GA_MOIS[m];
+      zone.appendChild(el("div", "lab", abo ? "Début de validité" : "Date du ticket")); a = el("input"); a.type = "date"; zone.appendChild(a); zone.appendChild(raccourcis(a, maj));
+      if (abo) { zone.appendChild(el("div", "lab", "Dernier jour de validité (calculé, modifiable)")); f = el("input"); f.type = "date"; zone.appendChild(f); }
+      zone.appendChild(fb); a.onchange = maj; if (f) f.onchange = function () { f.dataset.m = "1"; maj(); };
+    } else if (cat === "Documents et justificatifs") {
+      zone.appendChild(el("div", "lab", "Date du document")); dd = el("input"); dd.type = "date"; dd.max = aujourdhui; zone.appendChild(dd); zone.appendChild(raccourcis(dd));
+      if (GA_PERIODE.indexOf(m) >= 0) { zone.appendChild(el("div", "lab", "Premier jour concerné")); a = el("input"); a.type = "date"; zone.appendChild(a); zone.appendChild(el("div", "lab", "Dernier jour concerné (facultatif)")); f = el("input"); f.type = "date"; zone.appendChild(f); a.onchange = function () { f.min = a.value; }; }
+    }
+    function maj() { if (!a) return; var mo = GA_MOIS[m]; if (mo && a.value && f && !f.dataset.m) f.value = gaFinAbo(a.value, mo); fb.textContent = a.value ? (mo && f && f.value ? "Valable du " + gaFr(a.value) + " au " + gaFr(f.value) + " — aucun dépôt mensuel à refaire pendant cette période." : "Ticket du " + gaFr(a.value)) : ""; }
+    zone.appendChild(el("div", "lab", "Commentaire (facultatif)")); var tx = el("textarea"); tx.maxLength = 600; tx.placeholder = "Précision utile pour le responsable"; zone.appendChild(tx); zone.tx = tx;
+  }
+  ms.onchange = dessiner;
+  var pz = el("div", ""); pz.appendChild(el("div", "lab", "Document (PDF, JPG, PNG) — plusieurs pièces possibles")); z.appendChild(pz);
+  var PJ = gaPieces(pz, 6, function () { });
+  var er = el("div", "err"); z.appendChild(er);
+  var e = el("button", "", "Envoyer"); e.type = "button"; z.appendChild(e); var re = el("button", "sec", "Retour"); re.type = "button"; z.appendChild(re); re.onclick = function () { espace(REEL || r); };
+  var env = false, JT = jetonPJ();
+  e.onclick = function () {
+    if (env) return; er.textContent = "";
+    if (!ms.value) { er.textContent = "Choisissez le type."; return; }
+    if (cat === "Titres de transport" && !a.value) { er.textContent = "Indiquez la date de début."; return; }
+    if (GA_PERIODE.indexOf(ms.value) >= 0 && !a.value) { er.textContent = "Indiquez le premier jour concerné."; return; }
+    var L = PJ.liste(); if (!L.length) { er.textContent = "Joignez une photo ou un fichier."; return; }
+    env = true; e.disabled = true; e.textContent = "Envoi en cours…";
+    var charge = { categorie: cat, motif: ms.value, dateDoc: dd ? dd.value : "", debut: a ? a.value : "", fin: f ? f.value : "", commentaire: zone.tx ? zone.tx.value : "", fichiers: L.map(function (p) { return { nom: p.nom, b64: p.b64 }; }), jeton: JT };
+    runK(function (res) { env = false; if (res && res.ok) { gaPreuve(r, res); return; } e.disabled = false; e.textContent = "Réessayer l’envoi"; er.textContent = (res && res.msg) || "Envoi non confirmé : réessayez."; },
+      function () { env = false; e.disabled = false; e.textContent = "Réessayer l’envoi"; er.textContent = "Connexion interrompue : l’envoi n’est pas confirmé. Réessayez (aucun doublon ne sera créé)."; }).gaDeposer(DEV, charge);
+  };
+}
+function gaPreuve(r, res) {
+  vide(); c.className = "c l"; var z = el("div", "ga prv"); c.appendChild(z);
+  z.appendChild(el("div", "ok", "✔")); z.appendChild(el("div", "nom", "Dépôt enregistré"));
+  var d = res.dossier; z.appendChild(el("div", "g", d.motif + " · " + d.categorie));
+  z.appendChild(el("div", "id", d.id)); z.appendChild(el("div", "g2", "Déposé le " + d.depose + " (heure du serveur)"));
+  z.appendChild(el("span", "bd", d.statut));
+  z.appendChild(el("div", "g2", "Ce récapitulatif est votre preuve de dépôt : vous le retrouvez dans « Mes dépôts ». Le dossier sera vérifié par l’administration."));
+  var b = el("button", "", "Mes dépôts"); b.type = "button"; b.onclick = function () { espace(REEL || r); }; z.appendChild(b);
+}
+function gaComplement(r, d) {
+  vide(); c.className = "c l"; var z = el("div", "ga"); c.appendChild(z);
+  z.appendChild(el("div", "t", "Compléter le dossier")); z.appendChild(el("div", "nom", d.motif));
+  if (d.motifDecision) z.appendChild(el("div", "g2", "Demande : " + d.motifDecision));
+  var PJ = gaPieces(z, 4, function () { }), er = el("div", "err"); z.appendChild(er);
+  var e = el("button", "", "Envoyer les pièces"); e.type = "button"; z.appendChild(e); var re = el("button", "sec", "Retour"); re.type = "button"; re.onclick = function () { espace(REEL || r); }; z.appendChild(re);
+  var env = false, JT = jetonPJ();
+  e.onclick = function () { if (env) return; var L = PJ.liste(); if (!L.length) { er.textContent = "Joignez une photo ou un fichier."; return; } env = true; e.disabled = true; e.textContent = "Envoi en cours…";
+    runK(function (res) { env = false; if (res && res.ok) { espace(REEL || r); return; } e.disabled = false; e.textContent = "Réessayer l’envoi"; er.textContent = (res && res.msg) || "Envoi non confirmé."; }, function () { env = false; e.disabled = false; e.textContent = "Réessayer l’envoi"; er.textContent = "Connexion interrompue : réessayez."; }).gaAjouterPieces(DEV, d.id, L.map(function (p) { return { nom: p.nom, b64: p.b64 }; }), JT); };
+}
+
+function niv(x,f){return x===null||x===undefined||!isFinite(x)?"#9ca3af":x<0?"#7c3aed":f>=.75?"#16a34a":f>=.5?"#facc15":f>=.25?"#f97316":"#dc2626"}
 function anneau(frac,col,t1,t2){var C=2*Math.PI*52,f=Math.max(0,Math.min(1,frac)),d=el("div","anr");d.innerHTML='<svg viewBox="0 0 130 130"><circle cx="65" cy="65" r="52" fill="none" stroke="#e6e0cf" stroke-width="11"/><circle class="pg" cx="65" cy="65" r="52" fill="none" stroke="'+col+'" stroke-width="11" stroke-linecap="round" transform="rotate(-90 65 65)" stroke-dasharray="0 '+C.toFixed(1)+'" style="transition:stroke-dasharray 1s cubic-bezier(.2,.7,.2,1)"/></svg>';var p=d.querySelector(".pg");if(f<=0)p.style.display="none";else setTimeout(function(){p.setAttribute("stroke-dasharray",(C*f).toFixed(1)+" "+C.toFixed(1))},80);var ct=el("div","anc");ct.appendChild(el("b","",t1));ct.appendChild(el("span","",t2));d.appendChild(ct);return d}
 function carteCat(p,col,base){var d=el("div","cat"),h=el("button","ch");h.type="button";h.setAttribute("aria-expanded","true");h.appendChild(el("b","",p.lib+" — "+p.periode));h.appendChild(el("span","ctg"+(p.source==="Paie"||p.source==="Saisi"?" pa":""),p.source==="Paie"?"Fiche de paie":p.source==="Saisi"?"Saisi":p.source==="Estimé"?"Estimé":"À vérifier"));var chv=el("span","chv","▾");h.appendChild(chv);d.appendChild(h);
  var body=el("div","cbd");d.appendChild(body);h.onclick=function(){var o=h.getAttribute("aria-expanded")==="true";h.setAttribute("aria-expanded",o?"false":"true");body.style.display=o?"none":"";chv.textContent=o?"▸":"▾"};
