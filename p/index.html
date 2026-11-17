@@ -9,7 +9,7 @@
   }
   function make(ok, ko) {
     var o = { withSuccessHandler: function (f) { return make(f, ko); }, withFailureHandler: function (f) { return make(ok, f); } };
-    ["etat", "verifier", "pointer", "ouvrirScan", "congesEtat", "congesDemander", "congesAnnuler","congesConnexion","congesPiece","congesAjouterPiece","stampDonnees","recupDemander","recupVerifier","recupStatut","agentBilan","agentDetails","agentSignaler","agentSignalements","meteoDonnees","gaMesDossiers","gaDeposer","gaMaPiece","gaAjouterPieces"].forEach(function (n) { o[n] = function () { appelle(n, Array.prototype.slice.call(arguments), ok, ko); }; });
+    ["etat", "verifier", "pointer", "ouvrirScan", "congesEtat", "congesDemander", "congesAnnuler","congesConnexion","congesPiece","congesAjouterPiece","stampDonnees","recupDemander","recupVerifier","recupStatut","agentBilan","agentDetails","agentSignaler","agentSignalements","meteoDonnees","gaMesDossiers","gaDeposer","gaMaPiece","gaAjouterPieces","qsPoser","qsIrisRepondre","qsMesQuestions","qsDemanderHumain"].forEach(function (n) { o[n] = function () { appelle(n, Array.prototype.slice.call(arguments), ok, ko); }; });
     return o;
   }
   window.google = { script: { run: make(null, null) } };
@@ -51,7 +51,7 @@ function estAdmin(){return !!REEL&&String(REEL.nom).trim().toUpperCase()==="HEBA
 function espace(r){if(!r.__demo)REEL=r;if(!estAdmin())DEMOP=false;espaceRendu(r.__demo?r:(DEMOP?demoData():r))}
 function demoPresume(){return{d:frD(new Date()),h:"06:00 – 09:00",dur:180,site:"Site fictif",ctrl:"09:02"}}
 function bandeauPresume(r){var P=r.presume||(DEMOP?demoPresume():null);if(!P)return;var b=el("div","pre");b.setAttribute("role","status");b.appendChild(el("b","","Présence non confirmée — absence présumée"));b.appendChild(el("p","","Service du "+dLong(P.d)+" · Horaire prévu : "+(P.h||"Non renseigné")+" · Durée prévue : "+dureeTxt(P.dur)));b.appendChild(el("p","","Arrivée : non enregistrée · Départ : non enregistré · Contrôle à "+hhmm(P.ctrl)));b.appendChild(el("div","prn","Statut provisoire : ce n’est pas une décision. Un responsable doit le confirmer. Si vous étiez présent, prévenez-le."));c.appendChild(b)}
-function espaceRendu(r){vide();c.className="c l";if(DEMOP)c.appendChild(el("div","dban","Mode démonstration · données fictives · rien n’est enregistré"));c.appendChild(el("div","t","Mon espace"));c.appendChild(el("div","nom",r.prenom+" "+r.nom));var ids=el("div","ids");[["N° de badge",fmtBadge(r.badge)||"—"],["N° d’accès",fmtCarte(r.carte)||"—"]].forEach(function(x){var d=el("div","");d.appendChild(el("span","",x[0]));d.appendChild(el("b","",x[1]));ids.appendChild(d)});c.appendChild(ids);bandeauPresume(r);if(TK){var pb=el("button","","Pointer");pb.onclick=function(){envoyer("","")};c.appendChild(pb)}var nv=el("div","seg gnav");[["c","Mes congés"],["a","Mes absences"],["g","Gestion administrative"]].forEach(function(o){var b=el("button",o[0]===VUE?"on":"",o[1]);b.type="button";b.onclick=function(){VUE=o[0];espace(r)};nv.appendChild(b)});c.appendChild(nv);if(estAdmin()){var db=el("button","dbtn"+(DEMOP?" on":""),DEMOP?"Quitter la démonstration":"Mode démonstration");db.type="button";db.onclick=function(){DEMOP=!DEMOP;espace(REEL||r)};c.appendChild(db)};if(VUE==="c")corpsConges(r);else if(VUE==="g")corpsGA(r);else corpsAbs(r)}/* IRIS — onglet agent « Gestion administrative » (ajout isolé).
+function espaceRendu(r){vide();c.className="c l";if(DEMOP)c.appendChild(el("div","dban","Mode démonstration · données fictives · rien n’est enregistré"));c.appendChild(el("div","t","Mon espace"));c.appendChild(el("div","nom",r.prenom+" "+r.nom));var ids=el("div","ids");[["N° de badge",fmtBadge(r.badge)||"—"],["N° d’accès",fmtCarte(r.carte)||"—"]].forEach(function(x){var d=el("div","");d.appendChild(el("span","",x[0]));d.appendChild(el("b","",x[1]));ids.appendChild(d)});c.appendChild(ids);bandeauPresume(r);if(TK){var pb=el("button","","Pointer");pb.onclick=function(){envoyer("","")};c.appendChild(pb)}var nv=el("div","seg gnav");[["c","Mes congés"],["a","Mes absences"],["g","Gestion administrative"]].forEach(function(o){var b=el("button",o[0]===VUE?"on":"",o[1]);b.type="button";b.onclick=function(){VUE=o[0];espace(r)};nv.appendChild(b)});c.appendChild(nv);c.appendChild(qsBouton(r));if(estAdmin()){var db=el("button","dbtn"+(DEMOP?" on":""),DEMOP?"Quitter la démonstration":"Mode démonstration");db.type="button";db.onclick=function(){DEMOP=!DEMOP;espace(REEL||r)};c.appendChild(db)};if(VUE==="c")corpsConges(r);else if(VUE==="g")corpsGA(r);else corpsAbs(r)}/* IRIS — onglet agent « Gestion administrative » (ajout isolé).
    Réutilise les composants de p/index.html : el, c, vide, run, runK, toastD, visionneuse, lirePJ, jetonPJ, DEV, REEL, espace.
    Intégration (après accord) : coller ce bloc avant « function niv », ajouter ["g","Gestion administrative"] au sélecteur d'onglets et « else if(VUE==="g")corpsGA(r) » dans espaceRendu. */
 var GAC = {
@@ -166,6 +166,205 @@ function gaComplement(r, d) {
   var env = false, JT = jetonPJ();
   e.onclick = function () { if (env) return; var L = PJ.liste(); if (!L.length) { er.textContent = "Joignez une photo ou un fichier."; return; } env = true; e.disabled = true; e.textContent = "Envoi en cours…";
     runK(function (res) { env = false; if (res && res.ok) { espace(REEL || r); return; } e.disabled = false; e.textContent = "Réessayer l’envoi"; er.textContent = (res && res.msg) || "Envoi non confirmé."; }, function () { env = false; e.disabled = false; e.textContent = "Réessayer l’envoi"; er.textContent = "Connexion interrompue : réessayez."; }).gaAjouterPieces(DEV, d.id, L.map(function (p) { return { nom: p.nom, b64: p.b64 }; }), JT); };
+}
+
+/* IRIS — « Posez votre question » dans l'espace agent (ajout isolé).
+   Réutilise les composants de p/index.html : el, c, vide, runK, toastD, jetonPJ, DEV, REEL, DEMOP, espace.
+   Intégration : coller ce bloc avant « function niv », ajouter "qsPoser","qsMesQuestions","qsDemanderHumain" à la liste blanche du shim,
+   et « c.appendChild(qsBouton(r)); » juste après « c.appendChild(nv); » dans espaceRendu. Tout est préfixé « qs ». */
+var QS = { zone: null, liste: [], sig: "", timer: null, env: false, jeton: "", dernier: "", rec: null, ecoute: false, att: null, lst: null, pend: {}, pol: {} };
+var QS_PERIODE = 20000, QS_MAX = 500, QS_POLL = 4000, QS_ATTENTE = 90000;
+(function () { if (document.getElementById("qs-css")) return; var s = document.createElement("style"); s.id = "qs-css"; s.textContent =
+  "button.qsb{display:block;width:100%;margin-top:14px;background:#fff;color:#04112c;border:1.5px solid #c9a24d;border-radius:14px;padding:14px 12px;min-height:52px;font-size:16px;font-weight:600;text-align:center;line-height:1.2;cursor:pointer}" +
+  "button.qsb:active{background:#f3ecdb}" +
+  ".qs{text-align:left;max-width:100%;overflow-wrap:anywhere}.qs .t{font-size:15px}.qs .qsfil{margin-top:14px;display:flex;flex-direction:column;gap:12px}" +
+  ".qs .qsm{width:fit-content;max-width:90%;border-radius:16px;padding:11px 14px;font-size:16px;line-height:1.45;text-align:left;border:1px solid #e7e2d6}" +
+  ".qs .qsa{margin-left:auto;background:#04112c;color:#fff;border-color:#04112c;border-bottom-right-radius:5px}" +
+  ".qs .qsi{margin-right:auto;background:#f6f4ef;color:#04112c;border-bottom-left-radius:5px}" +
+  ".qs .qsr{margin-right:auto;background:#fbf3dc;color:#04112c;border-color:#c9a24d;border-bottom-left-radius:5px}" +
+  ".qs .qsn{margin-right:auto;background:#fff;color:#6e6a60;border-style:dashed}" +
+  ".qs .qsl{font-size:15px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8a7b57;margin-bottom:4px}" +
+  ".qs .qst{white-space:pre-wrap;overflow-wrap:anywhere}" +
+  ".qs .qsd{font-size:15px;color:#6e6a60;margin-top:6px}" +
+  ".qs .qss{margin-top:8px;font-size:15px}.qs .qss a{display:block;color:#1e3a8a;text-decoration:underline;margin-top:4px;overflow-wrap:anywhere}" +
+  ".qs .qsx{font-size:15px;color:#6e6a60;margin-top:8px;line-height:1.35}" +
+  ".qs button.qsh{width:100%;margin-top:10px;background:#fff;color:#04112c;border:1px solid #c9a24d;border-radius:12px;padding:10px 12px;font-size:15px;font-weight:600;min-height:44px}" +
+  ".qs .qsok{font-size:15px;font-weight:700;color:#166534;margin-top:8px}" +
+  ".qs .qsbar{margin-top:16px}.qs textarea{display:block;font-family:inherit;font-size:16px;width:100%;border-radius:14px;margin:0;padding:12px 14px;border:1px solid #d8d2c4;background:#fff;color:#1d1d1f;min-height:92px;resize:vertical;line-height:1.4}" +
+  ".qs .qscnt{font-size:15px;color:#6e6a60;text-align:right;margin-top:4px}" +
+  ".qs .qsrow{display:flex;gap:8px;margin-top:8px;align-items:stretch}" +
+  ".qs .qsrow button{margin:0;min-height:52px;border-radius:14px;font-size:16px;font-weight:600;padding:0 14px}" +
+  ".qs button.qsenv{flex:1 1 0;min-width:0;width:auto;background:#04112c;color:#fff;border:1px solid #04112c}.qs button.qsenv:disabled{opacity:.6}" +
+  ".qs button.qsmic{flex:0 0 auto;width:auto;background:#fff;color:#04112c;border:1.5px solid #c9a24d;display:flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}" +
+  ".qs button.qsmic.on{background:#fbf3dc;animation:qspulse 1.2s infinite}.qs .qsmic svg{width:20px;height:20px;flex:none}" +
+  ".qs button.qsret{width:100%;margin-top:12px;background:#fff;color:#04112c;border:1px solid #d8d2c4;border-radius:14px;min-height:50px;font-size:16px}" +
+  ".qs .qspts{display:inline-flex;gap:4px;margin-left:6px;vertical-align:middle}.qs .qspts i{width:7px;height:7px;border-radius:50%;background:#8a7b57;animation:qsb 1.2s infinite}.qs .qspts i:nth-child(2){animation-delay:.2s}.qs .qspts i:nth-child(3){animation-delay:.4s}" +
+  "@keyframes qspulse{0%{box-shadow:0 0 0 0 rgba(201,162,77,.65)}100%{box-shadow:0 0 0 14px rgba(201,162,77,0)}}@keyframes qsb{0%,80%,100%{opacity:.25}40%{opacity:1}}" +
+  "@media(prefers-reduced-motion:reduce){.qs button.qsmic.on,.qs .qspts i{animation:none}}";
+  document.head.appendChild(s); })();
+function qsNet(t) { return String(t === undefined || t === null ? "" : t).replace(/gemini/gi, "IRIS").replace(/google/gi, "IRIS"); }
+function qsUrlOk(u) { return /^https?:\/\/[^\s"'<>]+$/i.test(String(u || "")); }
+function qsBouton(r) { var b = el("button", "qsb", "Posez votre question"); b.type = "button"; b.onclick = function () { qsOuvrir(r); }; return b; }
+function qsQuitter() {
+  if (QS.timer) { clearInterval(QS.timer); QS.timer = null; }
+  if (QS.rec) { try { QS.rec.onend = QS.rec.onerror = QS.rec.onresult = null; QS.rec.abort(); } catch (e) { } QS.rec = null; }
+  for (var k in QS.pol) clearInterval(QS.pol[k]);
+  QS.pol = {}; QS.pend = {}; QS.ecoute = false; QS.zone = null; QS.env = false; QS.att = null; QS.lst = null;
+}
+function qsBulle(type, texte, etiquette) {
+  var b = el("div", "qsm " + type); if (etiquette) b.appendChild(el("div", "qsl", etiquette));
+  b.appendChild(el("div", "qst", qsNet(texte))); return b;
+}
+function qsFusion(q) { for (var i = 0; i < QS.liste.length; i++) if (QS.liste[i].id === q.id) { QS.liste[i] = q; return; } QS.liste.push(q); }
+function qsRendre() {
+  var z = QS.zone, L = QS.lst; if (!z || !L) return; L.textContent = "";
+  QS.liste.forEach(function (q) {
+    L.appendChild(qsBulle("qsa", q.question));
+    if (q.reponseIris) {
+      var b = qsBulle("qsi", q.reponseIris, "IRIS");
+      var src = (q.sources || []).filter(function (s) { return s && qsUrlOk(s.url); });
+      if (src.length) {
+        var sd = el("div", "qss", "Sources :");
+        src.forEach(function (s) { var a = el("a", "", qsNet(s.titre || "Source")); a.href = s.url; a.target = "_blank"; a.rel = "noopener noreferrer"; sd.appendChild(a); });
+        b.appendChild(sd);
+      }
+      b.appendChild(el("div", "qsx", "Réponse indicative : elle ne remplace pas l’avis de votre responsable."));
+      if (q.humainDemande) b.appendChild(el("div", "qsok", "✔ Demande transmise"));
+      else if (!q.reponseResponsable && q.statut !== "Clôturée") {
+        var h = el("button", "qsh", "Demander aussi à mon responsable"); h.type = "button";
+        h.onclick = function () {
+          if (h.disabled) return; h.disabled = true; h.textContent = "Envoi en cours…";
+          runK(function (res) {
+            if (res && res.ok && res.question) { qsFusion(res.question); qsRendre(); }
+            else { h.disabled = false; h.textContent = "Demander aussi à mon responsable"; toastD((res && res.msg) || "Demande non confirmée : réessayez."); }
+          }, function () { h.disabled = false; h.textContent = "Demander aussi à mon responsable"; toastD("Connexion interrompue : réessayez."); }).qsDemanderHumain(DEV, q.id);
+        };
+        b.appendChild(h);
+      }
+      L.appendChild(b);
+    } else if (QS.pend[q.id]) {
+      var pb = el("div", "qsm qsi"); pb.setAttribute("role", "status"); pb.appendChild(el("div", "qsl", "IRIS"));
+      var tx = el("div", "qst", "IRIS réfléchit…"), pt = el("span", "qspts"); pt.setAttribute("aria-hidden", "true"); pt.appendChild(el("i")); pt.appendChild(el("i")); pt.appendChild(el("i")); tx.appendChild(pt); pb.appendChild(tx); L.appendChild(pb);
+    } else if (!q.reponseResponsable && q.statut !== "Clôturée") {
+      L.appendChild(qsBulle("qsn", "Votre question a bien été transmise à votre responsable. Vous verrez sa réponse ici."));
+    }
+    if (q.reponseResponsable) {
+      var rb = qsBulle("qsr", q.reponseResponsable, "Votre responsable");
+      if (q.reponduLe) rb.appendChild(el("div", "qsd", "Répondu le " + q.reponduLe));
+      L.appendChild(rb);
+    }
+  });
+}
+function qsCharger(silencieux) {
+  var z = QS.zone; if (!z || DEMOP) return;
+  function msgErr(m) { var e = z.querySelector(".qserr"); if (e) e.textContent = m; }
+  runK(function (res) {
+    if (QS.zone !== z || QS.env) return;
+    if (res && res.ok && Array.isArray(res.questions)) {
+      var sig = JSON.stringify(res.questions), ancien = QS.sig; QS.sig = sig;
+      if (sig !== ancien || !QS.liste.length) { QS.liste = res.questions.slice().reverse(); qsRendre(); }
+    } else if (!silencieux) msgErr((res && res.msg) || "Historique indisponible pour le moment.");
+  }, function () { if (QS.zone === z && !silencieux) msgErr("Connexion interrompue : l’historique n’a pas pu être chargé."); }).qsMesQuestions(DEV);
+}
+function qsMicro(ta, majCompteur, er) {
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR) return null;
+  var b = el("button", "qsmic"); b.type = "button"; b.setAttribute("aria-label", "Dicter ma question");
+  var ns = "http://www.w3.org/2000/svg", sv = document.createElementNS(ns, "svg"); sv.setAttribute("viewBox", "0 0 24 24"); sv.setAttribute("aria-hidden", "true");
+  [["rect", { x: 9, y: 2, width: 6, height: 12, rx: 3 }], ["path", { d: "M5 11a7 7 0 0 0 14 0M12 18v4" }]].forEach(function (o) { var n = document.createElementNS(ns, o[0]); for (var k in o[1]) n.setAttribute(k, o[1][k]); n.setAttribute("fill", "none"); n.setAttribute("stroke", "currentColor"); n.setAttribute("stroke-width", "2"); n.setAttribute("stroke-linecap", "round"); sv.appendChild(n); });
+  var lib = el("span", "", "Dicter"); b.appendChild(sv); b.appendChild(lib);
+  function repos() { QS.ecoute = false; b.classList.remove("on"); lib.textContent = "Dicter"; b.setAttribute("aria-pressed", "false"); }
+  b.onclick = function () {
+    er.textContent = "";
+    if (QS.ecoute && QS.rec) { try { QS.rec.stop(); } catch (e) { } return; }
+    var rec; try { rec = new SR(); } catch (e) { er.textContent = "La dictée n’est pas disponible sur cet appareil. Écrivez votre question."; return; }
+    rec.lang = "fr-FR"; rec.interimResults = false; rec.continuous = false; rec.maxAlternatives = 1; QS.rec = rec;
+    rec.onresult = function (ev) {
+      var t = ""; for (var i = ev.resultIndex || 0; i < ev.results.length; i++) if (ev.results[i].isFinal !== false) t += ev.results[i][0].transcript + " ";
+      t = t.trim(); if (!t) return; var v = ta.value.replace(/\s+$/, ""); ta.value = ((v ? v + " " : "") + t).slice(0, QS_MAX); majCompteur();
+    };
+    rec.onerror = function (ev) {
+      var e = ev && ev.error;
+      er.textContent = e === "not-allowed" || e === "service-not-allowed" ? "Le micro n’est pas autorisé. Autorisez-le dans les réglages de votre navigateur, ou écrivez votre question."
+        : e === "no-speech" ? "Je n’ai rien entendu. Appuyez de nouveau sur le micro et parlez."
+        : e === "audio-capture" ? "Aucun micro n’a été trouvé sur cet appareil."
+        : e === "network" ? "La dictée a besoin d’une connexion. Réessayez ou écrivez votre question."
+        : e === "aborted" ? "" : "La dictée n’a pas fonctionné. Écrivez votre question.";
+      repos();
+    };
+    rec.onend = function () { repos(); };
+    try { rec.start(); QS.ecoute = true; b.classList.add("on"); lib.textContent = "J’écoute…"; b.setAttribute("aria-pressed", "true"); } catch (e) { repos(); er.textContent = "La dictée n’a pas pu démarrer. Écrivez votre question."; }
+  };
+  return b;
+}
+function qsReflechit() {
+  var pb = el("div", "qsm qsi"); pb.setAttribute("role", "status"); pb.appendChild(el("div", "qsl", "IRIS"));
+  var tx = el("div", "qst", "IRIS réfléchit…"), pt = el("span", "qspts"); pt.setAttribute("aria-hidden", "true"); pt.appendChild(el("i")); pt.appendChild(el("i")); pt.appendChild(el("i")); tx.appendChild(pt); pb.appendChild(tx); return pb;
+}
+// Réponse d'IRIS : qsIrisRepondre (long, son échec est silencieux) + sondage de qsMesQuestions toutes les QS_POLL ms pendant QS_ATTENTE ms
+function qsGenerer(z, id) {
+  var debut = Date.now();
+  function fini() { if (QS.pol[id]) { clearInterval(QS.pol[id]); delete QS.pol[id]; } if (QS.pend[id]) { delete QS.pend[id]; if (QS.zone === z) qsRendre(); } }
+  function recu(q) { if (q) { qsFusion(q); } fini(); if (QS.zone === z) qsRendre(); }
+  runK(function (res) {
+    if (QS.zone !== z) return;
+    if (res && res.ok && res.question && (res.iris || res.question.reponseIris)) recu(res.question);
+    else if (!res || !res.ok || !res.enCours) fini();
+  }, function () { }).qsIrisRepondre(DEV, id);
+  QS.pol[id] = setInterval(function () {
+    if (QS.zone !== z || !document.body.contains(z)) { qsQuitter(); return; }
+    if (Date.now() - debut > QS_ATTENTE) { fini(); return; }
+    runK(function (res) {
+      if (QS.zone !== z || !QS.pend[id] || !res || !res.ok || !Array.isArray(res.questions)) return;
+      for (var i = 0; i < res.questions.length; i++) if (res.questions[i].id === id && (res.questions[i].reponseIris || res.questions[i].reponseResponsable)) { recu(res.questions[i]); return; }
+    }, function () { }).qsMesQuestions(DEV);
+  }, QS_POLL);
+}
+function qsOuvrir(r) {
+  qsQuitter(); vide(); c.className = "c l";
+  var z = el("div", "qs"); c.appendChild(z); QS.zone = z; QS.liste = []; QS.sig = ""; QS.jeton = jetonPJ(); QS.dernier = "";
+  z.appendChild(el("div", "t", "Posez votre question"));
+  var fil = el("div", "qsfil"); z.appendChild(fil);
+  fil.appendChild(qsBulle("qsi", "Bonjour ! Je suis IRIS. Posez-moi votre question : congés, paie, droits… Je vous réponds tout de suite, et votre responsable peut aussi vous répondre.", "IRIS"));
+  QS.lst = el("div", "qsfil"); QS.lst.style.marginTop = "0"; fil.appendChild(QS.lst);
+  QS.att = el("div", "qsfil"); QS.att.style.marginTop = "0"; fil.appendChild(QS.att);
+  var bar = el("div", "qsbar"); z.appendChild(bar);
+  var ta = el("textarea"); ta.maxLength = QS_MAX; ta.rows = 3; ta.placeholder = "Écrivez votre question ici"; ta.setAttribute("aria-label", "Votre question"); bar.appendChild(ta);
+  var cnt = el("div", "qscnt", "0 / " + QS_MAX); bar.appendChild(cnt);
+  var er = el("div", "err qserr"); er.style.marginTop = "8px";
+  function maj() { cnt.textContent = ta.value.length + " / " + QS_MAX; }
+  ta.addEventListener("input", maj);
+  var row = el("div", "qsrow"); bar.appendChild(row);
+  var mic = qsMicro(ta, maj, er); if (mic) row.appendChild(mic);
+  var env = el("button", "qsenv", "Envoyer"); env.type = "button"; row.appendChild(env);
+  bar.appendChild(er);
+  env.onclick = function () {
+    if (QS.env || QS.zone !== z) return; er.textContent = "";
+    var t = ta.value.trim();
+    if (t.length < 3) { er.textContent = "Écrivez votre question."; return; }
+    if (DEMOP) { toastD("Mode démonstration : rien n’est enregistré."); return; }
+    if (QS.ecoute && QS.rec) { try { QS.rec.stop(); } catch (e) { } }
+    if (t !== QS.dernier) { QS.jeton = jetonPJ(); QS.dernier = t; }
+    QS.env = true; env.disabled = true; env.textContent = "Envoi…";
+    var A = QS.att; A.textContent = ""; A.appendChild(qsBulle("qsa", t));
+    A.appendChild(qsReflechit());
+    try { A.lastChild.scrollIntoView({ block: "nearest" }); } catch (e) { }
+    function fin() { QS.env = false; env.disabled = false; env.textContent = "Envoyer"; if (QS.att === A) A.textContent = ""; }
+    runK(function (res) {
+      if (QS.zone !== z) return; fin();
+      if (res && res.ok && res.question) {
+        var q = res.question; ta.value = ""; maj(); QS.dernier = ""; QS.jeton = jetonPJ();
+        if (q.reponseIris || q.reponseResponsable) { qsFusion(q); qsRendre(); }
+        else { QS.pend[q.id] = true; qsFusion(q); qsRendre(); qsGenerer(z, q.id); }
+        try { var d = QS.lst.lastChild; if (d) d.scrollIntoView({ block: "nearest" }); } catch (e) { }
+      } else er.textContent = (res && res.msg) || "Votre question n’a pas pu être envoyée. Réessayez.";
+    }, function () {
+      if (QS.zone !== z) return; fin();
+      er.textContent = "Connexion interrompue. Votre question est conservée : appuyez de nouveau sur « Envoyer » (aucun doublon ne sera créé).";
+    }).qsPoser(DEV, t, QS.jeton);
+  };
+  var ret = el("button", "qsret", "Retour"); ret.type = "button"; ret.onclick = function () { qsQuitter(); espace(REEL || r); }; z.appendChild(ret);
+  qsCharger(false);
+  QS.timer = setInterval(function () { if (QS.zone !== z || !document.body.contains(z)) { qsQuitter(); return; } if (document.hidden || QS.env || DEMOP) return; qsCharger(true); }, QS_PERIODE);
 }
 
 function niv(x,f){return x===null||x===undefined||!isFinite(x)?"#9ca3af":x<0?"#7c3aed":f>=.75?"#16a34a":f>=.5?"#facc15":f>=.25?"#f97316":"#dc2626"}
