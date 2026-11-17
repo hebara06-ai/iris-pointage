@@ -954,6 +954,115 @@
       r.dossiers.forEach(function (d) { var b = h("button", { c: "ed-b", t: "Détails", type: "button" }); b.onclick = function () { M.ferme(); gaDetails(d.id); }; M.box.appendChild(h("div", { c: "ga-l" }, [h("div", {}, [h("b", { t: d.motif }), h("div", { c: "m", t: d.depose + " · " + d.statut })]), b])); });
     });
   }
+  /* IRIS — onglet administrateur « Questions » (ajout isolé, inséré avant paneSg dans admin/index.html).
+     Réutilise : h, lab, msg, dessiner, ov, onglet, CLE. Aucun autre onglet n'est modifié.
+     Serveur : qsAdminListe / qsAdminRepondre / qsAdminClore / qsAdminRegenerer / qsAdminSupprimer (qs_serveur.gs). */
+  var QS = { err: null, liste: null, aTraiter: null, filtre: "", chargement: false, encore: false, ouvert: {}, brouillons: {}, occupe: {}, foc: null, pos: 0 };
+  var QS_STATUT = { "Répondue par IRIS": "#3b6fd4", "En attente de réponse": "#d4a017", "Répondue par le responsable": "#16a34a", "Clôturée": "#8a93a1" };
+  var QS_FILTRES = [["", "Tous"], ["traiter", "À traiter"], ["Répondue par IRIS", "Répondue par IRIS"], ["Répondue par le responsable", "Répondue par le responsable"], ["Clôturée", "Clôturée"]];
+  (function () { var s = document.createElement("style"); s.textContent = ".qs-k{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:14px}.qs-k button{flex:1 1 150px;max-width:230px;border:1px solid #e7e2d6;background:#faf8f3;border-radius:16px;padding:12px 8px;cursor:pointer;text-align:center;font:inherit;color:#0b1a2b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}.qs-k button b{display:block;font-size:26px;line-height:1.1}.qs-k button span{font-size:13px;color:#6e6a60}.qs-k button.on{border-color:#0b1a2b;box-shadow:0 0 0 1px #0b1a2b}.qs-q{padding:18px 0;border-top:1px solid #eee9dd}.qs-q:first-of-type{border-top:0}.qs-h{display:flex;gap:10px 14px;align-items:center;justify-content:space-between;flex-wrap:wrap}.qs-h>div{min-width:0}.qs-m{font-size:13px;color:#6e6a60}.qs-bd{display:inline-block;font-size:12px;font-weight:600;border-radius:999px;padding:4px 12px;color:#fff;white-space:nowrap}.qs-hd{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:3px 11px;color:#8a3b00;background:#fdebd0;border:1px solid #f0c48a;white-space:nowrap}.qs-tg{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}.qs-t{margin:10px 0 4px;font-size:16px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;background:#faf9f5;border-left:3px solid #c9a24d;border-radius:8px;padding:10px 14px}.qs-r{margin:8px 0;border:1px solid #e6dfcf;border-radius:14px;padding:12px 16px;font-size:15px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f7fd}.qs-r h5,.qs-rh{margin:0 0 6px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#8a7b57;font-weight:700}.qs-rp{background:#eaf7ef;border-color:#bfe3cc}.qs-s{margin:8px 0 0;padding:0;list-style:none;font-size:14px;white-space:normal}.qs-s li{margin:3px 0}.qs-s a{color:#1d4ed8;word-break:break-all}.qs-ta{width:100%;box-sizing:border-box;font:inherit;font-size:15px;border:1px solid #ddd6c6;border-radius:12px;padding:10px 12px;min-height:64px;margin-top:6px;resize:vertical}.qs-q>.ed-lab{margin-top:14px}.qs-ac{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}.qs-ac .ed-b{white-space:normal}.qs-fl{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:12px}@media(max-width:700px){.qs-tg{justify-content:flex-start}}@media(max-width:1100px){.ed-seg{flex-wrap:wrap;justify-content:center;overflow-x:visible}.ed-seg button{white-space:nowrap}}"; document.head.appendChild(s); })();
+  // Appel serveur avec gestion explicite de l'échec réseau (aucun « Chargement… » bloqué, aucune boucle)
+  function qsAppel(nom, arg, ok, ko) { google.script.run.withSuccessHandler(ok).withFailureHandler(function () { if (ko) ko(); else msg("Connexion impossible, réessayez.", true); })[nom](CLE, arg); }
+  function qsBadge() { return QS.aTraiter ? " (" + QS.aTraiter + ")" : ""; }
+  function qsAttente(q) { return q.statut === "En attente de réponse" || (q.humainDemande && q.statut !== "Répondue par le responsable" && q.statut !== "Clôturée"); }
+  // Chargement de la liste (silencieux : la liste affichée reste en place pendant le rechargement) ; en cas de refus : message + bouton « Réessayer », jamais de rechargement en boucle
+  function qsCharge() {
+    if (QS.chargement) { QS.encore = true; return; }
+    QS.chargement = true; QS.err = null; QS.encore = false;
+    function fin() { QS.chargement = false; if (QS.encore && !QS.err) { QS.encore = false; qsCharge(); return; } dessiner(); }
+    qsAppel("qsAdminListe", { statut: "" }, function (r) {
+      if (r && r.ok && Array.isArray(r.questions)) { QS.liste = r.questions; QS.aTraiter = Number(r.aTraiter) || 0; }
+      else { QS.err = (r && r.msg) || "Questions indisponibles."; QS.liste = null; QS.aTraiter = null; }
+      fin();
+    }, function () { QS.err = "Connexion impossible, réessayez."; QS.liste = null; QS.aTraiter = null; fin(); });
+  }
+  // Compteur du badge : chargé à l'ouverture de la fenêtre « Corrections » (hook additif sur le bouton) puis rafraîchi discrètement hors de l'onglet Questions
+  function qsCompteur() { QS.err = null; qsCharge(); }
+  setInterval(function () { if (ov.className === "on" && !document.hidden && onglet !== "qs" && !QS.err && !QS.chargement) qsCharge(); }, 60000);
+  function qsLien(s) {
+    var u = String((s && s.url) || ""), t = String((s && s.titre) || "Source");
+    if (/^https?:\/\//i.test(u)) return h("a", { href: u, target: "_blank", rel: "noopener noreferrer", t: t });
+    return h("span", { t: t });
+  }
+  function qsMicro(ta, id) {
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR) return null;
+    var b = h("button", { c: "ed-b", t: "Dicter", type: "button", title: "Dicter la réponse (français)", "aria-label": "Dicter la réponse" }), rec = null, actif = false;
+    function fini() { actif = false; b.textContent = "Dicter"; }
+    b.onclick = function () {
+      if (actif && rec) { try { rec.stop(); } catch (e) { } return; }
+      try {
+        rec = new SR(); rec.lang = "fr-FR"; rec.interimResults = false; rec.continuous = false;
+        rec.onresult = function (e) { var t = ""; for (var i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) t += e.results[i][0].transcript; t = t.trim(); if (t) { ta.value = (ta.value && !/\s$/.test(ta.value) ? ta.value + " " : ta.value) + t; QS.brouillons[id] = ta.value; } };
+        rec.onerror = function (e) { msg("Dictée indisponible" + (e && e.error === "not-allowed" ? " : microphone refusé." : ", réessayez."), true); fini(); };
+        rec.onend = fini; rec.start(); actif = true; b.textContent = "Arrêter la dictée";
+      } catch (e) { fini(); msg("Dictée indisponible, réessayez.", true); }
+    };
+    return b;
+  }
+  function qsAction(id, boutons, nom, arg, okMsg, apres) {
+    if (QS.occupe[id]) return; QS.occupe[id] = true; boutons.forEach(function (b) { b.disabled = true; });
+    function libre() { QS.occupe[id] = false; boutons.forEach(function (b) { b.disabled = false; }); }
+    qsAppel(nom, arg, function (r) {
+      libre();
+      if (r && r.ok) { msg(okMsg); if (apres) apres(); qsCharge(); } else msg((r && r.msg) || "Refusé.", true);
+    }, function () { libre(); msg("Connexion impossible, réessayez.", true); });
+  }
+  function qsLigne(q) {
+    var id = q.id, bds = [h("span", { c: "qs-bd", style: "background:" + (QS_STATUT[q.statut] || "#8a93a1"), t: q.statut })];
+    if (q.humainDemande) bds.unshift(h("span", { c: "qs-hd", t: "Réponse humaine demandée" }));
+    var it = h("div", { c: "qs-q" }), nom = ((q.prenom || "") + " " + (q.nom || "")).trim() || "Agent";
+    it.appendChild(h("div", { c: "qs-h" }, [h("div", {}, [h("b", { t: nom }), h("div", { c: "qs-m", t: "Question déposée le " + (q.depose || "—") })]), h("div", { c: "qs-tg" }, bds)]));
+    it.appendChild(h("div", { c: "qs-t", t: q.question }));
+    // Réponse d'IRIS (automatique), repliable
+    var ouv = !!QS.ouvert[id], boite = h("div", { c: "qs-r" }), tg = h("button", { c: "ed-b", type: "button", t: (ouv ? "Masquer" : "Voir") + " la réponse d’IRIS (automatique)" });
+    tg.setAttribute("aria-expanded", ouv ? "true" : "false");
+    tg.onclick = function () { QS.ouvert[id] = !QS.ouvert[id]; dessiner(); };
+    it.appendChild(h("div", { c: "qs-ac" }, [tg]));
+    if (ouv) {
+      boite.appendChild(h("h5", { t: "Réponse d’IRIS (automatique)" }));
+      if (q.reponseIris) {
+        boite.appendChild(h("div", { t: q.reponseIris }));
+        var ss = (q.sources || []).filter(function (s) { return s && (s.url || s.titre); });
+        if (ss.length) { var ul = h("ul", { c: "qs-s" }); ss.forEach(function (s) { ul.appendChild(h("li", {}, [qsLien(s)])); }); boite.appendChild(h("div", { c: "qs-m", style: "margin-top:8px", t: "Sources :" })); boite.appendChild(ul); }
+      } else boite.appendChild(h("div", { t: "IRIS n’a pas pu répondre automatiquement à cette question." }));
+      it.appendChild(boite);
+    }
+    if (q.reponseResponsable) it.appendChild(h("div", { c: "qs-r qs-rp" }, [h("h5", { t: "Réponse du responsable" + (q.reponduLe ? " — " + q.reponduLe : "") }), h("div", { t: q.reponseResponsable })]));
+    // Zone de réponse
+    var ta = h("textarea", { c: "qs-ta", placeholder: "Écrivez votre réponse, ou utilisez la dictée.", maxlength: "1500", "aria-label": "Votre réponse à l’agent" }); ta.value = QS.brouillons[id] || "";
+    ta.addEventListener("input", function () { QS.brouillons[id] = ta.value; QS.pos = ta.selectionStart; });
+    ta.addEventListener("focus", function () { QS.foc = id; });
+    ta.addEventListener("blur", function () { if (ta.isConnected && QS.foc === id) QS.foc = null; });
+    it.appendChild(lab("Votre réponse à l’agent", ta));
+    var br = h("button", { c: "ed-b ed-p", t: "Répondre", type: "button" }), bg = h("button", { c: "ed-b", t: "Régénérer la réponse d’IRIS", type: "button" }), bc = h("button", { c: "ed-b", t: "Clôturer", type: "button" }), bs = h("button", { c: "ed-b ed-d", t: "Supprimer…", type: "button" });
+    var tous = [br, bg, bc, bs], mic = qsMicro(ta, id); if (mic) tous.push(mic);
+    br.onclick = function () { var t = ta.value.trim(); if (t.length < 2) { msg("Écrivez votre réponse.", true); return; } qsAction(id, tous, "qsAdminRepondre", { id: id, reponse: t }, "Réponse envoyée à l’agent.", function () { QS.brouillons[id] = ""; QS.foc = null; }); };
+    bg.onclick = function () { qsAction(id, tous, "qsAdminRegenerer", { id: id }, "Réponse d’IRIS régénérée.", function () { QS.ouvert[id] = true; }); };
+    bc.onclick = function () { qsAction(id, tous, "qsAdminClore", { id: id }, "Question clôturée."); };
+    bs.onclick = function () { if (confirm("Supprimer cette question ? Elle disparaîtra de l’espace de l’agent et de cette liste.") && prompt("Tapez SUPPRIMER pour confirmer.") === "SUPPRIMER") qsAction(id, tous, "qsAdminSupprimer", { id: id, confirmation: "SUPPRIMER" }, "Question supprimée.", function () { delete QS.brouillons[id]; delete QS.ouvert[id]; }); };
+    it.appendChild(h("div", { c: "qs-ac" }, [br, mic, bg, q.statut === "Clôturée" ? null : bc, bs]));
+    if (QS.foc === id) setTimeout(function () { if (ta.isConnected) { ta.focus(); try { ta.setSelectionRange(QS.pos, QS.pos); } catch (e) { } } }, 0);
+    return it;
+  }
+  function paneQs(c) {
+    if (QS.err && !QS.chargement) {
+      var re = h("button", { c: "ed-b", t: "Réessayer", type: "button" }); re.onclick = function () { QS.err = null; QS.liste = null; QS.aTraiter = null; dessiner(); };
+      c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Questions des agents" }), h("p", { c: "ed-vide", t: QS.err }), re])); return;
+    }
+    if (QS.liste === null) { c.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); if (!QS.chargement) qsCharge(); return; }
+    var L = QS.liste, F = QS.filtre;
+    var cpt = { "": L.length, traiter: L.filter(qsAttente).length };
+    L.forEach(function (q) { cpt[q.statut] = (cpt[q.statut] || 0) + 1; });
+    var kb = h("div", { c: "qs-k" });
+    QS_FILTRES.forEach(function (f) { var b = h("button", { type: "button" }, [h("b", { t: String(cpt[f[0]] || 0) }), h("span", { t: f[1] })]); if (F === f[0]) b.className = "on"; b.onclick = function () { QS.filtre = f[0]; dessiner(); }; kb.appendChild(b); });
+    var ac = h("button", { c: "ed-b", t: "Actualiser", type: "button" }); ac.onclick = function () { qsCharge(); msg("Liste actualisée."); };
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Questions des agents" }), h("p", { c: "ed-note", t: "Chaque question posée par un agent reçoit d’abord une réponse automatique d’IRIS, fondée sur des sources officielles. Vous pouvez la relire, répondre vous-même à l’agent, régénérer la réponse d’IRIS ou clôturer la question." }), kb, h("div", { c: "qs-fl" }, [h("span", { c: "ed-note", t: QS.aTraiter ? QS.aTraiter + " question(s) à traiter." : "Aucune question à traiter." }), ac])]));
+    var vues = L.filter(function (q) { return F === "" ? true : F === "traiter" ? qsAttente(q) : q.statut === F; });
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Questions (" + vues.length + ")" })]);
+    if (!vues.length) carte.appendChild(h("p", { c: "ed-vide", t: L.length ? "Aucune question pour ce filtre." : "Aucune question pour le moment." }));
+    vues.forEach(function (q) { carte.appendChild(qsLigne(q)); });
+    c.appendChild(carte);
+  }
   function paneSg(c) {
     if (!SG) { c.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); chargerSg(dessiner); return; }
     c.appendChild(carteBlocages());
@@ -974,15 +1083,16 @@
   function dessiner() {
     var y = ov.scrollTop; ov.textContent = "";
     var np = ((DATA && DATA.conges) || []).filter(function (x) { return x.statut === "En attente"; }).length;
-    var seg = h("div", { c: "ed-seg" }, [["pt", "Pointages"], ["ab", "Absences et retards"], ["cg", "Congés" + (np ? " (" + np + ")" : "")], ["sg", "Signalements" + (SG ? (function () { var n = SG.signalements.filter(function (x) { return ["Correction acceptée", "Correction refusée", "Clôturée"].indexOf(x.statut) < 0; }).length; return n ? " (" + n + ")" : ""; })() : "")], ["ag", "Agents"], ["ga", "Gestion administrative"], ["pa", "Paramètres"]].map(function (o) { var b = h("button", { t: o[1], type: "button" }); if (o[0] === onglet) b.className = "on"; b.onclick = function () { onglet = o[0]; dessiner(); }; return b; }));
+    var seg = h("div", { c: "ed-seg" }, [["pt", "Pointages"], ["ab", "Absences et retards"], ["cg", "Congés" + (np ? " (" + np + ")" : "")], ["sg", "Signalements" + (SG ? (function () { var n = SG.signalements.filter(function (x) { return ["Correction acceptée", "Correction refusée", "Clôturée"].indexOf(x.statut) < 0; }).length; return n ? " (" + n + ")" : ""; })() : "")], ["ag", "Agents"], ["ga", "Gestion administrative"], ["qs", "Questions" + qsBadge()], ["pa", "Paramètres"]].map(function (o) { var b = h("button", { t: o[1], type: "button" }); if (o[0] === onglet) b.className = "on"; b.onclick = function () { onglet = o[0]; dessiner(); }; return b; }));
     var x = h("button", { c: "ed-x", t: "Fermer", type: "button" }); x.onclick = fermer;
     ov.appendChild(h("div", { c: "ed-top" }, [h("h2", { t: "Corrections" }), seg, x]));
     var corps = h("div", { c: "ed-body" }); ov.appendChild(corps);
-    if (!DATA) corps.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); else (onglet === "pt" ? panePt : onglet === "ab" ? paneAb : onglet === "cg" ? paneCg : onglet === "sg" ? paneSg : onglet === "pa" ? paneParam : onglet === "ga" ? paneGa : paneAg)(corps);
+    if (!DATA) corps.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); else (onglet === "pt" ? panePt : onglet === "ab" ? paneAb : onglet === "cg" ? paneCg : onglet === "sg" ? paneSg : onglet === "pa" ? paneParam : onglet === "ga" ? paneGa : onglet === "qs" ? paneQs : paneAg)(corps);
     ov.scrollTop = y;
   }
   function fermer() { ov.className = ""; document.body.style.overflow = ""; }
   btn.onclick = function () { ov.className = "on"; document.body.style.overflow = "hidden"; if (!jourSel) jourSel = iso(); DATA = null; SG = null; dessiner(); charger(); };
+  (function () { var ouvrir = btn.onclick; btn.onclick = function () { ouvrir.apply(this, arguments); qsCompteur(); }; })();
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") fermer(); });
 })();</script><script>var MOIS="",minuterie=null,CL={"Présent":"s-pr","Parti":"s-pa","Absent":"s-ab","Attendu":"s-at","Repos":"s-re","En retard":"s-rt","Justifiée":"s-ju"};function g(i){return document.getElementById(i)}function td(tr,t,c){var x=document.createElement("td");if(c)x.className=c;x.textContent=t;tr.appendChild(x);return x}function pl(t,c,titre){var s=document.createElement("span");s.className="pl "+c;s.textContent=t;if(titre)s.title=titre;return s}var ADM=null,DERN=null,ADMT=null,FICHE=null,PER={type:"mois",ref:""},PERD=null,PERN=0,REF=null,POSTF=[];function fj(n){return String(Math.round(Number(n||0)*100)/100).replace(".",",")}var ET={vt:"#16a34a",ja:"#facc15",or:"#f97316",ro:"#dc2626",vi:"#7c3aed",gr:"#9ca3af"},ETX={vt:"#15803d",ja:"#a16207",or:"#c2410c",ro:"#b91c1c",vi:"#6d28d9",gr:"#4b5563"};function etatSolde(so){var T=so?(so.total!==undefined&&so.total!==null?Number(so.total):Number(so.reliquat||0)+Number(so.acquis||0)):NaN,r=so&&so.reste!==null&&so.reste!==undefined&&so.reste!==""?Math.round(Number(so.reste)*100)/100:NaN;if(!so||!isFinite(r)||!isFinite(T))return{k:"gr",col:ET.gr,lib:"Solde non vérifié",pill:"N/A",pct:0,r:NaN,T:T};var pct=T>0?Math.max(0,Math.min(1,r/T)):0;if(r<0)return{k:"vi",col:ET.vi,lib:"Dépassement à vérifier",pill:"−"+fj(-r)+" j",pct:0,r:r,T:T};if(r===0)return{k:"ro",col:ET.ro,lib:"CONGÉS ÉPUISÉS",pill:"Congés épuisés",pct:0,r:r,T:T};var k=r<=5?"or":r<=10?"ja":"vt",lib=r<=5?"Solde faible":r<=10?"Solde à surveiller":"Solde confortable";return{k:k,col:ET[k],lib:lib,pill:Math.round(100*pct)+" %",pct:pct,r:r,T:T}}function jaugeEl(et,c){var w=document.createElement("div");w.className="jq";var t=document.createElement("div");t.className="jt "+et.k;var i=document.createElement("i");i.style.width=(100*et.pct)+"%";i.style.background=et.col;t.appendChild(i);w.appendChild(t);var p=document.createElement("span");p.className="jp "+et.k;p.textContent=c&&et.k==="ro"?"Épuisés":et.pill;w.appendChild(p);w.title=et.lib+(isFinite(et.r)?" : "+fj(et.r)+" j disponible"+(et.r>1?"s":"")+" sur "+fj(et.T):"");w.setAttribute("role","img");w.setAttribute("aria-label",w.title);return w}function mixW(h,a){var n=parseInt(h.slice(1),16),r=n>>16,g1=(n>>8)&255,b=n&255;function m(c){return Math.round(c*a+255*(1-a))}return"#"+[m(r),m(g1),m(b)].map(function(c){return("0"+c.toString(16)).slice(-2)}).join("")}
 function legSolde(){var w=document.createElement("div");w.className="lgs";[["vt","Solde confortable","plus de 10 jours"],["ja","Solde à surveiller","6 à 10 jours"],["or","Solde faible","1 à 5 jours"],["ro","CONGÉS ÉPUISÉS","exactement 0 jour"],["vi","Dépassement à vérifier","solde négatif ou congés anticipés"],["gr","Solde non vérifié","données indisponibles"]].forEach(function(z){var d=document.createElement("span"),i=document.createElement("i");i.style.background=ET[z[0]];d.appendChild(i);d.appendChild(document.createTextNode(z[1]+" ("+z[2]+")"));w.appendChild(d)});return w}
