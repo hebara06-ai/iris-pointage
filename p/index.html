@@ -733,8 +733,8 @@ function rcInstalle() { try { return !!(window.matchMedia && window.matchMedia("
   s.textContent = ".seg.gnav button.rcb{flex:1 0 100%;order:10;margin-top:2px;padding:13px 8px;font-size:17px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px;background:transparent;border:2px solid #d9b44a;color:inherit}.seg.gnav button.rcb svg{width:24px;height:24px;flex:none}" +
     ".rcov{position:fixed;left:0;top:0;width:100%;height:100vh;height:100dvh;z-index:200001;background:rgba(4,17,44,.94);display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif}" +
     ".rcc{width:min(92vw,440px);max-height:92vh;overflow:auto;box-sizing:border-box;background:#fff;color:#04112c;border-radius:20px;padding:22px 18px max(18px,env(safe-area-inset-bottom));text-align:center}.rcc h2{margin:0 0 12px;font-size:23px;line-height:1.25}" +
-    ".rcl{display:flex;align-items:center;gap:14px;text-align:left;margin:10px 0;padding:12px;border-radius:14px;background:#f3efe2;font-size:19px;line-height:1.3}.rcl b{flex:none;width:36px;height:36px;border-radius:50%;background:#04112c;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px}.rcl svg{width:28px;height:28px;vertical-align:middle;flex:none}" +
-    ".rcc button{margin:12px 0 0;width:100%;padding:16px 10px;font-size:19px;font-weight:700;border-radius:14px;border:2px solid #04112c;background:#d9b44a;color:#04112c;font-family:inherit}";
+    ".rcl{display:flex;align-items:center;gap:14px;text-align:left;margin:8px 0;padding:10px 12px;border-radius:14px;background:#f3efe2;font-size:18px;line-height:1.3}.rcl b{flex:none;width:36px;height:36px;border-radius:50%;background:#04112c;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px}.rcl svg{width:28px;height:28px;vertical-align:middle;flex:none}" +
+    ".rcn{margin:14px 4px 0;font-size:16px;line-height:1.3;color:#04112c}.rcl small{font-size:16px;line-height:1.3}.rcc button{margin:12px 0 0;width:100%;padding:16px 10px;font-size:19px;font-weight:700;border-radius:14px;border:2px solid #04112c;background:#d9b44a;color:#04112c;font-family:inherit}";
   document.head.appendChild(s);
 })();
 function rcIcone() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 8v6M9 11l3 3 3-3"/></svg>'; }
@@ -749,13 +749,16 @@ function rcGuide() {
   var n = rcNav();
   if (n.ios) {
     try { history.replaceState(null, "", location.pathname); } catch (e) { }
-    if (n.safari) {
-      ligne(1, "Touchez le bouton <strong>Partager</strong> " + rcPartage() + (n.ipad ? " (en haut de l’écran)." : " (en bas de l’écran)."));
-    } else {
-      ligne(1, "Touchez le bouton <strong>Partager</strong> " + rcPartage() + " ou les 3 points " + rcMenu() + " du navigateur.");
+    if (!n.safari) {
+      var av = el("div", "rcl", ""); av.innerHTML = "<span><strong>Vous n’êtes pas dans Safari.</strong> Touchez « Copier le lien », ouvrez <strong>Safari</strong>, collez le lien dans la barre d’adresse, puis revenez ici.</span>"; bx.appendChild(av);
+      rcCopie(bx);
     }
-    ligne(2, "Descendez et touchez <strong>Sur l’écran d’accueil</strong> (ou <strong>Ajouter à l’écran d’accueil</strong>).");
-    ligne(3, "Touchez <strong>Ajouter</strong>. L’icône IRIS apparaît sur votre téléphone.");
+    if (n.ipad) ligne(1, "Touchez le bouton <strong>Partager</strong> " + rcPartage() + " (en haut de l’écran, à côté de l’adresse).");
+    else ligne(1, "Touchez le bouton <strong>≡</strong> (ou <strong>•••</strong>) dans la barre d’adresse, en bas de l’écran.");
+    ligne(2, "Touchez <strong>Partager</strong>.");
+    ligne(3, "Descendez et touchez <strong>Sur l’écran d’accueil</strong>.<br><small>Pas dans la liste ? Tout en bas, touchez <strong>Modifier les actions</strong>, puis le <strong>+</strong> devant « Sur l’écran d’accueil ».</small>");
+    ligne(4, "Si on vous propose <strong>Ouvrir comme app web</strong>, laissez-le <strong>éteint</strong>. Touchez <strong>Ajouter</strong>.");
+    if (n.safari) { var q = el("div", "rcn", "Vous ne trouvez toujours pas ? Vous n’êtes peut-être pas dans Safari (fenêtre d’une autre application)."); bx.appendChild(q); rcCopie(bx); }
   } else if (n.firefox) {
     ligne(1, "Touchez les 3 points " + rcMenu() + " du navigateur.");
     ligne(2, "Touchez <strong>Installer</strong> ou <strong>Ajouter à l’écran d’accueil</strong>.");
@@ -768,7 +771,12 @@ function rcGuide() {
   var f = el("button", "", "J’ai compris"); f.type = "button"; f.onclick = rcFerme; bx.appendChild(f);
   ov.appendChild(bx); document.body.appendChild(ov); RC.ov = ov;
 }
-// Parcours : bouton -> question Oui/Non -> Oui : Android = fenêtre d'installation du navigateur ; iPhone = feuille Partager ouverte directement
+// Parcours : bouton -> question Oui/Non -> Oui : Android = fenêtre d'installation du navigateur ; iPhone = guide pas à pas (navigator.share n'ouvre PAS « Sur l'écran d'accueil » : constaté sur iPhone iOS 26)
+function rcCopie(bx) {
+  var b = el("button", "", "Copier le lien"); b.type = "button"; b.style.background = "transparent";
+  b.onclick = function () { try { navigator.clipboard.writeText(rcLien()).then(function () { b.textContent = "Lien copié ✔"; }, function () { b.textContent = rcLien(); }); } catch (e) { b.textContent = rcLien(); } };
+  bx.appendChild(b); return b;
+}
 function rcLien() { return location.origin + location.pathname; }
 function rcAppli() { return /FBAN|FBAV|Instagram|Line\/|MicroMessenger|Snapchat|Twitter|LinkedInApp|TikTok|WhatsApp|Messenger/.test(navigator.userAgent || ""); }
 function rcBoite(titre) {
@@ -791,23 +799,8 @@ function rcOui() {
     var e = RC.ev; RC.ev = null; rcFerme();
     try { e.prompt(); if (e.userChoice && e.userChoice.then) e.userChoice.then(function () { }, function () { }); return; } catch (x) { }
   }
-  if (rcNav().ios) { if (rcAppli()) rcSafari(); else rcEtapeIos(); return; }
+  if (rcNav().ios && rcAppli()) { rcSafari(); return; }
   rcGuide();
-}
-// iPhone/iPad : Apple interdit l'ajout automatique. On ouvre directement la feuille « Partager » ; il reste 2 touches.
-function rcEtapeIos() {
-  try { history.replaceState(null, "", location.pathname); } catch (e) { }
-  var bx = rcBoite("Dernière étape");
-  bx.appendChild(el("div", "rcl", "Une fenêtre va s’ouvrir. Dedans :"));
-  rcLigne(bx, 1, "Touchez <strong>Sur l’écran d’accueil</strong> (descendez un peu si besoin).");
-  rcLigne(bx, 2, "Si on vous propose <strong>Ouvrir comme app web</strong>, laissez-le <strong>éteint</strong>.");
-  rcLigne(bx, 3, "Touchez <strong>Ajouter</strong>.");
-  rcBtn(bx, "Continuer", function () {
-    var fait = false;
-    try { if (navigator.share) { fait = true; navigator.share({ title: "IRIS", url: rcLien() }).then(function () { rcFerme(); }, function (e) { if (!e || e.name !== "AbortError") rcGuide(); }); } } catch (e) { fait = false; }
-    if (!fait) rcGuide();
-  });
-  rcBtn(bx, "Fermer", rcFerme, true);
 }
 // Navigateur intégré à une application (WhatsApp, Facebook, Instagram…) : l'ajout n'y existe pas -> ouvrir dans Safari
 function rcSafari() {
