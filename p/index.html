@@ -719,10 +719,6 @@ function psOuvrir(r) {
    Réutilise : el, c. */
 var RC = { ev: null, ov: null };
 function rcIos() { var u = navigator.userAgent || ""; return /iPhone|iPad|iPod/.test(u) || (/Macintosh/.test(u) && navigator.maxTouchPoints > 1); }
-function rcNav() {
-  var u = navigator.userAgent || "", ios = rcIos();
-  return { ios: ios, ipad: /iPad/.test(u) || (ios && /Macintosh/.test(u)), safari: ios && !/CriOS|EdgiOS|OPiOS|FxiOS|GSA\//.test(u), firefox: /Firefox|FxiOS/.test(u), samsung: /SamsungBrowser/.test(u) };
-}
 function rcInstalle() { try { return !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true; } catch (e) { return false; } }
 (function () {
   if (!rcIos() && !document.querySelector('link[rel="manifest"]')) { var l = document.createElement("link"); l.rel = "manifest"; l.href = "manifest.webmanifest"; document.head.appendChild(l); }
@@ -733,8 +729,8 @@ function rcInstalle() { try { return !!(window.matchMedia && window.matchMedia("
   s.textContent = ".seg.gnav button.rcb{flex:1 0 100%;order:10;margin-top:2px;padding:13px 8px;font-size:17px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px;background:transparent;border:2px solid #d9b44a;color:inherit}.seg.gnav button.rcb svg{width:24px;height:24px;flex:none}" +
     ".rcov{position:fixed;left:0;top:0;width:100%;height:100vh;height:100dvh;z-index:200001;background:rgba(4,17,44,.94);display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif}" +
     ".rcc{width:min(92vw,440px);max-height:92vh;overflow:auto;box-sizing:border-box;background:#fff;color:#04112c;border-radius:20px;padding:22px 18px max(18px,env(safe-area-inset-bottom));text-align:center}.rcc h2{margin:0 0 12px;font-size:23px;line-height:1.25}" +
-    ".rcl{display:flex;align-items:center;gap:14px;text-align:left;margin:8px 0;padding:10px 12px;border-radius:14px;background:#f3efe2;font-size:18px;line-height:1.3}.rcl b{flex:none;width:36px;height:36px;border-radius:50%;background:#04112c;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px}.rcl svg{width:28px;height:28px;vertical-align:middle;flex:none}" +
-    ".rcn{margin:14px 4px 0;font-size:16px;line-height:1.3;color:#04112c}.rcl small{font-size:16px;line-height:1.3}.rcc button{margin:12px 0 0;width:100%;padding:16px 10px;font-size:19px;font-weight:700;border-radius:14px;border:2px solid #04112c;background:#d9b44a;color:#04112c;font-family:inherit}";
+    ".rcl{display:flex;align-items:center;gap:14px;text-align:left;margin:10px 0;padding:12px;border-radius:14px;background:#f3efe2;font-size:19px;line-height:1.3}.rcl b{flex:none;width:36px;height:36px;border-radius:50%;background:#04112c;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px}.rcl svg{width:28px;height:28px;vertical-align:middle;flex:none}" +
+    ".rcc button{margin:12px 0 0;width:100%;padding:16px 10px;font-size:19px;font-weight:700;border-radius:14px;border:2px solid #04112c;background:#d9b44a;color:#04112c;font-family:inherit}";
   document.head.appendChild(s);
 })();
 function rcIcone() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 8v6M9 11l3 3 3-3"/></svg>'; }
@@ -746,97 +742,30 @@ function rcGuide() {
   var ov = el("div", "rcov"), bx = el("div", "rcc"); ov.setAttribute("role", "dialog"); ov.setAttribute("aria-label", "Ajouter IRIS sur l’écran d’accueil");
   bx.appendChild(el("h2", "", "Ajouter IRIS sur l’écran d’accueil"));
   function ligne(n, html) { var l = el("div", "rcl"); l.appendChild(el("b", "", String(n))); var t = document.createElement("span"); t.innerHTML = html; l.appendChild(t); bx.appendChild(l); }
-  var n = rcNav();
-  if (n.ios) {
+  if (rcIos()) {
     try { history.replaceState(null, "", location.pathname); } catch (e) { }
-    if (!n.safari) {
-      var av = el("div", "rcl", ""); av.innerHTML = "<span><strong>Vous n’êtes pas dans Safari.</strong> Touchez « Copier le lien », ouvrez <strong>Safari</strong>, collez le lien dans la barre d’adresse, puis revenez ici.</span>"; bx.appendChild(av);
-      rcCopie(bx);
-    }
-    if (n.ipad) ligne(1, "Touchez le bouton <strong>Partager</strong> " + rcPartage() + " (en haut de l’écran, à côté de l’adresse).");
-    else ligne(1, "Touchez le bouton <strong>≡</strong> (ou <strong>•••</strong>) dans la barre d’adresse, en bas de l’écran.");
-    ligne(2, "Touchez <strong>Partager</strong>.");
-    ligne(3, "Descendez et touchez <strong>Sur l’écran d’accueil</strong>.<br><small>Pas dans la liste ? Tout en bas, touchez <strong>Modifier les actions</strong>, puis le <strong>+</strong> devant « Sur l’écran d’accueil ».</small>");
-    ligne(4, "Si on vous propose <strong>Ouvrir comme app web</strong>, laissez-le <strong>éteint</strong>. Touchez <strong>Ajouter</strong>.");
-    if (n.safari) { var q = el("div", "rcn", "Vous ne trouvez toujours pas ? Vous n’êtes peut-être pas dans Safari (fenêtre d’une autre application)."); bx.appendChild(q); rcCopie(bx); }
-  } else if (n.firefox) {
-    ligne(1, "Touchez les 3 points " + rcMenu() + " du navigateur.");
-    ligne(2, "Touchez <strong>Installer</strong> ou <strong>Ajouter à l’écran d’accueil</strong>.");
+    ligne(1, "Touchez le bouton <strong>Partager</strong> " + rcPartage() + " (en bas ou en haut de l’écran).");
+    ligne(2, "Descendez et touchez <strong>Sur l’écran d’accueil</strong>.");
     ligne(3, "Touchez <strong>Ajouter</strong>. L’icône IRIS apparaît sur votre téléphone.");
   } else {
-    ligne(1, "Touchez les 3 points " + rcMenu() + (n.samsung ? " ou le menu ≡ du navigateur." : " du navigateur (en haut à droite)."));
-    ligne(2, "Touchez <strong>Installer l’application</strong> ou <strong>Ajouter à l’écran d’accueil</strong>.");
-    ligne(3, "Touchez <strong>Installer</strong> ou <strong>Ajouter</strong>. L’icône IRIS apparaît sur votre téléphone.");
+    ligne(1, "Touchez les 3 points " + rcMenu() + " du navigateur (en haut à droite).");
+    ligne(2, "Touchez <strong>Ajouter à l’écran d’accueil</strong> ou <strong>Installer l’application</strong>.");
+    ligne(3, "Touchez <strong>Ajouter</strong> ou <strong>Installer</strong>. L’icône IRIS apparaît sur votre téléphone.");
   }
   var f = el("button", "", "J’ai compris"); f.type = "button"; f.onclick = rcFerme; bx.appendChild(f);
   ov.appendChild(bx); document.body.appendChild(ov); RC.ov = ov;
 }
-// Parcours : bouton -> question Oui/Non -> Oui : Android = fenêtre d'installation du navigateur ; iPhone = fenêtre de partage (lien IRIS) puis guide pas à pas (la fenêtre n'a pas « Sur l'écran d'accueil » : constaté iOS 26)
-function rcCopie(bx) {
-  var b = el("button", "", "Copier le lien"); b.type = "button"; b.style.background = "transparent";
-  b.onclick = function () { try { navigator.clipboard.writeText(rcLien()).then(function () { b.textContent = "Lien copié ✔"; }, function () { b.textContent = rcLien(); }); } catch (e) { b.textContent = rcLien(); } };
-  bx.appendChild(b); return b;
-}
-function rcLien() { return location.origin + location.pathname; }
-function rcAppli() { return /FBAN|FBAV|Instagram|Line\/|MicroMessenger|Snapchat|Twitter|LinkedInApp|TikTok|WhatsApp|Messenger/.test(navigator.userAgent || ""); }
-function rcBoite(titre) {
-  rcFerme();
-  var ov = el("div", "rcov"), bx = el("div", "rcc"); ov.setAttribute("role", "dialog"); ov.setAttribute("aria-label", titre);
-  bx.appendChild(el("h2", "", titre)); ov.appendChild(bx); document.body.appendChild(ov); RC.ov = ov; return bx;
-}
-function rcBtn(bx, txt, f, secondaire) { var b = el("button", "", txt); b.type = "button"; if (secondaire) b.style.background = "transparent"; b.onclick = f; bx.appendChild(b); return b; }
-function rcLigne(bx, n, html) { var l = el("div", "rcl"); l.appendChild(el("b", "", String(n))); var t = document.createElement("span"); t.innerHTML = html; l.appendChild(t); bx.appendChild(l); }
-function rcDemande(auto) {
-  if (RC.ov) return;
-  var bx = rcBoite("Voulez-vous mettre IRIS sur l’écran d’accueil de votre téléphone ?");
-  bx.appendChild(el("div", "rcl", "Vous ouvrirez IRIS d’un seul toucher, comme une application."));
-  function fin() { try { localStorage.setItem("rc_q", "1"); } catch (e) { } }
-  rcBtn(bx, "Oui", function () { fin(); rcOui(); });
-  rcBtn(bx, auto ? "Plus tard" : "Non", function () { fin(); rcFerme(); }, true);
-}
-function rcOui() {
-  if (RC.ev && RC.ev.prompt) {            // Android (Chrome, Edge, Samsung, Opera…) : fenêtre d'installation du navigateur
-    var e = RC.ev; RC.ev = null; rcFerme();
+// Bouton de l'espace de l'agent : invite d'installation du navigateur si disponible, sinon guide pas à pas
+function rcOuvre() {
+  if (RC.ev && RC.ev.prompt) {
+    var e = RC.ev; RC.ev = null;
     try { e.prompt(); if (e.userChoice && e.userChoice.then) e.userChoice.then(function () { }, function () { }); return; } catch (x) { }
   }
-  if (rcNav().ios) { if (rcAppli()) rcSafari(); else rcEtapeIos(); return; }
   rcGuide();
-}
-// iPhone/iPad : on ouvre d'abord la fenêtre de partage du téléphone (avec le lien IRIS : Messages, Copier, Ouvrir dans Safari…).
-// Cette fenêtre n'a PAS « Sur l'écran d'accueil » (constaté) : quand elle se ferme, le guide pas à pas s'affiche. Lien « introuvable » toujours visible.
-function rcEtapeIos() {
-  try { history.replaceState(null, "", location.pathname); } catch (e) { }
-  var bx = rcBoite("Ajouter IRIS à l’accueil");
-  bx.appendChild(el("div", "rcl", "Touchez Continuer : la fenêtre du téléphone s’ouvre avec le lien IRIS. Ensuite, le guide vous montre comment mettre l’icône sur l’écran d’accueil."));
-  rcBtn(bx, "Continuer", function () {
-    var fait = false;
-    try { if (navigator.share) { fait = true; navigator.share({ title: "IRIS", url: rcLien() }).then(function () { rcGuide(); }, function () { rcGuide(); }); } } catch (e) { fait = false; }
-    if (!fait) rcGuide();
-  });
-  rcBtn(bx, "Je ne trouve pas « Sur l’écran d’accueil »", rcGuide, true);
-  rcBtn(bx, "Fermer", rcFerme, true);
-}
-// Navigateur intégré à une application (WhatsApp, Facebook, Instagram…) : l'ajout n'y existe pas -> ouvrir dans Safari
-function rcSafari() {
-  var bx = rcBoite("Ouvrez IRIS dans Safari");
-  bx.appendChild(el("div", "rcl", "Dans cette fenêtre, l’ajout à l’écran d’accueil n’est pas possible."));
-  rcLigne(bx, 1, "Touchez <strong>Copier le lien</strong> ci-dessous.");
-  rcLigne(bx, 2, "Ouvrez <strong>Safari</strong>, touchez la barre d’adresse, puis <strong>Coller</strong>.");
-  var b = rcBtn(bx, "Copier le lien", function () {
-    try { navigator.clipboard.writeText(rcLien()).then(function () { b.textContent = "Lien copié ✔"; }, function () { b.textContent = rcLien(); }); } catch (e) { b.textContent = rcLien(); }
-  });
-  rcBtn(bx, "Fermer", rcFerme, true);
-}
-function rcOuvre() { rcDemande(false); }
-function rcQuestion() {
-  try { if (localStorage.getItem("rc_q")) return; } catch (e) { return; }
-  if (rcInstalle() || RC.ov || document.querySelector(".psov")) return;
-  rcDemande(true);
 }
 function rcBouton() {
   if (rcInstalle()) return null;
-  var b = el("button", "rcb"); b.type = "button"; b.innerHTML = rcIcone() + "<span>Ajouter IRIS à l’accueil</span>"; b.onclick = rcOuvre; setTimeout(rcQuestion, 1500);
+  var b = el("button", "rcb"); b.type = "button"; b.innerHTML = rcIcone() + "<span>Ajouter IRIS à l’accueil</span>"; b.onclick = rcOuvre;
   return b;
 }
-
 </script><link rel="stylesheet" href="../iris.css?v=20261116"></body></html>
