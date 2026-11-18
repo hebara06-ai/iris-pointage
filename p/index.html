@@ -719,6 +719,10 @@ function psOuvrir(r) {
    Réutilise : el, c. */
 var RC = { ev: null, ov: null };
 function rcIos() { var u = navigator.userAgent || ""; return /iPhone|iPad|iPod/.test(u) || (/Macintosh/.test(u) && navigator.maxTouchPoints > 1); }
+function rcNav() {
+  var u = navigator.userAgent || "", ios = rcIos();
+  return { ios: ios, ipad: /iPad/.test(u) || (ios && /Macintosh/.test(u)), safari: ios && !/CriOS|EdgiOS|OPiOS|FxiOS|GSA\//.test(u), firefox: /Firefox|FxiOS/.test(u), samsung: /SamsungBrowser/.test(u) };
+}
 function rcInstalle() { try { return !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true; } catch (e) { return false; } }
 (function () {
   if (!rcIos() && !document.querySelector('link[rel="manifest"]')) { var l = document.createElement("link"); l.rel = "manifest"; l.href = "manifest.webmanifest"; document.head.appendChild(l); }
@@ -742,15 +746,24 @@ function rcGuide() {
   var ov = el("div", "rcov"), bx = el("div", "rcc"); ov.setAttribute("role", "dialog"); ov.setAttribute("aria-label", "Ajouter IRIS sur l’écran d’accueil");
   bx.appendChild(el("h2", "", "Ajouter IRIS sur l’écran d’accueil"));
   function ligne(n, html) { var l = el("div", "rcl"); l.appendChild(el("b", "", String(n))); var t = document.createElement("span"); t.innerHTML = html; l.appendChild(t); bx.appendChild(l); }
-  if (rcIos()) {
+  var n = rcNav();
+  if (n.ios) {
     try { history.replaceState(null, "", location.pathname); } catch (e) { }
-    ligne(1, "Touchez le bouton <strong>Partager</strong> " + rcPartage() + " (en bas ou en haut de l’écran).");
-    ligne(2, "Descendez et touchez <strong>Sur l’écran d’accueil</strong>.");
+    if (n.safari) {
+      ligne(1, "Touchez le bouton <strong>Partager</strong> " + rcPartage() + (n.ipad ? " (en haut de l’écran)." : " (en bas de l’écran)."));
+    } else {
+      ligne(1, "Touchez le bouton <strong>Partager</strong> " + rcPartage() + " ou les 3 points " + rcMenu() + " du navigateur.");
+    }
+    ligne(2, "Descendez et touchez <strong>Sur l’écran d’accueil</strong> (ou <strong>Ajouter à l’écran d’accueil</strong>).");
+    ligne(3, "Touchez <strong>Ajouter</strong>. L’icône IRIS apparaît sur votre téléphone.");
+  } else if (n.firefox) {
+    ligne(1, "Touchez les 3 points " + rcMenu() + " du navigateur.");
+    ligne(2, "Touchez <strong>Installer</strong> ou <strong>Ajouter à l’écran d’accueil</strong>.");
     ligne(3, "Touchez <strong>Ajouter</strong>. L’icône IRIS apparaît sur votre téléphone.");
   } else {
-    ligne(1, "Touchez les 3 points " + rcMenu() + " du navigateur (en haut à droite).");
-    ligne(2, "Touchez <strong>Ajouter à l’écran d’accueil</strong> ou <strong>Installer l’application</strong>.");
-    ligne(3, "Touchez <strong>Ajouter</strong> ou <strong>Installer</strong>. L’icône IRIS apparaît sur votre téléphone.");
+    ligne(1, "Touchez les 3 points " + rcMenu() + (n.samsung ? " ou le menu ≡ du navigateur." : " du navigateur (en haut à droite)."));
+    ligne(2, "Touchez <strong>Installer l’application</strong> ou <strong>Ajouter à l’écran d’accueil</strong>.");
+    ligne(3, "Touchez <strong>Installer</strong> ou <strong>Ajouter</strong>. L’icône IRIS apparaît sur votre téléphone.");
   }
   var f = el("button", "", "J’ai compris"); f.type = "button"; f.onclick = rcFerme; bx.appendChild(f);
   ov.appendChild(bx); document.body.appendChild(ov); RC.ov = ov;
@@ -765,7 +778,20 @@ function rcOuvre() {
 }
 function rcBouton() {
   if (rcInstalle()) return null;
-  var b = el("button", "rcb"); b.type = "button"; b.innerHTML = rcIcone() + "<span>Ajouter IRIS à l’accueil</span>"; b.onclick = rcOuvre;
+  var b = el("button", "rcb"); b.type = "button"; b.innerHTML = rcIcone() + "<span>Ajouter IRIS à l’accueil</span>"; b.onclick = rcOuvre; setTimeout(rcQuestion, 1500);
   return b;
+}
+
+// Question posée une seule fois par téléphone : « Voulez-vous IRIS sur votre écran d'accueil ? »
+function rcQuestion() {
+  try { if (localStorage.getItem("rc_q")) return; } catch (e) { return; }
+  if (rcInstalle() || RC.ov || document.querySelector(".psov")) return;
+  var ov = el("div", "rcov"), bx = el("div", "rcc"); ov.setAttribute("role", "dialog"); ov.setAttribute("aria-label", "Ajouter IRIS à l’écran d’accueil");
+  bx.appendChild(el("h2", "", "Voulez-vous mettre IRIS sur l’écran d’accueil de votre téléphone ?"));
+  bx.appendChild(el("div", "rcl", "Vous ouvrirez IRIS d’un seul toucher, comme une application."));
+  function fin() { try { localStorage.setItem("rc_q", "1"); } catch (e) { } rcFerme(); }
+  var oui = el("button", "", "Oui"); oui.type = "button"; oui.onclick = function () { fin(); rcOuvre(); };
+  var non = el("button", "", "Plus tard"); non.type = "button"; non.style.background = "transparent"; non.onclick = fin;
+  bx.appendChild(oui); bx.appendChild(non); ov.appendChild(bx); document.body.appendChild(ov); RC.ov = ov;
 }
 </script><link rel="stylesheet" href="../iris.css?v=20261116"></body></html>
