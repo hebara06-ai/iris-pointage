@@ -9,7 +9,7 @@
   }
   function make(ok, ko) {
     var o = { withSuccessHandler: function (f) { return make(f, ko); }, withFailureHandler: function (f) { return make(ok, f); } };
-    ["etat", "verifier", "pointer", "ouvrirScan", "congesEtat", "congesDemander", "congesAnnuler","congesConnexion","congesPiece","congesAjouterPiece","stampDonnees","recupDemander","recupVerifier","recupStatut","agentBilan","agentDetails","agentSignaler","agentSignalements","meteoDonnees","gaMesDossiers","gaDeposer","gaMaPiece","gaAjouterPieces","qsPoser","qsIrisRepondre","qsMesQuestions","qsDemanderHumain","qsReecrire","qsMaPiece"].forEach(function (n) { o[n] = function () { appelle(n, Array.prototype.slice.call(arguments), ok, ko); }; });
+    ["etat", "verifier", "pointer", "ouvrirScan", "congesEtat", "congesDemander", "congesAnnuler","congesConnexion","congesPiece","congesAjouterPiece","stampDonnees","recupDemander","recupVerifier","recupStatut","agentBilan","agentDetails","agentSignaler","agentSignalements","meteoDonnees","gaMesDossiers","gaDeposer","gaMaPiece","gaAjouterPieces","qsPoser","qsIrisRepondre","qsMesQuestions","qsDemanderHumain","qsReecrire","qsMaPiece","cmCompteur","cmMesCommunications","cmLire"].forEach(function (n) { o[n] = function () { appelle(n, Array.prototype.slice.call(arguments), ok, ko); }; });
     return o;
   }
   window.google = { script: { run: make(null, null) } };
@@ -51,7 +51,7 @@ function estAdmin(){return !!REEL&&String(REEL.nom).trim().toUpperCase()==="HEBA
 function espace(r){if(!r.__demo)REEL=r;if(!estAdmin())DEMOP=false;espaceRendu(r.__demo?r:(DEMOP?demoData():r))}
 function demoPresume(){return{d:frD(new Date()),h:"06:00 – 09:00",dur:180,site:"Site fictif",ctrl:"09:02"}}
 function bandeauPresume(r){var P=r.presume||(DEMOP?demoPresume():null);if(!P)return;var b=el("div","pre");b.setAttribute("role","status");b.appendChild(el("b","","Présence non confirmée — absence présumée"));b.appendChild(el("p","","Service du "+dLong(P.d)+" · Horaire prévu : "+(P.h||"Non renseigné")+" · Durée prévue : "+dureeTxt(P.dur)));b.appendChild(el("p","","Arrivée : non enregistrée · Départ : non enregistré · Contrôle à "+hhmm(P.ctrl)));b.appendChild(el("div","prn","Statut provisoire : ce n’est pas une décision. Un responsable doit le confirmer. Si vous étiez présent, prévenez-le."));c.appendChild(b)}
-function espaceRendu(r){vide();c.className="c l";if(DEMOP)c.appendChild(el("div","dban","Mode démonstration · données fictives · rien n’est enregistré"));c.appendChild(el("div","t","Mon espace"));c.appendChild(el("div","nom",r.prenom+" "+r.nom));var ids=el("div","ids");[["N° de badge",fmtBadge(r.badge)||"—"],["N° d’accès",fmtCarte(r.carte)||"—"]].forEach(function(x){var d=el("div","");d.appendChild(el("span","",x[0]));d.appendChild(el("b","",x[1]));ids.appendChild(d)});c.appendChild(ids);bandeauPresume(r);if(TK){var pb=el("button","","Pointer");pb.onclick=function(){envoyer("","")};c.appendChild(pb)}var nv=el("div","seg gnav");[["c","Mes congés"],["a","Mes absences"],["g","Gestion administrative"]].forEach(function(o){var b=el("button",o[0]===VUE?"on":"",o[1]);b.type="button";b.onclick=function(){VUE=o[0];espace(r)};nv.appendChild(b)});var pg=el("button","ptg");pg.type="button";pg.innerHTML=psIcone()+"<span>Pointage</span>";pg.onclick=function(){psOuvrir(r)};nv.appendChild(pg);var rb=rcBouton();if(rb)nv.appendChild(rb);c.appendChild(nv);c.appendChild(qsBouton(r));if(estAdmin()){var db=el("button","dbtn"+(DEMOP?" on":""),DEMOP?"Quitter la démonstration":"Mode démonstration");db.type="button";db.onclick=function(){DEMOP=!DEMOP;espace(REEL||r)};c.appendChild(db)};if(VUE==="c")corpsConges(r);else if(VUE==="g")corpsGA(r);else corpsAbs(r)}/* IRIS — onglet agent « Gestion administrative » (ajout isolé).
+function espaceRendu(r){vide();c.className="c l";if(DEMOP)c.appendChild(el("div","dban","Mode démonstration · données fictives · rien n’est enregistré"));c.appendChild(el("div","t","Mon espace"));c.appendChild(el("div","nom",r.prenom+" "+r.nom));var ids=el("div","ids");[["N° de badge",fmtBadge(r.badge)||"—"],["N° d’accès",fmtCarte(r.carte)||"—"]].forEach(function(x){var d=el("div","");d.appendChild(el("span","",x[0]));d.appendChild(el("b","",x[1]));ids.appendChild(d)});c.appendChild(ids);bandeauPresume(r);if(TK){var pb=el("button","","Pointer");pb.onclick=function(){envoyer("","")};c.appendChild(pb)}var nv=el("div","seg gnav");[["c","Mes congés"],["a","Mes absences"],["g","Gestion administrative"]].forEach(function(o){var b=el("button",o[0]===VUE?"on":"",o[1]);b.type="button";b.onclick=function(){VUE=o[0];espace(r)};nv.appendChild(b)});var pg=el("button","ptg");pg.type="button";pg.innerHTML=psIcone()+"<span>Pointage</span>";pg.onclick=function(){psOuvrir(r)};nv.appendChild(pg);var cmb=cmaBouton();if(cmb)nv.appendChild(cmb);var rb=rcBouton();if(rb)nv.appendChild(rb);c.appendChild(nv);c.appendChild(qsBouton(r));if(estAdmin()){var db=el("button","dbtn"+(DEMOP?" on":""),DEMOP?"Quitter la démonstration":"Mode démonstration");db.type="button";db.onclick=function(){DEMOP=!DEMOP;espace(REEL||r)};c.appendChild(db)};if(VUE==="c")corpsConges(r);else if(VUE==="g")corpsGA(r);else corpsAbs(r)}/* IRIS — onglet agent « Gestion administrative » (ajout isolé).
    Réutilise les composants de p/index.html : el, c, vide, run, runK, toastD, visionneuse, lirePJ, jetonPJ, DEV, REEL, espace.
    Intégration (après accord) : coller ce bloc avant « function niv », ajouter ["g","Gestion administrative"] au sélecteur d'onglets et « else if(VUE==="g")corpsGA(r) » dans espaceRendu. */
 var GAC = {
@@ -833,4 +833,113 @@ function rcBouton() {
   return b;
 }
 
+</script><script>/* IRIS — rubrique « Communications » de MON ESPACE (Phase 1 : annonces, pastille, lecture individuelle). Ajout isolé.
+   Réutilise : el, c, DEV, DEMOP, toastD, conges. N'appelle jamais run() (son échec remplacerait la page) : appels directs et silencieux. */
+var CMA = { etat: null, tmr: 0, ov: null, liste: null, bouton: null };
+(function () {
+  if (document.getElementById("cm-css")) return;
+  var s = document.createElement("style"); s.id = "cm-css";
+  s.textContent = ".seg.gnav button.cmb{flex:1 0 100%;order:9;margin-top:2px;padding:15px 8px;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:12px;border:1px solid #d3d0c6;background:#ecebe6;color:#1b2230}" +
+    ".seg.gnav button.cmb.non{background:#04112c;color:#fff;border-color:#04112c}.seg.gnav button.cmb svg{width:26px;height:26px;flex:none}" +
+    ".cmp{min-width:26px;height:26px;border-radius:13px;background:#8b1d1d;color:#fff;font-size:15px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0 7px;box-sizing:border-box;line-height:1;border:2px solid #fff}" +
+    ".cmov{position:fixed;left:0;top:0;width:100%;height:100vh;height:100dvh;z-index:200002;background:#f4f1ea;color:#04112c;display:flex;flex-direction:column;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif}" +
+    ".cmh{padding:max(14px,env(safe-area-inset-top)) 16px 12px;background:#04112c;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:10px}.cmh h2{margin:0;font-size:22px;display:flex;align-items:center;gap:10px}" +
+    ".cmh button{font-size:17px;font-weight:700;padding:10px 16px;border-radius:12px;border:2px solid #d9b44a;background:transparent;color:#fff;font-family:inherit}" +
+    ".cml{flex:1;overflow:auto;padding:14px 14px max(20px,env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}.cml h3{margin:6px 4px 10px;font-size:15px;letter-spacing:.1em;text-transform:uppercase;color:#7a6a3a}" +
+    ".cmc{background:#fff;border:1px solid #e3dfd2;border-radius:16px;padding:14px 16px;margin:0 0 12px;text-align:left}.cmc.nl{border-color:#04112c;box-shadow:0 0 0 2px rgba(4,17,44,.12)}" +
+    ".cmc .t{font-size:19px;font-weight:700;line-height:1.25;margin:0}.cmc.nl .t{font-weight:800}.cmc .m{font-size:14px;color:#6b6755;margin-top:4px}" +
+    ".cmc .tg{display:inline-block;font-size:13px;font-weight:700;padding:3px 10px;border-radius:999px;background:#ecebe6;color:#04112c;margin:0 6px 8px 0}.cmc .tg.nv{background:#8b1d1d;color:#fff}.cmc .tg.ur{background:#d9b44a}.cmc .tg.im{background:#f0e2b0}" +
+    ".cmc .co{font-size:18px;line-height:1.4;margin-top:10px;white-space:pre-wrap;word-break:break-word}.cmc .qu{font-size:17px;font-weight:600;margin-top:8px}" +
+    ".cmv{text-align:center;color:#6b6755;font-size:17px;padding:30px 10px}";
+  document.head.appendChild(s);
+})();
+function cmaIcone() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 8h8M8 12h5"/></svg>'; }
+function cmaAppel(nom, args, ok, ko) {
+  try {
+    var f = google.script.run.withSuccessHandler(function (r) { try { ok(r); } catch (e) { } }).withFailureHandler(function () { if (ko) ko(); });
+    f[nom].apply(f, args);
+  } catch (e) { if (ko) ko(); }
+}
+function cmaTexteNombre(n) { return n > 99 ? "99+" : String(n); }
+// Met à jour le bouton : bleu nuit + pastille s'il y a des messages non lus, gris clair sans pastille sinon
+function cmaMajBouton() {
+  var b = CMA.bouton; if (!b) return;
+  var n = CMA.etat || 0; b.className = "cmb" + (n > 0 ? " non" : "");
+  b.textContent = ""; b.insertAdjacentHTML("beforeend", cmaIcone());
+  var t = document.createElement("span"); t.textContent = "Communications"; b.appendChild(t);
+  if (n > 0) { var p = document.createElement("span"); p.className = "cmp"; p.textContent = cmaTexteNombre(n); b.appendChild(p); }
+  b.setAttribute("aria-label", n > 0 ? "Communications, " + n + (n > 1 ? " messages non lus" : " message non lu") : "Communications, aucun message non lu");
+}
+function cmaCompteur() {
+  if (DEMOP || !CMA.bouton || !document.body.contains(CMA.bouton)) return;
+  cmaAppel("cmCompteur", [DEV], function (r) { if (r && r.ok && typeof r.nonLus === "number") { CMA.etat = r.nonLus; cmaMajBouton(); } });
+}
+function cmaArret() { clearInterval(CMA.tmr); CMA.tmr = 0; }
+function cmaDemarre() {
+  cmaArret(); setTimeout(cmaCompteur, 300);   // le bouton est ajouté à la page juste après sa création
+  CMA.tmr = setInterval(function () {
+    if (!CMA.bouton || !document.body.contains(CMA.bouton)) { cmaArret(); return; }
+    if (!document.hidden && !CMA.ov) cmaCompteur();
+  }, 45000);
+}
+function cmaFerme() { if (CMA.ov && CMA.ov.parentNode) CMA.ov.parentNode.removeChild(CMA.ov); CMA.ov = null; document.documentElement.style.overflow = ""; cmaCompteur(); }
+function cmaDateFr(d) { return d ? d.slice(8, 10) + "/" + d.slice(5, 7) + "/" + d.slice(0, 4) : ""; }
+function cmaCarte(x, zone) {
+  var k = document.createElement("div"); k.className = "cmc" + (x.lu ? "" : " nl"); k.setAttribute("role", "button"); k.tabIndex = 0;
+  function tag(txt, cls) { var e = document.createElement("span"); e.className = "tg" + (cls ? " " + cls : ""); e.textContent = txt; return e; }
+  var tete = document.createElement("div");
+  if (!x.lu) tete.appendChild(tag("Nouveau", "nv"));
+  tete.appendChild(tag(x.categorie)); if (x.priorite === "Urgente") tete.appendChild(tag("Urgent", "ur")); else if (x.priorite === "Importante") tete.appendChild(tag("Important", "im"));
+  k.appendChild(tete);
+  var t = document.createElement("p"); t.className = "t"; t.textContent = x.titre; k.appendChild(t);
+  var q = []; if (x.dateEv) q.push(cmaDateFr(x.dateEv)); if (x.heureDeb) q.push(x.heureDeb + (x.heureFin ? " – " + x.heureFin : ""));
+  var m = document.createElement("div"); m.className = "m"; m.textContent = "Publié le " + new Date(x.publication).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" }); k.appendChild(m);
+  var det = document.createElement("div"); det.style.display = "none"; k.appendChild(det);
+  function remplit() {
+    det.textContent = "";
+    if (q.length) { var a = document.createElement("div"); a.className = "qu"; a.textContent = "Quand : " + q.join(" · "); det.appendChild(a); }
+    var l = [x.site, x.etage ? "Étage " + x.etage : "", x.lieu, x.ref ? "Réf. " + x.ref : ""].filter(Boolean).join(" · ");
+    if (l) { var b = document.createElement("div"); b.className = "qu"; b.textContent = "Où : " + l; det.appendChild(b); }
+    var c2 = document.createElement("div"); c2.className = "co"; c2.textContent = x.message; det.appendChild(c2);
+  }
+  remplit();
+  function bascule() {
+    var ouvert = det.style.display !== "none"; det.style.display = ouvert ? "none" : "block";
+    if (!ouvert && !x.lu) {
+      x.lu = true; k.className = "cmc"; var nv = tete.querySelector(".tg.nv"); if (nv) nv.parentNode.removeChild(nv);
+      if (typeof CMA.etat === "number" && CMA.etat > 0) { CMA.etat--; cmaMajBouton(); }
+      cmaAppel("cmLire", [DEV, x.id], function (r) { if (r && r.ok && typeof r.nonLus === "number") { CMA.etat = r.nonLus; cmaMajBouton(); } }, function () { x.lu = false; cmaCompteur(); });
+    }
+  }
+  k.onclick = bascule; k.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); bascule(); } };
+  zone.appendChild(k);
+}
+function cmaOuvre() {
+  if (DEMOP) { toastD("Mode démonstration : les communications ne sont pas disponibles."); return; }
+  if (CMA.ov) return;
+  var ov = document.createElement("div"); ov.className = "cmov"; ov.setAttribute("role", "dialog"); ov.setAttribute("aria-label", "Communications");
+  var h = document.createElement("div"); h.className = "cmh"; var h2 = document.createElement("h2"); h2.textContent = "Communications"; h.appendChild(h2);
+  var f = document.createElement("button"); f.type = "button"; f.textContent = "Fermer"; f.onclick = cmaFerme; h.appendChild(f); ov.appendChild(h);
+  var corps = document.createElement("div"); corps.className = "cml"; ov.appendChild(corps);
+  var ti = document.createElement("h3"); ti.textContent = "Annonces"; corps.appendChild(ti);
+  var zone = document.createElement("div"); corps.appendChild(zone);
+  var v = document.createElement("div"); v.className = "cmv"; v.textContent = "Chargement…"; zone.appendChild(v);
+  document.body.appendChild(ov); CMA.ov = ov; document.documentElement.style.overflow = "hidden";
+  function charge() {
+    cmaAppel("cmMesCommunications", [DEV], function (r) {
+      if (!CMA.ov) return; zone.textContent = "";
+      if (!r || !r.ok) { v = document.createElement("div"); v.className = "cmv"; v.textContent = (r && r.msg) || "Impossible de charger les communications."; zone.appendChild(v); var re = document.createElement("button"); re.type = "button"; re.textContent = "Réessayer"; re.style.cssText = "font-size:18px;font-weight:700;padding:14px 22px;border-radius:14px;border:2px solid #04112c;background:#fff;color:#04112c;margin-top:10px"; re.onclick = function () { zone.textContent = ""; charge(); }; zone.appendChild(re); return; }
+      CMA.etat = r.nonLus; cmaMajBouton();
+      if (!r.communications.length) { v = document.createElement("div"); v.className = "cmv"; v.textContent = "Aucune annonce pour le moment."; zone.appendChild(v); return; }
+      r.communications.forEach(function (x) { cmaCarte(x, zone); });
+    }, function () { if (!CMA.ov) return; zone.textContent = ""; v = document.createElement("div"); v.className = "cmv"; v.textContent = "Connexion impossible. Vérifiez votre réseau puis réessayez."; zone.appendChild(v); var re = document.createElement("button"); re.type = "button"; re.textContent = "Réessayer"; re.style.cssText = "font-size:18px;font-weight:700;padding:14px 22px;border-radius:14px;border:2px solid #04112c;background:#fff;color:#04112c;margin-top:10px"; re.onclick = function () { zone.textContent = ""; charge(); }; zone.appendChild(re); });
+  }
+  charge();
+}
+// Appelée à l'affichage de MON ESPACE : retourne le bouton (ou null en mode démonstration sans serveur)
+function cmaBouton() {
+  var b = document.createElement("button"); b.type = "button"; CMA.bouton = b; CMA.etat = 0; cmaMajBouton(); b.onclick = cmaOuvre;
+  if (!DEMOP) cmaDemarre();
+  return b;
+}
 </script><link rel="stylesheet" href="../iris.css?v=20261116"></body></html>
