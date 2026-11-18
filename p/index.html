@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; frame-src blob:; connect-src https://script.google.com https://script.googleusercontent.com https://api.open-meteo.com https://api-bdc.io; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width, initial-scale=1"><title>IRIS</title><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#0b1a2b"><link rel="icon" href="../icon-192.png"><script>(function shim(){
+<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; frame-src blob:; connect-src https://script.google.com https://script.googleusercontent.com https://api.open-meteo.com https://api-bdc.io; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width, initial-scale=1"><title>IRIS</title><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#0b1a2b"><link rel="icon" href="../icon-192.png"><link rel="apple-touch-icon" href="../icon-192.png"><meta name="apple-mobile-web-app-title" content="IRIS"><script>(function shim(){
   var URL_APP = "https://script.google.com/macros/s/AKfycbzAc5Ge9XGmOE5bBbOxkN528oSBNvgw3MZEGRZVH15HxMZnVB_MwputipQMebgHXAxO/exec";
   function appelle(nom, args, ok, ko) {
     var x = new XMLHttpRequest();
@@ -51,7 +51,7 @@ function estAdmin(){return !!REEL&&String(REEL.nom).trim().toUpperCase()==="HEBA
 function espace(r){if(!r.__demo)REEL=r;if(!estAdmin())DEMOP=false;espaceRendu(r.__demo?r:(DEMOP?demoData():r))}
 function demoPresume(){return{d:frD(new Date()),h:"06:00 – 09:00",dur:180,site:"Site fictif",ctrl:"09:02"}}
 function bandeauPresume(r){var P=r.presume||(DEMOP?demoPresume():null);if(!P)return;var b=el("div","pre");b.setAttribute("role","status");b.appendChild(el("b","","Présence non confirmée — absence présumée"));b.appendChild(el("p","","Service du "+dLong(P.d)+" · Horaire prévu : "+(P.h||"Non renseigné")+" · Durée prévue : "+dureeTxt(P.dur)));b.appendChild(el("p","","Arrivée : non enregistrée · Départ : non enregistré · Contrôle à "+hhmm(P.ctrl)));b.appendChild(el("div","prn","Statut provisoire : ce n’est pas une décision. Un responsable doit le confirmer. Si vous étiez présent, prévenez-le."));c.appendChild(b)}
-function espaceRendu(r){vide();c.className="c l";if(DEMOP)c.appendChild(el("div","dban","Mode démonstration · données fictives · rien n’est enregistré"));c.appendChild(el("div","t","Mon espace"));c.appendChild(el("div","nom",r.prenom+" "+r.nom));var ids=el("div","ids");[["N° de badge",fmtBadge(r.badge)||"—"],["N° d’accès",fmtCarte(r.carte)||"—"]].forEach(function(x){var d=el("div","");d.appendChild(el("span","",x[0]));d.appendChild(el("b","",x[1]));ids.appendChild(d)});c.appendChild(ids);bandeauPresume(r);if(TK){var pb=el("button","","Pointer");pb.onclick=function(){envoyer("","")};c.appendChild(pb)}var nv=el("div","seg gnav");[["c","Mes congés"],["a","Mes absences"],["g","Gestion administrative"]].forEach(function(o){var b=el("button",o[0]===VUE?"on":"",o[1]);b.type="button";b.onclick=function(){VUE=o[0];espace(r)};nv.appendChild(b)});var pg=el("button","ptg");pg.type="button";pg.innerHTML=psIcone()+"<span>Pointage</span>";pg.onclick=function(){psOuvrir(r)};nv.appendChild(pg);c.appendChild(nv);c.appendChild(qsBouton(r));if(estAdmin()){var db=el("button","dbtn"+(DEMOP?" on":""),DEMOP?"Quitter la démonstration":"Mode démonstration");db.type="button";db.onclick=function(){DEMOP=!DEMOP;espace(REEL||r)};c.appendChild(db)};if(VUE==="c")corpsConges(r);else if(VUE==="g")corpsGA(r);else corpsAbs(r)}/* IRIS — onglet agent « Gestion administrative » (ajout isolé).
+function espaceRendu(r){vide();c.className="c l";if(DEMOP)c.appendChild(el("div","dban","Mode démonstration · données fictives · rien n’est enregistré"));c.appendChild(el("div","t","Mon espace"));c.appendChild(el("div","nom",r.prenom+" "+r.nom));var ids=el("div","ids");[["N° de badge",fmtBadge(r.badge)||"—"],["N° d’accès",fmtCarte(r.carte)||"—"]].forEach(function(x){var d=el("div","");d.appendChild(el("span","",x[0]));d.appendChild(el("b","",x[1]));ids.appendChild(d)});c.appendChild(ids);bandeauPresume(r);if(TK){var pb=el("button","","Pointer");pb.onclick=function(){envoyer("","")};c.appendChild(pb)}var nv=el("div","seg gnav");[["c","Mes congés"],["a","Mes absences"],["g","Gestion administrative"]].forEach(function(o){var b=el("button",o[0]===VUE?"on":"",o[1]);b.type="button";b.onclick=function(){VUE=o[0];espace(r)};nv.appendChild(b)});var pg=el("button","ptg");pg.type="button";pg.innerHTML=psIcone()+"<span>Pointage</span>";pg.onclick=function(){psOuvrir(r)};nv.appendChild(pg);var rb=rcBouton();if(rb)nv.appendChild(rb);c.appendChild(nv);c.appendChild(qsBouton(r));if(estAdmin()){var db=el("button","dbtn"+(DEMOP?" on":""),DEMOP?"Quitter la démonstration":"Mode démonstration");db.type="button";db.onclick=function(){DEMOP=!DEMOP;espace(REEL||r)};c.appendChild(db)};if(VUE==="c")corpsConges(r);else if(VUE==="g")corpsGA(r);else corpsAbs(r)}/* IRIS — onglet agent « Gestion administrative » (ajout isolé).
    Réutilise les composants de p/index.html : el, c, vide, run, runK, toastD, visionneuse, lirePJ, jetonPJ, DEV, REEL, espace.
    Intégration (après accord) : coller ce bloc avant « function niv », ajouter ["g","Gestion administrative"] au sélecteur d'onglets et « else if(VUE==="g")corpsGA(r) » dans espaceRendu. */
 var GAC = {
@@ -616,7 +616,14 @@ function psPointer(tk) {
       var b = el("button", "sec", "Mon espace"); b.type = "button"; b.onclick = function () { conges(); }; c.appendChild(b);
       return;
     }
-    TK = r.ticket; setAu(r); demarre();
+    // Pointage automatique : l'agent a scanné avec la caméra de l'onglet Pointage, il n'a pas à toucher « Pointer ».
+    // Même enchaînement que demarre() puis bonjour() ; le premier usage d'un téléphone (formulaire) reste inchangé.
+    TK = r.ticket; setAu(r);
+    run(function (e) {
+      if (!e) { expireAu(); expire(); return; }
+      setAu(e);
+      if (e.agent) envoyer("", ""); else formulaire("");
+    }).etat(DEV, TK);
   }).ouvrirScan(tk, DEV);
 }
 function psBoucle() {
@@ -703,5 +710,62 @@ function psOuvrir(r) {
   document.documentElement.style.overflow = "hidden";
   document.addEventListener("visibilitychange", psVis);
   psDemarreCamera();   // dans le geste de l'utilisateur (obligatoire sur iOS)
+}
+
+/* IRIS — raccourci sur l'écran d'accueil du téléphone (ajout isolé).
+   Android (Chrome, Edge, Samsung…) : manifeste « p/manifest.webmanifest » + invite d'installation du navigateur si elle existe, sinon guide.
+   iPhone/iPad : aucune installation automatique possible (règle Apple) -> guide en 3 étapes. Pas de manifeste sur iOS : le raccourci s'ouvre
+   dans le navigateur et garde le même téléphone enregistré (une « app » iOS isolerait le stockage et obligerait à se réassocier).
+   Réutilise : el, c. */
+var RC = { ev: null, ov: null };
+function rcIos() { var u = navigator.userAgent || ""; return /iPhone|iPad|iPod/.test(u) || (/Macintosh/.test(u) && navigator.maxTouchPoints > 1); }
+function rcInstalle() { try { return !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true; } catch (e) { return false; } }
+(function () {
+  if (!rcIos() && !document.querySelector('link[rel="manifest"]')) { var l = document.createElement("link"); l.rel = "manifest"; l.href = "manifest.webmanifest"; document.head.appendChild(l); }
+  window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); RC.ev = e; });
+  window.addEventListener("appinstalled", function () { RC.ev = null; rcFerme(); var b = document.querySelector(".rcb"); if (b && b.parentNode) b.parentNode.removeChild(b); });
+  if (document.getElementById("rc-css")) return;
+  var s = document.createElement("style"); s.id = "rc-css";
+  s.textContent = ".seg.gnav button.rcb{flex:1 0 100%;order:10;margin-top:2px;padding:13px 8px;font-size:17px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px;background:transparent;border:2px solid #d9b44a;color:inherit}.seg.gnav button.rcb svg{width:24px;height:24px;flex:none}" +
+    ".rcov{position:fixed;left:0;top:0;width:100%;height:100vh;height:100dvh;z-index:200001;background:rgba(4,17,44,.94);display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif}" +
+    ".rcc{width:min(92vw,440px);max-height:92vh;overflow:auto;box-sizing:border-box;background:#fff;color:#04112c;border-radius:20px;padding:22px 18px max(18px,env(safe-area-inset-bottom));text-align:center}.rcc h2{margin:0 0 12px;font-size:23px;line-height:1.25}" +
+    ".rcl{display:flex;align-items:center;gap:14px;text-align:left;margin:10px 0;padding:12px;border-radius:14px;background:#f3efe2;font-size:19px;line-height:1.3}.rcl b{flex:none;width:36px;height:36px;border-radius:50%;background:#04112c;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px}.rcl svg{width:28px;height:28px;vertical-align:middle;flex:none}" +
+    ".rcc button{margin:12px 0 0;width:100%;padding:16px 10px;font-size:19px;font-weight:700;border-radius:14px;border:2px solid #04112c;background:#d9b44a;color:#04112c;font-family:inherit}";
+  document.head.appendChild(s);
+})();
+function rcIcone() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 8v6M9 11l3 3 3-3"/></svg>'; }
+function rcPartage() { return '<svg viewBox="0 0 24 24" fill="none" stroke="#0a66ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="bouton Partager"><path d="M12 15V3M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>'; }
+function rcMenu() { return '<svg viewBox="0 0 24 24" fill="#04112c" aria-label="menu"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>'; }
+function rcFerme() { if (RC.ov && RC.ov.parentNode) RC.ov.parentNode.removeChild(RC.ov); RC.ov = null; }
+function rcGuide() {
+  rcFerme();
+  var ov = el("div", "rcov"), bx = el("div", "rcc"); ov.setAttribute("role", "dialog"); ov.setAttribute("aria-label", "Ajouter IRIS sur l’écran d’accueil");
+  bx.appendChild(el("h2", "", "Ajouter IRIS sur l’écran d’accueil"));
+  function ligne(n, html) { var l = el("div", "rcl"); l.appendChild(el("b", "", String(n))); var t = document.createElement("span"); t.innerHTML = html; l.appendChild(t); bx.appendChild(l); }
+  if (rcIos()) {
+    try { history.replaceState(null, "", location.pathname); } catch (e) { }
+    ligne(1, "Touchez le bouton <strong>Partager</strong> " + rcPartage() + " (en bas ou en haut de l’écran).");
+    ligne(2, "Descendez et touchez <strong>Sur l’écran d’accueil</strong>.");
+    ligne(3, "Touchez <strong>Ajouter</strong>. L’icône IRIS apparaît sur votre téléphone.");
+  } else {
+    ligne(1, "Touchez les 3 points " + rcMenu() + " du navigateur (en haut à droite).");
+    ligne(2, "Touchez <strong>Ajouter à l’écran d’accueil</strong> ou <strong>Installer l’application</strong>.");
+    ligne(3, "Touchez <strong>Ajouter</strong> ou <strong>Installer</strong>. L’icône IRIS apparaît sur votre téléphone.");
+  }
+  var f = el("button", "", "J’ai compris"); f.type = "button"; f.onclick = rcFerme; bx.appendChild(f);
+  ov.appendChild(bx); document.body.appendChild(ov); RC.ov = ov;
+}
+// Bouton de l'espace de l'agent : invite d'installation du navigateur si disponible, sinon guide pas à pas
+function rcOuvre() {
+  if (RC.ev && RC.ev.prompt) {
+    var e = RC.ev; RC.ev = null;
+    try { e.prompt(); if (e.userChoice && e.userChoice.then) e.userChoice.then(function () { }, function () { }); return; } catch (x) { }
+  }
+  rcGuide();
+}
+function rcBouton() {
+  if (rcInstalle()) return null;
+  var b = el("button", "rcb"); b.type = "button"; b.innerHTML = rcIcone() + "<span>Ajouter IRIS à l’accueil</span>"; b.onclick = rcOuvre;
+  return b;
 }
 </script><link rel="stylesheet" href="../iris.css?v=20261116"></body></html>
