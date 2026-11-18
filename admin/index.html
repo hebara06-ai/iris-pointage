@@ -253,7 +253,7 @@ var IrisVoix = (function () {
   var btn = document.getElementById("btned"); if (!btn) return;
   var ov = document.createElement("div"); ov.id = "ed"; document.body.appendChild(ov);
   var toast = document.createElement("div"); toast.id = "edm"; document.body.appendChild(toast);
-  var onglet = "pt", DATA = null, jourSel = "", tt = null, NJ = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+  var onglet = (location.search.indexOf("cm=1") >= 0 ? "cm" : "pt"), DATA = null, jourSel = "", tt = null, NJ = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
   function h(t, a, k) { var e = document.createElement(t); if (a) for (var x in a) { if (x === "c") e.className = a[x]; else if (x === "t") e.textContent = a[x]; else e.setAttribute(x, a[x]); } (k || []).forEach(function (c) { if (c) e.appendChild(c); }); return e; }
   function tl(t) { var l = String(t || "").toLowerCase(), n = l.indexOf("non") >= 0; return l.indexOf("retard") === 0 ? (n ? "Retard non excusé" : "Retard excusé") : (n ? "Absence non justifiée" : "Absence justifiée"); }
 
@@ -1169,25 +1169,75 @@ var IrisVoix = (function () {
     if (QS.foc === id) setTimeout(function () { if (ta.isConnected) { ta.focus(); try { ta.setSelectionRange(QS.pos, QS.pos); } catch (e) { } } }, 0);
     return it;
   }
-    // ===== Communications (Phase 1 : annonces) — inséré dans la portée de l'administration : réutilise h, lab, appel, msg, sure, dessiner =====
-  var CM = { liste: null, cat: null, err: null, charge: false, vue: "liste", id: null, detail: null, form: null, filtre: "tous", sel: {}, rech: "", site: "" };
-  function cmBadge() { return ""; }
-  function cmErreur(t) { CM.err = t; CM.charge = false; dessiner(); }
+    // ===== Communications (Phases 1 à 4 : annonces, accusés, participation, rappels, e-mails, messages privés) — inséré dans la portée de l'administration : réutilise h, lab, appel, msg, sure, dessiner =====
+  var CM = { liste: null, cat: null, err: null, charge: false, vue: "liste", id: null, detail: null, form: null, filtre: "tous", sel: {}, rech: "", site: "",
+    flt: { categorie: "", site: "", agent: "", du: "", au: "" }, nonLus: 0, pollId: 0, pollEnCours: false, emb: false, cible: null,
+    fils: null, fil: null, cle: "", rep: { texte: "", orig: "", commId: "" }, suivi: null, sv: { du: "", au: "" }, emails: null, emStatut: "", ajout: {}, rechAjout: "" };
+  // Compteur affiché dans le libellé de l'onglet (texte seul) : « (3) », « (99+) »
+  function cmBadge() { var n = Number(CM.nonLus) || 0; return n > 0 ? " (" + (n > 99 ? "99+" : n) + ")" : ""; }
+  // Pastille ronde rouge foncé, chiffre blanc, 99+ ; null si zéro (sauf option « gris »)
+  function cmPastille(n, gris) {
+    n = Number(n) || 0; if (n <= 0 && !gris) return null;
+    var p = h("span", { c: "cm-pastille", role: "img", "aria-label": n + (gris ? " en cours" : " non lu(s)"), t: n > 99 ? "99+" : String(n) });
+    p.style.cssText = "display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:28px;padding:0 6px;box-sizing:border-box;border-radius:14px;font-weight:700;font-size:15px;margin-left:8px;" + (n > 0 && !gris ? "background:#8b1d1d;color:#fff" : "background:#d9dde3;color:#333");
+    return p;
+  }
+  // Redessin : dans la fenêtre d'administration, ou dans un conteneur embarqué (voir paneCmEmbarque)
+  function cmDess() { if (CM.emb && CM.cible) { CM.cible.textContent = ""; cmCorps(CM.cible); } else dessiner(); }
+  // Appel serveur à plusieurs arguments : fn(CLE, a1, a2…). mute = appel silencieux (aucun message en cas d'échec). Rappelle toujours ok(...)
+  function cmAppel(nom, args, ok, mute) {
+    args = args || []; var fini = false;
+    function bon(r) { if (fini) return; fini = true; ok(r); }
+    function mauvais() { if (fini) return; fini = true; ok({ ok: false, msg: "Connexion impossible, réessayez.", silencieux: !!mute }); }
+    try {
+      if (typeof google !== "undefined" && google.script && google.script.run) {
+        var run = google.script.run.withSuccessHandler(bon).withFailureHandler(mauvais);
+        run[nom].apply(run, [CLE].concat(args));
+      } else appel(nom, args.length > 1 ? args : args[0], bon);
+    } catch (e) { mauvais(); }
+  }
+  // Exécute une action avec le bouton désactivé pendant l'envoi
+  function cmAction(btn, nom, args, ok) { if (btn) btn.disabled = true; cmAppel(nom, args, function (r) { if (btn) btn.disabled = false; ok(r || { ok: false, msg: "Réponse vide." }); }); }
+  function cmSure(label, danger, fn) { var b = sure(label, danger, function () { fn(b); }); return b; }
+  function cmBtn(t, fn, prim) { var b = h("button", { c: "ed-b" + (prim ? " ed-p" : ""), t: t, type: "button" }); b.onclick = function () { fn(b); }; return b; }
+  function cmErreur(t) { CM.err = t; CM.charge = false; cmDess(); }
+  function cmCompteurMaj(fin) { cmAppel("cmAdminCompteur", [], function (r) { if (r && r.ok) { var n = Number(r.nonLus) || 0, ch = n !== CM.nonLus; CM.nonLus = n; if (fin) fin(ch); } }, true); }
+  // Rafraîchissement discret du compteur (~45 s) : jamais de redessin pendant une saisie (formulaire, détail, conversation)
+  function cmPoll() {
+    if (document.hidden || CM.pollEnCours) return;
+    try { if (typeof ov !== "undefined" && !CM.emb && ov.className !== "on") return; } catch (e) { }
+    CM.pollEnCours = true;
+    cmAppel("cmAdminCompteur", [], function (r) {
+      CM.pollEnCours = false; if (!r || !r.ok) return;
+      var n = Number(r.nonLus) || 0; if (n === CM.nonLus) return; CM.nonLus = n;
+      if (CM.liste && CM.cat && (CM.vue === "liste" || CM.vue === "prives" || CM.vue === "suivi")) { if (CM.vue === "prives") CM.fils = null; cmDess(); }
+    }, true);
+  }
+  if (!CM.pollId) CM.pollId = setInterval(cmPoll, 45000);
+  function cmListeO() { var o = {}; ["categorie", "site", "agent", "du", "au"].forEach(function (k) { if (CM.flt[k]) o[k] = CM.flt[k]; }); return o; }
   function cmCharge(apres) {
     if (CM.charge) return; CM.charge = true; CM.err = null;
-    appel("cmAdminCatalogue", {}, function (c) {
-      if (!c || !c.ok) { cmErreur((c && c.msg) || "Communications indisponibles."); return; }
-      CM.cat = c;
-      appel("cmAdminListe", {}, function (r) {
+    function liste() {
+      cmAppel("cmAdminListe", [cmListeO()], function (r) {
         if (!r || !r.ok) { cmErreur((r && r.msg) || "Liste indisponible."); return; }
-        CM.liste = r; CM.charge = false; if (apres) apres(); else dessiner();
+        CM.liste = r; CM.charge = false; cmCompteurMaj(function (ch) { if (ch && CM.vue !== "form" && CM.vue !== "fil") cmDess(); }); if (apres) apres(); else cmDess();
       });
+    }
+    if (CM.cat) { liste(); return; }
+    cmAppel("cmAdminCatalogue", [{}], function (c) {
+      if (!c || !c.ok) { cmErreur((c && c.msg) || "Communications indisponibles."); return; }
+      CM.cat = c; liste();
     });
   }
   function cmFr(d) { return d ? d.slice(8, 10) + "/" + d.slice(5, 7) + "/" + d.slice(0, 4) : ""; }
   function cmQuand(ms) { if (!ms) return "—"; return new Date(ms).toLocaleString("fr-FR", { timeZone: "Europe/Paris", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }); }
+  function cmDate(d) { return typeof d === "number" ? cmQuand(d) : String(d || ""); }
   function cmLieu(x) { return [x.site, x.etage ? "Étage " + x.etage : "", x.lieu, x.ref ? "Réf. " + x.ref : ""].filter(Boolean).join(" · "); }
   function cmQuandEv(x) { var p = []; if (x.dateEv) p.push(cmFr(x.dateEv)); if (x.heureDeb) p.push(x.heureDeb + (x.heureFin ? " – " + x.heureFin : "")); return p.join(" · "); }
+  function cmDelai(n) { n = Number(n) || 0; return n >= 24 && n % 24 === 0 ? n + " h (" + (n / 24) + (n === 24 ? " jour)" : " jours)") : n + " h"; }
+  var CM_EMAIL = { attente: "E-mail en attente", envoye: "E-mail envoyé", echec: "E-mail en échec", invalide: "Adresse e-mail invalide", aucun: "Pas d’e-mail" };
+  var CM_PART = { present: "Présent", absent: "Absent", empechement: "Empêché", "": "Pas de réponse" };
+  function cmTag(t) { return h("span", { c: "ed-tag", t: t }); }
   function cmCarteApercu(x) {
     var k = [h("div", { c: "ed-row" }, [h("span", { c: "ed-tag", t: x.categorie }), x.priorite && x.priorite !== "Normale" ? h("span", { c: "ed-tag", t: x.priorite }) : null]), h("h3", { t: x.titre || "(sans titre)" })];
     var q = cmQuandEv(x), l = cmLieu(x);
@@ -1196,59 +1246,182 @@ var IrisVoix = (function () {
     var m = h("p", {}); m.style.whiteSpace = "pre-wrap"; m.textContent = x.message || ""; k.push(m);
     return h("div", { c: "ed-card" }, k);
   }
-  function cmRetour() { CM.vue = "liste"; CM.id = null; CM.detail = null; CM.form = null; CM.sel = {}; CM.rech = ""; CM.site = ""; dessiner(); }
+  function cmRetour() { CM.vue = "liste"; CM.id = null; CM.detail = null; CM.form = null; CM.sel = {}; CM.rech = ""; CM.site = ""; CM.ajout = {}; CM.rechAjout = ""; cmDess(); }
   function cmOuvrirDetail(id) {
-    CM.vue = "detail"; CM.id = id; CM.detail = null; dessiner();
-    appel("cmAdminDetail", id, function (r) { if (!r || !r.ok) { msg((r && r.msg) || "Introuvable.", true); cmRetour(); return; } CM.detail = r; dessiner(); });
+    CM.vue = "detail"; CM.id = id; CM.detail = null; CM.ajout = {}; CM.rechAjout = ""; cmDess();
+    cmAppel("cmAdminDetail", [id], function (r) { if (!r || !r.ok) { msg((r && r.msg) || "Introuvable.", true); cmRetour(); return; } CM.detail = r; cmDess(); });
   }
   function cmNouveau(x) {
     CM.vue = "form"; CM.sel = {}; CM.rech = ""; CM.site = "";
-    CM.form = x ? { id: x.id, statut: x.statut, titre: x.titre, categorie: x.categorie, priorite: x.priorite, message: x.message, dateEv: x.dateEv, heureDeb: x.heureDeb, heureFin: x.heureFin, site: x.site, etage: x.etage, lieu: x.lieu, ref: x.ref, publication: "", destMode: x.destinataires === "tous" ? "tous" : "liste", verrou: x.statut === "Publiée" }
-      : { id: "", statut: "", titre: "", categorie: "Information générale", priorite: "Normale", message: "", dateEv: "", heureDeb: "", heureFin: "", site: "", etage: "", lieu: "", ref: "", publication: "", destMode: "tous", verrou: false };
+    CM.form = x ? { id: x.id, statut: x.statut, titre: x.titre, categorie: x.categorie, priorite: x.priorite, message: x.message, dateEv: x.dateEv, heureDeb: x.heureDeb, heureFin: x.heureFin, site: x.site, etage: x.etage, lieu: x.lieu, ref: x.ref, publication: "", destMode: x.destinataires === "tous" ? "tous" : "liste", verrou: x.statut === "Publiée",
+        accuse: !!x.accuse, participation: !!x.participation, confidentiel: !!x.confidentiel, rappels: (x.rappels || []).map(function (r) { return { h: Number(r.h), cible: r.cible === "tous" ? "tous" : "sans_reponse" }; }), reconfirmer: false, orig: x.texteOriginal || "", sigApercu: "" }
+      : { id: "", statut: "", titre: "", categorie: "Information générale", priorite: "Normale", message: "", dateEv: "", heureDeb: "", heureFin: "", site: "", etage: "", lieu: "", ref: "", publication: "", destMode: "tous", verrou: false, accuse: false, participation: false, confidentiel: false, rappels: [], reconfirmer: false, orig: "", sigApercu: "" };
     if (x && x.destinataires && x.destinataires !== "tous") { try { JSON.parse(x.destinataires).forEach(function (c) { CM.sel[c] = true; }); } catch (e) { } }
-    dessiner();
+    cmDess();
   }
-  function cmFiltreListe(c) {
+  function cmFiltreListe() {
     var L = CM.liste.communications, F = CM.filtre;
-    return L.filter(function (x) { return F === "tous" ? x.statut !== "Archivée" : F === "Brouillon" ? x.statut === "Brouillon" : F === "Programmée" ? x.statut === "Programmée" : F === "Publiée" ? x.statut === "Publiée" : x.statut === "Archivée"; });
+    return L.filter(function (x) { return F === "tous" ? x.statut !== "Archivée" : x.statut === F; });
   }
-  function paneCm(c) {
-    if (CM.err && !CM.charge) { var re = h("button", { c: "ed-b", t: "Réessayer", type: "button" }); re.onclick = function () { CM.err = null; CM.liste = null; dessiner(); }; c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Communications" }), h("p", { c: "ed-vide", t: CM.err }), re])); return; }
-    if (!CM.liste || !CM.cat) { c.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); cmCharge(); return; }
-    if (CM.vue === "form") { cmPaneForm(c); return; }
-    if (CM.vue === "detail") { cmPaneDetail(c); return; }
-    var k = CM.liste.compteurs;
-    var nv = h("button", { c: "ed-b ed-p", t: "Nouvelle communication", type: "button" }); nv.onclick = function () { cmNouveau(null); };
-    var ac = h("button", { c: "ed-b", t: "Actualiser", type: "button" }); ac.onclick = function () { CM.liste = null; dessiner(); msg("Liste actualisée."); };
-    var bar = h("div", { c: "ed-row" }, [nv, ac]);
+
+  // ---------- Vérification des dates et chiffres avant de remplacer un texte (jamais de modification silencieuse) ----------
+  var CM_JETON = /\d+|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|janvier|f[ée]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[ée]cembre/gi;
+  function cmJetons(t) { return (String(t || "").match(CM_JETON) || []).map(function (s) { return s.toLowerCase().replace(/é/g, "e").replace(/û/g, "u").replace(/^0+(?=\d)/, ""); }); }
+  function cmDiffJetons(a, b) {
+    var A = cmJetons(a), B = cmJetons(b), r = [], s = [];
+    A.forEach(function (x) { var i = B.indexOf(x); if (i >= 0) B.splice(i, 1); else r.push(x); }); s = B;
+    return { retires: r, ajoutes: s, different: !!(r.length || s.length) };
+  }
+  // Outils de texte sous un champ : Écouter / Dicter (IrisVoix si présent), Corriger / Reformuler (cmAdminReecrire) avec proposition à valider.
+  // E = { orig: "" } conserve le texte d'origine ; la proposition ne remplace JAMAIS le texte sans clic explicite.
+  function cmOutils(ta, E, surChange) {
+    var zone = h("div", { c: "cm-outils" }), note = h("p", { c: "ed-note", role: "status" }), prop = h("div", {}), boutons = [];
+    try { if (window.IrisVoix && IrisVoix.barre) zone.appendChild(IrisVoix.barre(ta, {})); } catch (e) { }
+    function lance(mode, libelle, attente) {
+      var b = cmBtn(libelle, function () {
+        var t = ta.value; prop.textContent = "";
+        if (t.trim().length < 3) { note.textContent = "Écrivez d’abord quelques mots."; return; }
+        note.textContent = attente; boutons.forEach(function (x) { x.disabled = true; });
+        cmAppel("cmAdminReecrire", [t, mode], function (r) {
+          boutons.forEach(function (x) { x.disabled = false; });
+          if (!r || !r.ok || !r.texte) { note.textContent = (r && r.msg) || "Indisponible pour le moment. Votre texte n’a pas été modifié."; return; }
+          if (ta.value !== t) { note.textContent = "Le texte a changé entre-temps : proposition ignorée."; return; }
+          note.textContent = "Proposition prête. Votre texte n’est pas encore modifié."; montre(t, r.texte);
+        });
+      }); boutons.push(b); return b;
+    }
+    function montre(orig, nouveau) {
+      prop.textContent = ""; var d = cmDiffJetons(orig, nouveau);
+      var o = h("p", {}); o.style.whiteSpace = "pre-wrap"; o.textContent = orig; var n = h("p", {}); n.style.whiteSpace = "pre-wrap"; n.textContent = nouveau;
+      var k = [h("h3", { t: "Proposition" }), h("p", { c: "ed-note", t: "Votre texte actuel :" }), o, h("p", { c: "ed-note", t: "Texte proposé :" }), n];
+      var ec = null; try { ec = window.IrisVoix && IrisVoix.boutonLire ? IrisVoix.boutonLire(nouveau, "Écouter la proposition") : null; } catch (e) { }
+      var avert = null;
+      if (d.different) { avert = h("p", { c: "ed-note", role: "alert", t: "Attention : les dates, heures ou chiffres ne sont pas les mêmes." + (d.retires.length ? " Absent(s) de la proposition : " + d.retires.join(", ") + "." : "") + (d.ajoutes.length ? " Nouveau(x) : " + d.ajoutes.join(", ") + "." : "") + " Vérifiez avant de l’utiliser." }); avert.style.cssText = "color:#8b1d1d;font-weight:700"; k.push(avert); }
+      function applique() { if (!E.orig) E.orig = orig; ta.value = nouveau; try { ta.dispatchEvent(new Event("input", { bubbles: true })); } catch (e) { } prop.textContent = ""; note.textContent = "Texte remplacé. Votre texte d’origine est conservé."; if (surChange) surChange(); }
+      var oui = d.different ? cmSure("Utiliser malgré la différence", true, applique) : cmBtn("Utiliser cette proposition", applique, true);
+      var non = cmBtn("Garder mon texte", function () { prop.textContent = ""; note.textContent = "Votre texte est conservé."; });
+      k.push(h("div", { c: "ed-row" }, [oui, non, ec]));
+      prop.appendChild(h("div", { c: "ed-card" }, k));
+    }
+    var row = h("div", { c: "ed-row" }, [lance("corriger", "Corriger", "Correction en cours…"), lance("reformuler", "Reformuler", "Reformulation en cours…")]);
+    zone.appendChild(row); zone.appendChild(note); zone.appendChild(prop); return zone;
+  }
+
+  // ---------- Sous-onglets Annonces / Messages privés ----------
+  function cmSousOnglets(c) {
+    var pub = CM.liste && CM.liste.compteurs ? CM.liste.compteurs.publiees : 0, nl = Number(CM.nonLus) || 0;
+    function onglet(cle, libelle, pastille, nonLu) {
+      var b = h("button", { type: "button", "aria-pressed": CM.vue === cle || (cle === "annonces" && CM.vue !== "prives") ? "true" : "false" }, [h("span", { t: libelle }), pastille]);
+      var actif = cle === "prives" ? CM.vue === "prives" : CM.vue !== "prives";
+      b.style.cssText = "flex:1;min-width:150px;min-height:56px;font-size:18px;font-weight:700;border-radius:14px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;border:3px solid " + (actif ? "#8b1d1d" : "transparent") + ";" + (nonLu ? "background:#14213d;color:#fff" : "background:#e5e7eb;color:#222");
+      b.onclick = function () { if (cle === "prives") { CM.vue = "prives"; CM.fils = null; } else { CM.vue = "liste"; } cmDess(); };
+      return b;
+    }
+    var ligne = h("div", { c: "ed-row" }, [onglet("annonces", "Annonces", cmPastille(pub, true), false), onglet("prives", "Messages privés", cmPastille(nl), nl > 0)]);
+    ligne.style.cssText = "display:flex;gap:10px;margin:10px 0;justify-content:center"; c.appendChild(ligne);
+  }
+  function cmPaneListe(c) {
+    var k = CM.liste.compteurs, cat = CM.cat;
+    var nv = cmBtn("Nouvelle communication", function () { cmNouveau(null); }, true);
+    var ac = cmBtn("Actualiser", function () { CM.liste = null; cmDess(); msg("Liste actualisée."); });
+    var sv = cmBtn("Tableau de suivi", function () { cmOuvrirSuivi(); }), em = cmBtn("E-mails", function () { cmOuvrirEmails(""); });
+    var bar = h("div", { c: "ed-row" }, [nv, ac, sv, em]);
     var filtres = h("div", { c: "ed-row" }); [["tous", "En cours"], ["Brouillon", "Brouillons (" + k.brouillons + ")"], ["Programmée", "Programmées (" + k.programmees + ")"], ["Publiée", "Publiées (" + k.publiees + ")"], ["Archivée", "Archives (" + k.archivees + ")"]].forEach(function (f) {
-      var b = h("button", { c: "ed-b" + (CM.filtre === f[0] ? " ed-p" : ""), t: f[1], type: "button" }); b.onclick = function () { CM.filtre = f[0]; dessiner(); }; filtres.appendChild(b);
+      var b = h("button", { c: "ed-b" + (CM.filtre === f[0] ? " ed-p" : ""), t: f[1], type: "button" }); b.onclick = function () { CM.filtre = f[0]; cmDess(); }; filtres.appendChild(b);
     });
-    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Communications" }), h("p", { c: "ed-note", t: "Annoncez une réunion, un événement ou une consigne aux agents de votre choix. Aucun e-mail n’est envoyé pour le moment : les agents lisent les annonces dans IRIS." }), bar, filtres]));
+    var etat = cat.emailReel ? "Les e-mails réels sont activés : les agents reçoivent aussi un e-mail." : "Les e-mails réels sont désactivés : aucun e-mail n’est envoyé, les agents lisent les annonces dans IRIS.";
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Communications" }), h("p", { c: "ed-note", t: "Annoncez une réunion, un événement ou une consigne aux agents de votre choix. " + etat }), bar, filtres]));
+    c.appendChild(cmCarteFiltres());
     var L = cmFiltreListe();
     if (!L.length) c.appendChild(h("p", { c: "ed-vide", t: "Aucune communication dans cette liste." }));
     L.forEach(function (x) {
-      var ouvrir = h("button", { c: "ed-b", t: "Ouvrir", type: "button" }); ouvrir.onclick = function () { cmOuvrirDetail(x.id); };
-      var acts = [ouvrir];
-      if (x.statut !== "Archivée") { var mod = h("button", { c: "ed-b", t: "Modifier", type: "button" }); mod.onclick = function () { cmNouveau(x); }; acts.push(mod); acts.push(sure("Archiver", true, function () { appel("cmAdminArchiver", x.id, function (r) { if (r && r.ok) { msg(r.msg); CM.liste = null; dessiner(); } else msg((r && r.msg) || "Échec.", true); }); })); }
+      var acts = [cmBtn("Ouvrir", function () { cmOuvrirDetail(x.id); })];
+      if (x.statut !== "Archivée") { acts.push(cmBtn("Modifier", function () { cmNouveau(x); })); acts.push(sure("Archiver", true, function () { cmAppel("cmAdminArchiver", [x.id], function (r) { if (r && r.ok) { msg(r.msg); CM.liste = null; cmDess(); } else msg((r && r.msg) || "Échec.", true); }); })); }
       var meta = x.statut === "Brouillon" ? "Brouillon" : x.statut === "Programmée" ? "Programmée pour le " + cmQuand(x.publication) : x.nbLus + " lu(s) sur " + x.nbDest + " destinataire(s)";
-      c.appendChild(h("div", { c: "ed-card" }, [h("div", { c: "ed-row" }, [h("span", { c: "ed-tag", t: x.statut }), h("span", { c: "ed-tag", t: x.categorie }), x.priorite !== "Normale" ? h("span", { c: "ed-tag", t: x.priorite }) : null]), h("h3", { t: x.titre }), h("p", { c: "ed-note", t: meta + (x.publication && x.statut === "Publiée" ? " · publiée le " + cmQuand(x.publication) : "") }), h("div", { c: "ed-row" }, acts)]));
+      var tags = [cmTag(x.statut), cmTag(x.categorie)]; if (x.priorite !== "Normale") tags.push(cmTag(x.priorite)); if (x.confidentiel) tags.push(cmTag("Confidentiel")); if (x.version > 1) tags.push(cmTag("Version " + x.version));
+      var st = [];
+      if (x.statut === "Publiée") {
+        if (x.accuse) st.push((x.nbAccuses || 0) + " accusé(s)");
+        if (x.participation) st.push((x.nbPresents || 0) + " présent(s), " + (x.nbAbsents || 0) + " absent(s), " + (x.nbEmpech || 0) + " empêché(s)");
+        if (x.emails) st.push("E-mails : " + (x.emails.envoye || 0) + " envoyé(s), " + (x.emails.attente || 0) + " en attente, " + (x.emails.echec || 0) + " en échec, " + (x.emails.invalide || 0) + " invalide(s)");
+        if (x.rappelsProgrammes || x.rappelsEnvoyes) st.push("Rappels : " + (x.rappelsEnvoyes || 0) + " envoyé(s), " + (x.rappelsProgrammes || 0) + " programmé(s)");
+      }
+      var k2 = [h("div", { c: "ed-row" }, tags), h("h3", { t: x.titre }), h("p", { c: "ed-note", t: meta + (x.publication && x.statut === "Publiée" ? " · publiée le " + cmQuand(x.publication) : "") })];
+      if (st.length) k2.push(h("p", { c: "ed-note cm-stats", t: st.join(" — ") }));
+      k2.push(h("div", { c: "ed-row" }, acts)); c.appendChild(h("div", { c: "ed-card" }, k2));
     });
   }
-  function cmPaneDetail(c) {
-    var ret = h("button", { c: "ed-b", t: "← Retour", type: "button" }); ret.onclick = cmRetour; c.appendChild(h("div", { c: "ed-row" }, [ret]));
-    if (!CM.detail) { c.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); return; }
-    var x = CM.detail.communication; c.appendChild(cmCarteApercu(x));
-    var D = CM.detail.destinataires, lus = D.filter(function (d) { return d.lu; }).length;
-    var lignes = D.map(function (d) { return h("div", { c: "ed-la" }, [h("b", { t: d.nom + " " + d.prenom }), h("span", { c: "ed-tag", t: d.lu ? "Lu le " + d.lu : "Non lu" })]); });
-    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Destinataires : " + lus + " lu(s) sur " + D.length })].concat(lignes.length ? lignes : [h("p", { c: "ed-vide", t: "Pas encore de destinataires (brouillon)." })])));
+  function cmCarteFiltres() {
+    var cat = CM.cat, sites = []; cat.agents.forEach(function (a) { if (a.site && sites.indexOf(a.site) < 0) sites.push(a.site); });
+    function sel(cle, opts, vide) { var s = h("select", { "aria-label": vide }); opts.forEach(function (o) { var op = h("option", { t: o[1], value: o[0] }); if (CM.flt[cle] === o[0]) op.selected = true; s.appendChild(op); }); s.onchange = function () { CM.flt[cle] = s.value; }; return s; }
+    function dt(cle) { var i = h("input", { type: "date" }); i.value = CM.flt[cle] || ""; i.onchange = i.oninput = function () { CM.flt[cle] = i.value; }; return i; }
+    var go = cmBtn("Appliquer les filtres", function () { CM.liste = null; cmDess(); }, true), rz = cmBtn("Effacer les filtres", function () { CM.flt = { categorie: "", site: "", agent: "", du: "", au: "" }; CM.liste = null; cmDess(); });
+    return h("div", { c: "ed-card" }, [h("h3", { t: "Filtrer la liste" }),
+      lab("Catégorie", sel("categorie", [["", "Toutes les catégories"]].concat(cat.categories.map(function (x) { return [x, x]; })), "Catégorie")),
+      lab("Site", sel("site", [["", "Tous les sites"]].concat(sites.map(function (x) { return [x, x]; })), "Site")),
+      lab("Agent destinataire", sel("agent", [["", "Tous les agents"]].concat(cat.agents.map(function (a) { return [a.cle, a.nom + " " + a.prenom]; })), "Agent")),
+      lab("Du (date de l’événement)", dt("du")), lab("Au", dt("au")), h("div", { c: "ed-row" }, [go, rz])]);
   }
+
+  // ---------- Détail ----------
+  function cmPaneDetail(c) {
+    c.appendChild(h("div", { c: "ed-row" }, [cmBtn("← Retour", cmRetour)]));
+    if (!CM.detail) { c.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); return; }
+    var x = CM.detail.communication, D = CM.detail.destinataires || [], H = CM.detail.historique || [];
+    c.appendChild(cmCarteApercu(x));
+    if (x.texteOriginal && x.texteOriginal !== x.message) { var o = h("p", {}); o.style.whiteSpace = "pre-wrap"; o.textContent = x.texteOriginal; c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Texte d’origine (avant correction ou reformulation)" }), o])); }
+    var opts = []; if (x.accuse) opts.push(cmTag("Accusé de réception demandé")); if (x.participation) opts.push(cmTag("Confirmation de participation demandée")); if (x.confidentiel) opts.push(cmTag("Confidentiel")); if (x.version > 1) opts.push(cmTag("Version " + x.version));
+    (x.rappels || []).forEach(function (r) { opts.push(cmTag("Rappel " + cmDelai(r.h) + (r.cible === "tous" ? " (tous)" : " (sans réponse)"))); });
+    var acts = []; var ec = null; try { ec = window.IrisVoix && IrisVoix.boutonLire ? IrisVoix.boutonLire(x.message || "", "Écouter le message") : null; } catch (e) { } if (ec) acts.push(ec);
+    if (x.statut !== "Archivée") { acts.push(cmBtn("Modifier", function () { cmNouveau(x); })); acts.push(cmSure("Archiver", true, function (b) { cmAction(b, "cmAdminArchiver", [x.id], function (r) { if (r.ok) { msg(r.msg); CM.liste = null; cmRetour(); } else msg(r.msg || "Échec.", true); }); })); }
+    if (opts.length) c.appendChild(h("div", { c: "ed-row" }, opts)); if (acts.length) c.appendChild(h("div", { c: "ed-row" }, acts));
+    var lus = D.filter(function (d) { return d.lu; }).length, acc = D.filter(function (d) { return d.accuseLe; }).length;
+    var tete = "Destinataires : " + lus + " lu(s) sur " + D.length + (x.accuse ? " · " + acc + " accusé(s)" : "") + (x.participation ? " · " + D.filter(function (d) { return d.participation === "present"; }).length + " présent(s), " + D.filter(function (d) { return d.participation === "absent"; }).length + " absent(s), " + D.filter(function (d) { return d.participation === "empechement"; }).length + " empêché(s)" : "");
+    var lignes = D.map(function (d) {
+      var t = [cmTag(d.lu ? "Lu le " + cmDate(d.lu) : "Non lu")];
+      if (x.accuse) t.push(cmTag(d.accuseLe ? "Accusé le " + cmDate(d.accuseLe) : "Pas d’accusé"));
+      if (x.participation) t.push(cmTag("Participation : " + (CM_PART[d.participation || ""] || d.participation)));
+      t.push(cmTag(CM_EMAIL[d.email] || "E-mail : " + (d.email || "inconnu")));
+      var l = [h("div", { c: "ed-la" }, [h("b", { t: d.nom + " " + d.prenom + (d.site ? " — " + d.site : "") })]), h("div", { c: "ed-row" }, t)];
+      if (d.commentaire) l.push(h("p", { c: "ed-note", t: "Commentaire : " + d.commentaire }));
+      if (x.statut === "Publiée") l.push(cmSure("Retirer", true, function (b) { cmAction(b, "cmAdminDestinataires", [x.id, { retirer: [d.cle] }], function (r) { if (r.ok) { msg(r.msg || "Destinataire retiré."); cmOuvrirDetail(x.id); CM.liste = null; } else msg(r.msg || "Échec.", true); }); }));
+      return h("div", { c: "cm-dest" }, l);
+    });
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: tete })].concat(lignes.length ? lignes : [h("p", { c: "ed-vide", t: "Pas encore de destinataires (brouillon)." })])));
+    if (x.statut === "Publiée") c.appendChild(cmBlocAjout(x, D));
+    var hl = H.map(function (e) { return h("div", { c: "ed-la" }, [h("b", { t: cmDate(e.date) + " — " + e.action }), h("span", { c: "ed-note", t: e.detail || "" })]); });
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Historique" })].concat(hl.length ? hl : [h("p", { c: "ed-vide", t: "Aucun événement enregistré." })])));
+  }
+  // Ajout de destinataires après publication (retrait : bouton « Retirer » de chaque ligne) — toujours avec confirmation
+  function cmBlocAjout(x, D) {
+    var deja = {}; D.forEach(function (d) { deja[d.cle] = true; });
+    var rech = h("input", { type: "search", placeholder: "Rechercher un agent à ajouter", autocomplete: "off" }); rech.value = CM.rechAjout;
+    var boite = h("div", {}), cpt = h("p", { c: "ed-note" }), zone = h("div", {});
+    function candidats() { var q = CM.rechAjout.toLowerCase(); return CM.cat.agents.filter(function (a) { return !deja[a.cle] && (!q || (a.nom + " " + a.prenom + " " + a.email).toLowerCase().indexOf(q) >= 0); }); }
+    function choisis() { return Object.keys(CM.ajout).filter(function (k) { return CM.ajout[k] && !deja[k]; }); }
+    function maj() { cpt.textContent = choisis().length + " agent(s) à ajouter"; }
+    function dessine() {
+      boite.textContent = ""; var L = candidats(); if (!L.length) boite.appendChild(h("p", { c: "ed-vide", t: "Aucun autre agent à ajouter." }));
+      L.forEach(function (a) { var cb = h("input", { type: "checkbox" }); cb.checked = !!CM.ajout[a.cle]; cb.onchange = function () { CM.ajout[a.cle] = cb.checked; maj(); }; boite.appendChild(h("label", { c: "ed-lab" }, [cb, h("span", { t: " " + a.nom + " " + a.prenom + (a.site ? " — " + a.site : "") })])); }); maj();
+    }
+    rech.oninput = function () { CM.rechAjout = rech.value; dessine(); };
+    var go = cmSure("Ajouter les agents choisis", false, function (b) {
+      var l = choisis(); if (!l.length) { msg("Choisissez au moins un agent.", true); return; }
+      cmAction(b, "cmAdminDestinataires", [x.id, { ajouter: l }], function (r) { if (r.ok) { msg(r.msg || "Destinataires ajoutés."); CM.ajout = {}; CM.liste = null; cmOuvrirDetail(x.id); } else msg(r.msg || "Échec.", true); });
+    });
+    zone.appendChild(h("p", { c: "ed-note", t: "Les agents ajoutés reçoivent la communication (et l’e-mail de publication si les e-mails réels sont activés). L’opération est inscrite à l’historique. Pour retirer un agent, utilisez « Retirer » dans la liste ci-dessus." }));
+    zone.appendChild(rech); zone.appendChild(cpt); zone.appendChild(boite); zone.appendChild(h("div", { c: "ed-row" }, [go])); dessine();
+    return h("div", { c: "ed-card" }, [h("h3", { t: "Gérer les destinataires" }), zone]);
+  }
+
+  // ---------- Formulaire ----------
   function cmPaneForm(c) {
-    var F = CM.form, cat = CM.cat;
+    var F = CM.form, cat = CM.cat, E = { get orig() { return F.orig; }, set orig(v) { F.orig = v; } };
     function champ(type, cle, ph, attrs) { var i = h("input", Object.assign({ type: type, placeholder: ph || "", autocomplete: "off" }, attrs || {})); i.value = F[cle] || ""; i.oninput = i.onchange = function () { F[cle] = i.value; }; return i; }
     function liste(cle, opts) { var s = h("select", {}); opts.forEach(function (o) { var op = h("option", { t: o, value: o }); if (F[cle] === o) op.selected = true; s.appendChild(op); }); s.onchange = function () { F[cle] = s.value; }; return s; }
+    function case_(cle, texte, aide) { var cb = h("input", { type: "checkbox" }); cb.checked = !!F[cle]; cb.onchange = function () { F[cle] = cb.checked; }; var k = [cb, h("span", { t: " " + texte })]; var l = h("label", { c: "ed-lab" }, k); return aide ? h("div", {}, [l, h("p", { c: "ed-note", t: aide })]) : l; }
     var titre = champ("text", "titre", "Titre de la communication", { maxlength: "120" });
-    var message = h("textarea", { rows: "6", placeholder: "Écrivez votre message", maxlength: "5000" }); message.value = F.message || ""; message.oninput = function () { F.message = message.value; };
+    var message = h("textarea", { rows: "6", placeholder: "Écrivez votre message", maxlength: "5000", "data-iv-no": "1" }); message.value = F.message || ""; message.oninput = function () { F.message = message.value; };
     var blocQuand = h("div", { c: "ed-card" }, [h("h3", { t: "Date et lieu (facultatifs pour une information générale)" }), lab("Date de l’événement", champ("date", "dateEv")), lab("Heure de début", champ("time", "heureDeb")), lab("Heure de fin (facultative)", champ("time", "heureFin")),
       lab("Site / Bâtiment", champ("text", "site", "Exemple : Tour B")), lab("Étage / Niveau", champ("text", "etage", "RDC, -1, 19e étage, N2…")), lab("Lieu / Espace", champ("text", "lieu", "Salle de réunion, Auditorium…")), lab("Numéro / Référence", champ("text", "ref", "1904, B12, Zone A…"))]);
     // Destinataires
@@ -1256,7 +1429,7 @@ var IrisVoix = (function () {
     function dessineDest() {
       zoneDest.textContent = "";
       var tous = h("input", { type: "radio", name: "cmd" }), ch = h("input", { type: "radio", name: "cmd" }); tous.checked = F.destMode === "tous"; ch.checked = F.destMode === "liste";
-      if (F.verrou) { tous.disabled = ch.disabled = true; zoneDest.appendChild(h("p", { c: "ed-note", t: "La liste des destinataires ne peut plus être modifiée après la publication." })); }
+      if (F.verrou) { tous.disabled = ch.disabled = true; zoneDest.appendChild(h("p", { c: "ed-note", t: "La liste des destinataires ne peut plus être modifiée ici après la publication : ouvrez le détail de la communication, puis « Gérer les destinataires »." })); }
       tous.onchange = function () { if (tous.checked) { F.destMode = "tous"; dessineDest(); } }; ch.onchange = function () { if (ch.checked) { F.destMode = "liste"; dessineDest(); } };
       zoneDest.appendChild(h("label", { c: "ed-lab" }, [tous, h("span", { t: " Tous les agents (" + cat.agents.length + ")" })]));
       zoneDest.appendChild(h("label", { c: "ed-lab" }, [ch, h("span", { t: " Choisir les agents" })]));
@@ -1280,32 +1453,176 @@ var IrisVoix = (function () {
       zoneDest.appendChild(rech); zoneDest.appendChild(ss); zoneDest.appendChild(h("div", { c: "ed-row" }, [tt, td])); zoneDest.appendChild(cpt); zoneDest.appendChild(boite); liste2();
     }
     dessineDest();
+    // Suivi et rappels
+    var zoneRap = h("div", {});
+    function dessineRap() {
+      zoneRap.textContent = "";
+      F.rappels.forEach(function (r, i) { zoneRap.appendChild(h("div", { c: "ed-la" }, [h("span", { t: "Rappel : " + cmDelai(r.h) + " — " + (r.cible === "tous" ? "tous les destinataires" : "seulement ceux qui n’ont pas répondu") }), cmBtn("Retirer ce rappel", function () { F.rappels.splice(i, 1); dessineRap(); })])); });
+      if (!F.rappels.length) zoneRap.appendChild(h("p", { c: "ed-vide", t: "Aucun rappel programmé." }));
+      var sd = h("select", { "aria-label": "Délai du rappel" }); (cat.delaisRappel && cat.delaisRappel.length ? cat.delaisRappel : [1, 2, 6, 12, 24, 48, 72]).forEach(function (n) { sd.appendChild(h("option", { t: cmDelai(n), value: String(n) })); });
+      var sc = h("select", { "aria-label": "Qui recevra le rappel" }); [["sans_reponse", "Seulement ceux qui n’ont pas répondu"], ["tous", "Tous les destinataires"]].forEach(function (o) { sc.appendChild(h("option", { t: o[1], value: o[0] })); });
+      var ajouter = cmBtn("Ajouter ce rappel", function () {
+        var n = Number(sd.value); if (F.rappels.some(function (r) { return r.h === n && r.cible === sc.value; })) { msg("Ce rappel existe déjà.", true); return; }
+        if (F.rappels.length >= 5) { msg("Cinq rappels au maximum.", true); return; }
+        F.rappels.push({ h: n, cible: sc.value }); dessineRap();
+      });
+      zoneRap.appendChild(lab("Délai (en heures)", sd)); zoneRap.appendChild(lab("Destinataires du rappel", sc)); zoneRap.appendChild(h("div", { c: "ed-row" }, [ajouter]));
+    }
+    dessineRap();
+    var blocOpt = h("div", { c: "ed-card" }, [h("h3", { t: "Suivi demandé aux agents" }),
+      case_("accuse", "Demander un accusé de réception", "L’agent confirme qu’il a pris connaissance du message (différent de « lu »)."),
+      case_("participation", "Demander une confirmation de participation", "L’agent répond : présent, absent ou empêché (avec un commentaire facultatif)."),
+      case_("confidentiel", "Mode confidentiel", "Seuls les destinataires voient cette communication."),
+      h("h3", { t: "Rappels automatiques" }), zoneRap]);
+    if (F.verrou) blocOpt.appendChild(h("div", {}, [h("h3", { t: "Modification d’une communication publiée" }), case_("reconfirmer", "Demander une nouvelle confirmation aux agents", "Les accusés et réponses déjà donnés seront à renouveler après cette modification. Sinon ils sont conservés.")]));
     var pubIn = champ("datetime-local", "publication");
     var apercuBox = h("div", {});
     function corps(action) {
       var dest = F.destMode === "tous" ? "tous" : Object.keys(CM.sel).filter(function (k) { return CM.sel[k]; });
-      return { id: F.id, action: action, titre: F.titre, categorie: F.categorie, priorite: F.priorite, message: F.message, dateEv: F.dateEv, heureDeb: F.heureDeb, heureFin: F.heureFin, site: F.site, etage: F.etage, lieu: F.lieu, ref: F.ref, publication: (F.publication || "").slice(0, 16), destinataires: dest };
+      var o = { id: F.id, action: action, titre: F.titre, categorie: F.categorie, priorite: F.priorite, message: F.message, dateEv: F.dateEv, heureDeb: F.heureDeb, heureFin: F.heureFin, site: F.site, etage: F.etage, lieu: F.lieu, ref: F.ref, publication: (F.publication || "").slice(0, 16), destinataires: dest,
+        rappels: F.rappels.map(function (r) { return { h: r.h, cible: r.cible }; }), accuse: !!F.accuse, participation: !!F.participation, confidentiel: !!F.confidentiel, reconfirmer: !!(F.verrou && F.reconfirmer) };
+      if (F.orig && F.orig !== F.message) o.texteOriginal = F.orig;   // champ complémentaire : texte saisi avant correction / reformulation
+      return o;
+    }
+    function signature() { var o = corps(""); return JSON.stringify(o); }
+    function montreApercu() {
+      apercuBox.textContent = ""; apercuBox.appendChild(h("p", { c: "ed-note", t: "Aperçu tel que l’agent le verra :" })); apercuBox.appendChild(cmCarteApercu(F));
+      var s = []; if (F.accuse) s.push("accusé de réception"); if (F.participation) s.push("confirmation de participation"); if (F.confidentiel) s.push("confidentiel"); if (F.rappels.length) s.push(F.rappels.length + " rappel(s)");
+      apercuBox.appendChild(h("p", { c: "ed-note", t: "Destinataires : " + nDest() + " agent(s)." + (s.length ? " Options : " + s.join(", ") + "." : "") }));
+      if (F.orig && F.orig !== F.message) { var o = h("p", { c: "ed-note" }); o.style.whiteSpace = "pre-wrap"; o.textContent = "Texte d’origine conservé : " + F.orig; apercuBox.appendChild(o); }
+      F.sigApercu = signature();
     }
     function envoyer(action, btn) {
+      if (action === "publier" && F.sigApercu !== signature()) { montreApercu(); msg("Relisez l’aperçu ci-dessous, puis validez de nouveau."); return; }
       btn.disabled = true;
-      appel("cmAdminSauve", corps(action), function (r) { btn.disabled = false; if (r && r.ok) { msg(r.msg); CM.liste = null; cmRetour(); } else msg((r && r.msg) || "Échec.", true); });
+      cmAppel("cmAdminSauve", [corps(action)], function (r) { btn.disabled = false; if (r && r.ok) { msg(r.msg); CM.liste = null; cmRetour(); } else msg((r && r.msg) || "Échec.", true); });
     }
     var brouillon = h("button", { c: "ed-b", t: F.verrou ? "Enregistrer les modifications" : "Enregistrer le brouillon", type: "button" });
     brouillon.onclick = function () { envoyer(F.verrou ? "publier" : "brouillon", brouillon); };
-    var prev = h("button", { c: "ed-b", t: "Prévisualiser", type: "button" });
-    prev.onclick = function () { apercuBox.textContent = ""; apercuBox.appendChild(h("p", { c: "ed-note", t: "Aperçu tel que l’agent le verra :" })); apercuBox.appendChild(cmCarteApercu(F)); };
+    var prev = cmBtn("Prévisualiser", montreApercu);
     var nDest = function () { return F.destMode === "tous" ? cat.agents.length : Object.keys(CM.sel).filter(function (k) { return CM.sel[k]; }).length; };
     var publier = null;
-    if (!F.verrou) publier = sure("Publier / programmer", false, function () { envoyer("publier", publier); });
-    var annuler = h("button", { c: "ed-b", t: "Annuler", type: "button" }); annuler.onclick = cmRetour;
-    var info = h("p", { c: "ed-note" }); function majInfo() { info.textContent = F.verrou ? "Annonce déjà publiée : vous pouvez corriger le texte, la date ou le lieu (le numéro de version augmente)." : "Laissez la date de publication vide pour publier immédiatement. « Publier » enverra l’annonce à " + nDest() + " agent(s)."; } majInfo();
-    var bloc1 = h("div", { c: "ed-card" }, [h("h3", { t: F.id ? "Modifier la communication" : "Nouvelle communication" }), lab("Catégorie", liste("categorie", cat.categories)), lab("Priorité", liste("priorite", cat.priorites)), lab("Titre", titre), lab("Message", message)]);
+    if (!F.verrou) publier = cmSure("Publier / programmer", false, function (b) { envoyer("publier", b); });
+    var annuler = cmBtn("Annuler", cmRetour);
+    var info = h("p", { c: "ed-note" }); function majInfo() { info.textContent = F.verrou ? "Communication déjà publiée : vous pouvez corriger le texte, la date ou le lieu (le numéro de version augmente). L’aperçu s’affiche avant l’enregistrement." : "Laissez la date de publication vide pour publier immédiatement. L’aperçu s’affiche avant l’envoi ; « Publier » enverra l’annonce à " + nDest() + " agent(s)."; } majInfo();
+    var bloc1 = h("div", { c: "ed-card" }, [h("h3", { t: F.id ? "Modifier la communication" : "Nouvelle communication" }), lab("Catégorie", liste("categorie", cat.categories)), lab("Priorité", liste("priorite", cat.priorites)), lab("Titre", titre), lab("Message", message), cmOutils(message, E, null)]);
     var blocDest = h("div", { c: "ed-card" }, [h("h3", { t: "Destinataires" }), zoneDest]);
     var blocPub = F.verrou ? null : h("div", { c: "ed-card" }, [h("h3", { t: "Publication" }), lab("Date et heure de publication (facultatif, heure de Paris)", pubIn), info]);
-    c.appendChild(bloc1); c.appendChild(blocQuand); c.appendChild(blocDest); if (blocPub) c.appendChild(blocPub);
+    c.appendChild(bloc1); c.appendChild(blocQuand); c.appendChild(blocDest); c.appendChild(blocOpt); if (blocPub) c.appendChild(blocPub); else c.appendChild(h("div", { c: "ed-card" }, [info]));
     c.appendChild(h("div", { c: "ed-row", style: "margin:14px 0" }, [brouillon, prev, publier, annuler])); c.appendChild(apercuBox);
-    [message].forEach(function (z) { try { if (window.IrisVoix && IrisVoix.decorer) IrisVoix.decorer(z); } catch (e) { } });
   }
+
+  // ---------- Tableau de suivi ----------
+  function cmOuvrirSuivi() { CM.vue = "suivi"; CM.suivi = null; cmDess(); cmChargeSuivi(); }
+  function cmChargeSuivi() { var o = {}; if (CM.sv.du) o.du = CM.sv.du; if (CM.sv.au) o.au = CM.sv.au; cmAppel("cmAdminSuivi", [o], function (r) { if (!r || !r.ok) { msg((r && r.msg) || "Suivi indisponible.", true); CM.vue = "liste"; cmDess(); return; } CM.suivi = r; cmDess(); }); }
+  function cmTuile(n, libelle, fn, alerte) {
+    var b = h("button", { type: "button", "aria-label": libelle + " : " + n }, [h("div", { t: String(n) }), h("div", { t: libelle })]);
+    b.style.cssText = "display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:110px;padding:10px;border-radius:16px;border:2px solid " + (alerte ? "#8b1d1d" : "#c9ced6") + ";background:#fff;cursor:" + (fn ? "pointer" : "default") + ";text-align:center;font-size:16px";
+    b.firstChild.style.cssText = "font-size:34px;font-weight:800;color:" + (alerte ? "#8b1d1d" : "#14213d"); if (fn) b.onclick = fn; else b.disabled = false;
+    return b;
+  }
+  function cmPaneSuivi(c) {
+    c.appendChild(h("div", { c: "ed-row" }, [cmBtn("← Retour", cmRetour)]));
+    var du = h("input", { type: "date" }), au = h("input", { type: "date" }); du.value = CM.sv.du; au.value = CM.sv.au; du.onchange = function () { CM.sv.du = du.value; }; au.onchange = function () { CM.sv.au = au.value; };
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Tableau de suivi" }), lab("Du", du), lab("Au", au), h("div", { c: "ed-row" }, [cmBtn("Actualiser", function () { CM.suivi = null; cmDess(); cmChargeSuivi(); }, true)])]));
+    var s = CM.suivi; if (!s) { c.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); return; }
+    var em = s.emails || {}, ra = s.rappels || {};
+    function va(f) { CM.filtre = f; CM.vue = "liste"; cmDess(); }
+    var T = [cmTuile(s.communicationsPubliees || 0, "Publiées", function () { va("Publiée"); }), cmTuile(s.programmees || 0, "Programmées", function () { va("Programmée"); }), cmTuile(s.brouillons || 0, "Brouillons", function () { va("Brouillon"); }), cmTuile(s.archives || 0, "Archivées", function () { va("Archivée"); }),
+      cmTuile(s.destinataires || 0, "Destinataires"), cmTuile(s.lus || 0, "Lus"), cmTuile(s.nonLus || 0, "Non lus", null, (s.nonLus || 0) > 0), cmTuile(s.accuses || 0, "Accusés"),
+      cmTuile(s.presents || 0, "Présents"), cmTuile(s.absents || 0, "Absents"), cmTuile(s.empechements || 0, "Empêchés"),
+      cmTuile(s.reponsesPrivesNonLues || 0, "Réponses privées non lues", function () { CM.vue = "prives"; CM.fils = null; cmDess(); }, (s.reponsesPrivesNonLues || 0) > 0),
+      cmTuile(em.attente || 0, "E-mails en attente", function () { cmOuvrirEmails("attente"); }), cmTuile(em.envoye || 0, "E-mails envoyés", function () { cmOuvrirEmails("envoye"); }), cmTuile(em.echec || 0, "E-mails en échec", function () { cmOuvrirEmails("echec"); }, (em.echec || 0) > 0), cmTuile(em.invalide || 0, "Adresses invalides", function () { cmOuvrirEmails("invalide"); }, (em.invalide || 0) > 0),
+      cmTuile(ra.programmes || 0, "Rappels programmés"), cmTuile(ra.envoyes || 0, "Rappels envoyés")];
+    var g = h("div", { c: "cm-tuiles" }, T); g.style.cssText = "display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:12px 0"; c.appendChild(g);
+  }
+
+  // ---------- E-mails ----------
+  function cmOuvrirEmails(statut) { CM.vue = "emails"; CM.emStatut = statut || ""; CM.emails = null; cmDess(); cmChargeEmails(); }
+  function cmChargeEmails() { cmAppel("cmAdminEmails", [CM.emStatut ? { statut: CM.emStatut } : {}], function (r) { if (!r || !r.ok) { msg((r && r.msg) || "E-mails indisponibles.", true); CM.vue = "liste"; cmDess(); return; } CM.emails = r; cmDess(); }); }
+  function cmPaneEmails(c) {
+    var cat = CM.cat; c.appendChild(h("div", { c: "ed-row" }, [cmBtn("← Retour", cmRetour)]));
+    // Interrupteur des e-mails réels : désactivé par défaut, texte clair, confirmation explicite
+    var actif = !!cat.emailReel;
+    var etat = h("p", { c: "ed-note", role: "status", t: actif ? "E-mails réels : ACTIVÉS. Les agents reçoivent un e-mail à la publication, pour les ajouts de destinataires et pour les rappels." : "E-mails réels : DÉSACTIVÉS. Aucun e-mail n’est envoyé aux agents. Les communications restent visibles dans IRIS." });
+    etat.style.fontWeight = "700";
+    var inter = cmSure(actif ? "Désactiver les e-mails réels" : "Activer les e-mails réels", actif, function (b) { cmAction(b, "cmAdminEmailReel", [!actif], function (r) { if (r.ok) { cat.emailReel = !!r.emailReel; msg(r.emailReel ? "E-mails réels activés." : "E-mails réels désactivés."); cmDess(); } else msg(r.msg || "Échec.", true); }); });
+    var essaiOk = !!cat.emailEssaiPossible;
+    var essai = cmBtn("Envoyer un e-mail d’essai (à vous seul)", function (b) { cmAction(b, "cmAdminEmailEssai", [], function (r) { msg(r.ok ? (r.msg || "E-mail d’essai envoyé.") : (r.msg || "Échec."), !r.ok); }); }); if (!essaiOk) essai.disabled = true;
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Envoi réel des e-mails" }), etat, h("p", { c: "ed-note", t: "L’e-mail d’essai part uniquement vers les adresses de l’administrateur, jamais vers les agents." + (essaiOk ? "" : " Indisponible : aucune adresse d’administrateur n’est configurée.") }), h("div", { c: "ed-row" }, [inter, essai])]));
+    var fr = h("div", { c: "ed-row" }); [["", "Tous"], ["attente", "En attente"], ["envoye", "Envoyés"], ["echec", "En échec"], ["invalide", "Invalides"]].forEach(function (f) { var b = h("button", { c: "ed-b" + (CM.emStatut === f[0] ? " ed-p" : ""), t: f[1], type: "button" }); b.onclick = function () { cmOuvrirEmails(f[0]); }; fr.appendChild(b); });
+    var rel = cmSure("Relancer les e-mails en échec", false, function (b) { cmAction(b, "cmAdminEmailsRelancer", [], function (r) { if (r.ok) { msg(r.msg || "Relance lancée."); cmOuvrirEmails(CM.emStatut); } else msg(r.msg || "Échec.", true); }); });
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "E-mails de communication" }), fr, h("div", { c: "ed-row" }, [rel])]));
+    if (!CM.emails) { c.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); return; }
+    if (!CM.emails.emails.length) c.appendChild(h("p", { c: "ed-vide", t: "Aucun e-mail dans cette liste." }));
+    CM.emails.emails.forEach(function (e) {
+      var k = [h("div", { c: "ed-row" }, [cmTag(e.statut), cmTag(e.type)]), h("h3", { t: e.titre }), h("p", { c: "ed-note", t: e.agent + " — " + (e.adresse || "pas d’adresse") }), h("p", { c: "ed-note", t: "Tentatives : " + (e.tentatives || 0) + (e.dernier ? " · dernier essai : " + cmDate(e.dernier) : "") })];
+      if (e.erreur) k.push(h("p", { c: "ed-note", t: "Erreur : " + e.erreur })); c.appendChild(h("div", { c: "ed-card" }, k));
+    });
+  }
+
+  // ---------- Messages privés ----------
+  function cmChargeFils() { cmAppel("cmAdminMessages", [], function (r) { if (!r || !r.ok) { msg((r && r.msg) || "Messages indisponibles.", true); CM.vue = "liste"; cmDess(); return; } CM.fils = r; CM.nonLus = Number(r.nonLus) || 0; cmDess(); }); }
+  function cmPanePrives(c) {
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Messages privés des agents" }), h("p", { c: "ed-note", t: "Chaque agent a une conversation privée avec vous. Les réponses des agents aux communications arrivent ici." }), h("div", { c: "ed-row" }, [cmBtn("Actualiser", function () { CM.fils = null; cmDess(); })])]));
+    if (!CM.fils) { c.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); cmChargeFils(); return; }
+    if (!CM.fils.fils.length) c.appendChild(h("p", { c: "ed-vide", t: "Aucun message privé pour le moment." }));
+    CM.fils.fils.forEach(function (f) {
+      var tete = h("div", { c: "ed-row" }, [h("h3", { t: f.nom + " " + f.prenom }), cmPastille(f.nonLus)]);
+      var d = f.dernierTexte || ""; if (d.length > 140) d = d.slice(0, 140) + "…";
+      c.appendChild(h("div", { c: "ed-card" }, [tete, h("p", { c: "ed-note", t: d + (f.derniereDate ? " — " + cmDate(f.derniereDate) : "") }), h("div", { c: "ed-row" }, [cmBtn("Ouvrir la conversation", function () { cmOuvrirFil(f.cle); }, f.nonLus > 0)])]));
+    });
+  }
+  function cmOuvrirFil(cle) {
+    CM.vue = "fil"; CM.cle = cle; CM.fil = null; CM.rep = { texte: "", orig: "", commId: "" }; cmDess();
+    cmAppel("cmAdminFil", [cle], function (r) { if (!r || !r.ok) { msg((r && r.msg) || "Conversation introuvable.", true); CM.vue = "prives"; CM.fils = null; cmDess(); return; } CM.fil = r; cmCompteurMaj(function () { cmDess(); }); cmDess(); });
+  }
+  function cmPaneFil(c) {
+    c.appendChild(h("div", { c: "ed-row" }, [cmBtn("← Retour aux messages", function () { CM.vue = "prives"; CM.fils = null; cmDess(); })]));
+    if (!CM.fil) { c.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); return; }
+    var F = CM.fil; c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Conversation avec " + F.nom + " " + F.prenom })]));
+    if (!F.messages.length) c.appendChild(h("p", { c: "ed-vide", t: "Pas encore de message." }));
+    F.messages.forEach(function (m) {
+      var mien = m.sens === "admin", t = h("p", {}); t.style.cssText = "white-space:pre-wrap;font-size:18px"; t.textContent = m.texte;
+      var k = [h("div", { c: "ed-row" }, [cmTag(mien ? "Vous" : F.prenom + " " + F.nom), m.commTitre ? cmTag("À propos de : " + m.commTitre) : null]), t, h("p", { c: "ed-note", t: cmDate(m.date) + (mien ? (m.lu ? " · lu par l’agent" : " · pas encore lu") : "") })];
+      if (m.texteOriginal && m.texteOriginal !== m.texte) { var o = h("p", { c: "ed-note" }); o.style.whiteSpace = "pre-wrap"; o.textContent = "Texte d’origine : " + m.texteOriginal; k.push(o); }
+      var acts = []; try { var ec = window.IrisVoix && IrisVoix.boutonLire ? IrisVoix.boutonLire(m.texte, "Écouter") : null; if (ec) acts.push(ec); } catch (e) { }
+      if (m.commId && !mien) acts.push(cmBtn("Répondre à ce sujet", function () { CM.rep.commId = m.commId; msg("Votre réponse sera liée à : " + (m.commTitre || m.commId)); }));
+      if (acts.length) k.push(h("div", { c: "ed-row" }, acts));
+      var carte = h("div", { c: "ed-card cm-msg" }, k); carte.style.cssText = "margin-" + (mien ? "left" : "right") + ":8%;" + (mien ? "background:#eef2fb" : ""); c.appendChild(carte);
+    });
+    // Réponse : outils IA, aperçu avant envoi
+    var R = CM.rep, ta = h("textarea", { rows: "4", placeholder: "Votre réponse", maxlength: "2000", "data-iv-no": "1" }); ta.value = R.texte; ta.oninput = function () { R.texte = ta.value; };
+    var E = { get orig() { return R.orig; }, set orig(v) { R.orig = v; } };
+    var apercu = h("div", {});
+    var envoi = cmBtn("Voir avant d’envoyer", function () {
+      apercu.textContent = ""; var t = ta.value.trim(); if (!t) { msg("Écrivez votre réponse.", true); return; }
+      var p = h("p", {}); p.style.cssText = "white-space:pre-wrap;font-size:18px"; p.textContent = t;
+      var ok = cmBtn("Confirmer l’envoi", function (b) {
+        cmAction(b, "cmAdminRepondre", [CM.cle, t, R.commId || "", R.orig && R.orig !== t ? R.orig : ""], function (r) { if (r.ok) { msg("Réponse envoyée."); CM.rep = { texte: "", orig: "", commId: "" }; cmOuvrirFil(CM.cle); } else msg(r.msg || "Échec de l’envoi.", true); });
+      }, true);
+      apercu.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Aperçu avant envoi" }), p, h("div", { c: "ed-row" }, [ok, cmBtn("Modifier", function () { apercu.textContent = ""; })])]));
+    }, true);
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Répondre" }), ta, cmOutils(ta, E, null), h("div", { c: "ed-row" }, [envoi]), apercu]));
+  }
+
+  // ---------- Assemblage ----------
+  function cmCorps(c) {
+    if (CM.err && !CM.charge) { c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Communications" }), h("p", { c: "ed-vide", t: CM.err }), cmBtn("Réessayer", function () { CM.err = null; CM.liste = null; cmDess(); })])); return; }
+    if (!CM.liste || !CM.cat) { c.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); cmCharge(); return; }
+    var v = CM.vue;
+    if (v === "form") { cmPaneForm(c); return; }
+    if (v === "detail") { cmPaneDetail(c); return; }
+    if (v === "suivi") { cmPaneSuivi(c); return; }
+    if (v === "emails") { cmPaneEmails(c); return; }
+    if (v === "fil") { cmPaneFil(c); return; }
+    cmSousOnglets(c);
+    if (v === "prives") cmPanePrives(c); else cmPaneListe(c);
+  }
+  function paneCm(c) { CM.emb = false; CM.cible = null; cmCorps(c); }
+  // Montage dans un autre espace (MON ESPACE) : n'utilise que les helpers h, lab, msg, sure ; le redessin se fait dans le conteneur
+  // (la page hôte doit fournir CLE ou google.script.run avec les fonctions cmAdmin*, et appel si google est absent)
+  function paneCmEmbarque(conteneur) { CM.emb = true; CM.cible = conteneur; conteneur.textContent = ""; cmCorps(conteneur); }
   function paneQs(c) {
     if (QS.err && !QS.chargement) {
       var re = h("button", { c: "ed-b", t: "Réessayer", type: "button" }); re.onclick = function () { QS.err = null; QS.liste = null; QS.aTraiter = null; dessiner(); };
