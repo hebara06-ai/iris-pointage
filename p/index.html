@@ -771,7 +771,7 @@ function rcGuide() {
   var f = el("button", "", "J’ai compris"); f.type = "button"; f.onclick = rcFerme; bx.appendChild(f);
   ov.appendChild(bx); document.body.appendChild(ov); RC.ov = ov;
 }
-// Parcours : bouton -> question Oui/Non -> Oui : Android = fenêtre d'installation du navigateur ; iPhone = guide pas à pas (navigator.share n'ouvre PAS « Sur l'écran d'accueil » : constaté sur iPhone iOS 26)
+// Parcours : bouton -> question Oui/Non -> Oui : Android = fenêtre d'installation du navigateur ; iPhone = fenêtre de partage (lien IRIS) puis guide pas à pas (la fenêtre n'a pas « Sur l'écran d'accueil » : constaté iOS 26)
 function rcCopie(bx) {
   var b = el("button", "", "Copier le lien"); b.type = "button"; b.style.background = "transparent";
   b.onclick = function () { try { navigator.clipboard.writeText(rcLien()).then(function () { b.textContent = "Lien copié ✔"; }, function () { b.textContent = rcLien(); }); } catch (e) { b.textContent = rcLien(); } };
@@ -799,8 +799,22 @@ function rcOui() {
     var e = RC.ev; RC.ev = null; rcFerme();
     try { e.prompt(); if (e.userChoice && e.userChoice.then) e.userChoice.then(function () { }, function () { }); return; } catch (x) { }
   }
-  if (rcNav().ios && rcAppli()) { rcSafari(); return; }
+  if (rcNav().ios) { if (rcAppli()) rcSafari(); else rcEtapeIos(); return; }
   rcGuide();
+}
+// iPhone/iPad : on ouvre d'abord la fenêtre de partage du téléphone (avec le lien IRIS : Messages, Copier, Ouvrir dans Safari…).
+// Cette fenêtre n'a PAS « Sur l'écran d'accueil » (constaté) : quand elle se ferme, le guide pas à pas s'affiche. Lien « introuvable » toujours visible.
+function rcEtapeIos() {
+  try { history.replaceState(null, "", location.pathname); } catch (e) { }
+  var bx = rcBoite("Ajouter IRIS à l’accueil");
+  bx.appendChild(el("div", "rcl", "Touchez Continuer : la fenêtre du téléphone s’ouvre avec le lien IRIS. Ensuite, le guide vous montre comment mettre l’icône sur l’écran d’accueil."));
+  rcBtn(bx, "Continuer", function () {
+    var fait = false;
+    try { if (navigator.share) { fait = true; navigator.share({ title: "IRIS", url: rcLien() }).then(function () { rcGuide(); }, function () { rcGuide(); }); } } catch (e) { fait = false; }
+    if (!fait) rcGuide();
+  });
+  rcBtn(bx, "Je ne trouve pas « Sur l’écran d’accueil »", rcGuide, true);
+  rcBtn(bx, "Fermer", rcFerme, true);
 }
 // Navigateur intégré à une application (WhatsApp, Facebook, Instagram…) : l'ajout n'y existe pas -> ouvrir dans Safari
 function rcSafari() {
