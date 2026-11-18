@@ -166,7 +166,90 @@
   try { var memo = localStorage.getItem("iris_meteo_ivry"); if (memo) rend(JSON.parse(memo)); } catch (e) {}
   setTimeout(function () { if (!el.innerHTML) el.innerHTML = '<div class="tx2"><b>Météo</b><span>Ivry-sur-Seine</span><span>en attente de connexion</span></div>'; }, 15000);
   go(); setInterval(go, 900000);
-})();</script><script>(function editInit() {
+})();</script><script>/* IRIS — boîte à outils « voix et écriture assistée » (partagée par l'espace agent et l'administration).
+   Fournit : lecture à voix haute (synthèse vocale du navigateur), dictée (reconnaissance vocale), barre d'outils « Écouter / Dicter / Corriger / Reformuler »
+   à poser sous un champ de saisie, décoration automatique des zones de texte, et bouton flottant « Écouter » à la sélection d'un texte.
+   Aucune dépendance. Tout le texte est inséré avec textContent. Le serveur n'est jamais appelé directement : les fonctions de correction sont fournies par la page. */
+var IrisVoix = (function () {
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition, synth = window.speechSynthesis, lecteur = null, rec = null;
+  var SVG_HP = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 3 9 3 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
+  var SVG_MIC = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="22"/></svg>';
+  var SVG_PLUME = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+  var SVG_ETOILE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z"/></svg>';
+  (function () {
+    if (document.getElementById('iv-css')) return; var s = document.createElement('style'); s.id = 'iv-css';
+    s.textContent = '.iv-bar{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 2px;align-items:center}.iv-b{display:inline-flex;align-items:center;gap:7px;width:auto!important;margin:0!important;padding:9px 14px!important;font-size:15px!important;font-weight:600;line-height:1.1;border-radius:12px!important;border:1px solid #d9b15f!important;background:#fff!important;color:#07152e!important;cursor:pointer;min-height:40px}.iv-b svg{flex:none}.iv-b[disabled]{opacity:.55;cursor:default}.iv-b.on{background:#07152e!important;color:#e9d9a8!important;border-color:#07152e!important}.iv-b.ec{animation:ivp 1s ease-in-out infinite}@keyframes ivp{50%{box-shadow:0 0 0 5px rgba(201,162,77,.35)}}.iv-note{font-size:15px;color:#6e6a60;flex:1 1 100%}.iv-flot{position:fixed;z-index:2147483000;display:none}.iv-flot .iv-b{box-shadow:0 6px 20px rgba(7,21,46,.28)}@media(prefers-reduced-motion:reduce){.iv-b.ec{animation:none}}';
+    document.head.appendChild(s);
+  })();
+  function ico(svg, txt) { var f = document.createElement('span'); f.style.display = 'inline-flex'; f.innerHTML = svg; var t = document.createElement('span'); t.textContent = txt; var w = document.createDocumentFragment(); w.appendChild(f); w.appendChild(t); return w; }
+  function bouton(svg, txt) { var b = document.createElement('button'); b.type = 'button'; b.className = 'iv-b'; b.appendChild(ico(svg, txt)); b.setAttribute('aria-label', txt); return b; }
+  function nettoyer(t) { return String(t || '').replace(/\*\*/g, '').replace(/\s+/g, ' ').replace(/https?:\/\/\S+/g, 'lien').trim().slice(0, 3000); }
+  function voixFr() { var v = synth && synth.getVoices ? synth.getVoices() : [], i; for (i = 0; i < v.length; i++) if (/^fr[-_]FR/i.test(v[i].lang)) return v[i]; for (i = 0; i < v.length; i++) if (/^fr/i.test(v[i].lang)) return v[i]; return null; }
+  function arreter() { try { if (synth) synth.cancel(); } catch (e) { } if (lecteur) { var l = lecteur; lecteur = null; if (l.fin) l.fin(); } }
+  // Lecture à voix haute ; un 2e appel avec le même bouton arrête la lecture
+  function lire(texte, onFin, cle) {
+    if (!synth || !window.SpeechSynthesisUtterance) return false;
+    var t = nettoyer(texte); if (!t) return false;
+    if (lecteur && lecteur.cle && lecteur.cle === cle) { arreter(); return true; }
+    arreter();
+    var u = new SpeechSynthesisUtterance(t); u.lang = 'fr-FR'; u.rate = 0.95; var v = voixFr(); if (v) u.voice = v;
+    var etat = { cle: cle, fin: function () { if (onFin) { var f = onFin; onFin = null; f(); } } }; lecteur = etat;
+    u.onend = u.onerror = function () { if (lecteur === etat) lecteur = null; etat.fin(); };
+    try { synth.speak(u); } catch (e) { lecteur = null; return false; }
+    return true;
+  }
+  function dispoLecture() { return !!(synth && window.SpeechSynthesisUtterance); }
+  function dispoDictee() { return !!SR; }
+  // Dictée : appelle onTexte(texteReconnu) ; onEtat('ecoute'|'arret'|'erreur', message)
+  function dicter(onTexte, onEtat) {
+    if (!SR) return null; var r = new SR(), actif = false; r.lang = 'fr-FR'; r.continuous = false; r.interimResults = false; r.maxAlternatives = 1;
+    r.onresult = function (e) { var t = ''; for (var i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript; if (t.trim()) onTexte(t.trim()); };
+    r.onerror = function (e) { actif = false; var m = e && e.error; onEtat('erreur', m === 'not-allowed' || m === 'service-not-allowed' ? 'Le micro est refusé : autorisez-le dans les réglages du navigateur.' : m === 'no-speech' ? 'Je n’ai rien entendu.' : 'La dictée a échoué.'); };
+    r.onend = function () { if (actif) { actif = false; onEtat('arret'); } };
+    return { demarrer: function () { try { arreter(); r.start(); actif = true; onEtat('ecoute'); } catch (e) { actif = false; onEtat('erreur', 'La dictée n’a pas pu démarrer.'); } }, arreter: function () { try { r.stop(); } catch (e) { } actif = false; onEtat('arret'); } };
+  }
+  function valeur(c) { return c.value || ''; }
+  function inserer(c, t) { var v = valeur(c), sep = v && !/\s$/.test(v) ? ' ' : ''; c.value = v + sep + t; try { c.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) { } c.focus(); }
+  // Barre d'outils sous un champ : opts = { corriger(texte, cb(err, nouveauTexte)), reformuler(texte, cb), lire:true, dicter:true }
+  function barre(champ, opts) {
+    opts = opts || {}; var bar = document.createElement('div'); bar.className = 'iv-bar'; bar.setAttribute('data-iv', '1'); var note = document.createElement('div'); note.className = 'iv-note'; note.setAttribute('role', 'status');
+    function msg(t) { note.textContent = t || ''; }
+    if (opts.lire !== false && dispoLecture()) { var bl = bouton(SVG_HP, 'Écouter'); bl.onclick = function () { var t = valeur(champ); if (!t.trim()) { msg('Rien à lire pour le moment.'); return; } msg(''); bl.classList.add('on'); if (!lire(t, function () { bl.classList.remove('on'); }, champ)) bl.classList.remove('on'); }; bar.appendChild(bl); }
+    if (opts.dicter !== false && dispoDictee()) {
+      var bd = bouton(SVG_MIC, 'Dicter'), d = dicter(function (t) { inserer(champ, t); if (opts.corrigerApresDictee && opts.corriger) { avec(opts.corriger, 'Correction…'); } }, function (e, m) { if (e === 'ecoute') { bd.classList.add('ec', 'on'); bd.lastChild.textContent = 'J’écoute…'; msg(''); } else { bd.classList.remove('ec', 'on'); bd.lastChild.textContent = 'Dicter'; if (e === 'erreur') msg(m); } }), ecoute = false;
+      bd.onclick = function () { if (ecoute) { ecoute = false; d.arreter(); } else { ecoute = true; d.demarrer(); } }; bar.appendChild(bd);
+    }
+    function avec(f, texteAttente) { var t = valeur(champ); if (t.trim().length < 3) { msg('Écrivez d’abord quelques mots.'); return; } msg(texteAttente); Array.prototype.forEach.call(bar.querySelectorAll('button'), function (b) { b.disabled = true; }); f(t, function (err, nv) { Array.prototype.forEach.call(bar.querySelectorAll('button'), function (b) { b.disabled = false; }); if (err || !nv) { msg(err || 'Aucune proposition.'); return; } champ.value = nv; try { champ.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) { } msg('Texte mis à jour.'); }); }
+    if (opts.corriger) { var bc = bouton(SVG_PLUME, 'Corriger'); bc.onclick = function () { avec(opts.corriger, 'Correction en cours…'); }; bar.appendChild(bc); }
+    if (opts.reformuler) { var br = bouton(SVG_ETOILE, 'Reformuler'); br.onclick = function () { avec(opts.reformuler, 'Reformulation en cours…'); }; bar.appendChild(br); }
+    bar.appendChild(note); return bar;
+  }
+  // Bouton « Écouter » pour un texte affiché (non modifiable) ; fournisseur = chaîne ou fonction
+  function boutonLire(fournisseur, libelle) {
+    if (!dispoLecture()) return null; var b = bouton(SVG_HP, libelle || 'Écouter');
+    b.onclick = function () { var t = typeof fournisseur === 'function' ? fournisseur() : fournisseur; b.classList.add('on'); if (!lire(t, function () { b.classList.remove('on'); }, b)) b.classList.remove('on'); }; return b;
+  }
+  // Décoration automatique : une barre sous chaque zone de texte (textarea, ou champ texte long) de la racine, y compris celles créées plus tard
+  function decorer(racine, opts, filtre) {
+    var vus = typeof WeakSet === 'function' ? new WeakSet() : null; function ok(c) { if (c.getAttribute('data-iv-no') || c.disabled || c.readOnly) return false; if (c.tagName === 'TEXTAREA') return true; if (c.tagName !== 'INPUT') return false; var t = (c.type || 'text').toLowerCase(); if (t !== 'text') return false; return (Number(c.maxLength) >= 100) || c.getAttribute('data-iv') === 'oui'; }
+    function passe(n) {
+      var champs = n.querySelectorAll ? Array.prototype.slice.call(n.querySelectorAll('textarea,input')) : []; if (n.matches && n.matches('textarea,input')) champs.unshift(n); Array.prototype.forEach.call(champs, function (c) {
+        if (vus && vus.has(c)) return; if (!ok(c) || (filtre && !filtre(c))) return; if (c.nextSibling && c.nextSibling.getAttribute && c.nextSibling.getAttribute('data-iv')) { if (vus) vus.add(c); return; }
+        if (vus) vus.add(c); if (c.parentNode) c.parentNode.insertBefore(barre(c, opts), c.nextSibling);
+      });
+    }
+    passe(racine); if (window.MutationObserver) new MutationObserver(function (ms) { ms.forEach(function (m) { Array.prototype.forEach.call(m.addedNodes, function (n) { if (n.nodeType === 1) passe(n); }); }); }).observe(racine, { childList: true, subtree: true });
+  }
+  // Lecture de la sélection : un bouton flottant « Écouter » apparaît quand on sélectionne un texte (n'importe où dans la page)
+  function lectureSelection() {
+    if (!dispoLecture() || document.getElementById('iv-flot')) return; var fl = document.createElement('div'); fl.id = 'iv-flot'; fl.className = 'iv-flot'; var b = bouton(SVG_HP, 'Écouter la sélection'); fl.appendChild(b); document.body.appendChild(fl); var sel = '';
+    function maj() { var s = window.getSelection && window.getSelection(), t = s ? String(s.toString() || '').trim() : ''; if (t.length < 3 || !s.rangeCount) { fl.style.display = 'none'; return; } var r = s.getRangeAt(0).getBoundingClientRect(); if (!r || (!r.width && !r.height)) { fl.style.display = 'none'; return; } sel = t; fl.style.display = 'block'; fl.style.left = Math.max(8, Math.min(window.innerWidth - 220, r.left)) + 'px'; fl.style.top = Math.max(8, r.top - 54) + 'px'; }
+    document.addEventListener('selectionchange', function () { clearTimeout(maj._t); maj._t = setTimeout(maj, 250); });
+    b.onmousedown = function (e) { e.preventDefault(); }; b.onclick = function () { lire(sel, null, 'sel'); fl.style.display = 'none'; };
+  }
+  return { lire: lire, arreter: arreter, dicter: dicter, barre: barre, boutonLire: boutonLire, decorer: decorer, lectureSelection: lectureSelection, dispoLecture: dispoLecture, dispoDictee: dispoDictee, nettoyer: nettoyer };
+})();
+</script><script>(function editInit() {
   var btn = document.getElementById("btned"); if (!btn) return;
   var ov = document.createElement("div"); ov.id = "ed"; document.body.appendChild(ov);
   var toast = document.createElement("div"); toast.id = "edm"; document.body.appendChild(toast);
@@ -954,13 +1037,13 @@
       r.dossiers.forEach(function (d) { var b = h("button", { c: "ed-b", t: "Détails", type: "button" }); b.onclick = function () { M.ferme(); gaDetails(d.id); }; M.box.appendChild(h("div", { c: "ga-l" }, [h("div", {}, [h("b", { t: d.motif }), h("div", { c: "m", t: d.depose + " · " + d.statut })]), b])); });
     });
   }
-  /* IRIS — onglet administrateur « Questions » (ajout isolé, inséré avant paneSg dans admin/index.html).
-     Réutilise : h, lab, msg, dessiner, ov, onglet, CLE. Aucun autre onglet n'est modifié.
-     Serveur : qsAdminListe / qsAdminRepondre / qsAdminClore / qsAdminRegenerer / qsAdminSupprimer (qs_serveur.gs). */
-  var QS = { err: null, liste: null, aTraiter: null, filtre: "", chargement: false, encore: false, ouvert: {}, brouillons: {}, occupe: {}, foc: null, pos: 0 };
+  /* IRIS — onglet administrateur « Questions IRIS » (version 2 ; remplace le module « Questions » de la page en ligne, inséré avant paneSg).
+     Réutilise : h, lab, msg, visionneuse, dessiner, ov, onglet, CLE. Voix et écriture assistée : IrisVoix (iris_voix.js, inséré plus haut dans la page).
+     Serveur : qsAdminListe / qsAdminRepondre (texte + pièces) / qsAdminPiece / qsAdminClore / qsAdminRegenerer / qsAdminSupprimer ; corrigerTexte / reformulerTexte. */
+  var QS = { err: null, liste: null, aTraiter: null, filtre: "", chargement: false, encore: false, ferme: {}, brouillons: {}, occupe: {}, fich: {}, foc: null, pos: 0 };
   var QS_STATUT = { "Répondue par IRIS": "#3b6fd4", "En attente de réponse": "#d4a017", "Répondue par le responsable": "#16a34a", "Clôturée": "#8a93a1" };
   var QS_FILTRES = [["", "Tous"], ["traiter", "À traiter"], ["Répondue par IRIS", "Répondue par IRIS"], ["Répondue par le responsable", "Répondue par le responsable"], ["Clôturée", "Clôturée"]];
-  (function () { var s = document.createElement("style"); s.textContent = ".qs-k{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:14px}.qs-k button{flex:1 1 150px;max-width:230px;border:1px solid #e7e2d6;background:#faf8f3;border-radius:16px;padding:12px 8px;cursor:pointer;text-align:center;font:inherit;color:#0b1a2b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}.qs-k button b{display:block;font-size:26px;line-height:1.1}.qs-k button span{font-size:13px;color:#6e6a60}.qs-k button.on{border-color:#0b1a2b;box-shadow:0 0 0 1px #0b1a2b}.qs-q{padding:18px 0;border-top:1px solid #eee9dd}.qs-q:first-of-type{border-top:0}.qs-h{display:flex;gap:10px 14px;align-items:center;justify-content:space-between;flex-wrap:wrap}.qs-h>div{min-width:0}.qs-m{font-size:13px;color:#6e6a60}.qs-bd{display:inline-block;font-size:12px;font-weight:600;border-radius:999px;padding:4px 12px;color:#fff;white-space:nowrap}.qs-hd{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:3px 11px;color:#8a3b00;background:#fdebd0;border:1px solid #f0c48a;white-space:nowrap}.qs-tg{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}.qs-t{margin:10px 0 4px;font-size:16px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;background:#faf9f5;border-left:3px solid #c9a24d;border-radius:8px;padding:10px 14px}.qs-r{margin:8px 0;border:1px solid #e6dfcf;border-radius:14px;padding:12px 16px;font-size:15px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f7fd}.qs-r h5,.qs-rh{margin:0 0 6px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#8a7b57;font-weight:700}.qs-rp{background:#eaf7ef;border-color:#bfe3cc}.qs-s{margin:8px 0 0;padding:0;list-style:none;font-size:14px;white-space:normal}.qs-s li{margin:3px 0}.qs-s a{color:#1d4ed8;word-break:break-all}.qs-ta{width:100%;box-sizing:border-box;font:inherit;font-size:15px;border:1px solid #ddd6c6;border-radius:12px;padding:10px 12px;min-height:64px;margin-top:6px;resize:vertical}.qs-q>.ed-lab{margin-top:14px}.qs-ac{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}.qs-ac .ed-b{white-space:normal}.qs-fl{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:12px}@media(max-width:700px){.qs-tg{justify-content:flex-start}}@media(max-width:1100px){.ed-seg{flex-wrap:wrap;justify-content:center;overflow-x:visible}.ed-seg button{white-space:nowrap}}"; document.head.appendChild(s); })();
+  (function () { var s = document.createElement("style"); s.textContent = ".qs-k{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:14px}.qs-k button{flex:1 1 150px;max-width:230px;border:1px solid #e7e2d6;background:#faf8f3;border-radius:16px;padding:12px 8px;cursor:pointer;text-align:center;font:inherit;color:#0b1a2b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}.qs-k button b{display:block;font-size:26px;line-height:1.1}.qs-k button span{font-size:13px;color:#6e6a60}.qs-k button.on{border-color:#0b1a2b;box-shadow:0 0 0 1px #0b1a2b}.qs-q{padding:18px 20px 20px;margin:0 0 18px;border:1px solid #e7e2d6;border-radius:20px;background:#fff;box-shadow:0 1px 2px rgba(11,26,43,.04)}.qs-h{display:flex;gap:10px 14px;align-items:center;justify-content:space-between;flex-wrap:wrap}.qs-h>div{min-width:0}.qs-nom{font-size:17px}.qs-m{font-size:13px;color:#6e6a60}.qs-bd{display:inline-block;font-size:12px;font-weight:600;border-radius:999px;padding:4px 12px;color:#fff;white-space:nowrap}.qs-hd{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:3px 11px;color:#8a3b00;background:#fdebd0;border:1px solid #f0c48a;white-space:nowrap}.qs-tg{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}.qs-t{margin:12px 0 6px;font-size:19px;line-height:1.5;font-weight:500;white-space:pre-wrap;overflow-wrap:anywhere;background:#faf9f5;border-left:4px solid #c9a24d;border-radius:10px;padding:12px 16px;color:#0b1a2b}.qs-r{margin:10px 0;border:1px solid #e6dfcf;border-radius:14px;padding:12px 16px;font-size:16px;line-height:1.55;overflow-wrap:anywhere;background:#f4f7fd}.qs-r .qs-rt{white-space:pre-wrap}.qs-r h5,.qs-rh{margin:0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#8a7b57;font-weight:700}.qs-rp{background:#eaf7ef;border-color:#bfe3cc}.qs-rb{display:flex;gap:8px 12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:6px}.qs-s{margin:8px 0 0;padding:0;list-style:none;font-size:14px;white-space:normal}.qs-s li{margin:3px 0}.qs-s a{color:#1d4ed8;word-break:break-all}.qs-ta{width:100%;box-sizing:border-box;font:inherit;font-size:16px;border:1px solid #ddd6c6;border-radius:12px;padding:10px 12px;min-height:84px;margin-top:6px;resize:vertical}.qs-q>.ed-lab{margin-top:14px}.qs-ac{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}.qs-ac .ed-b{white-space:normal}.qs-pj{display:flex;gap:10px;flex-wrap:wrap;align-items:stretch;margin-top:8px}.qs-pj>div{display:flex;gap:8px;align-items:center;border:1px solid #e6dfcf;border-radius:12px;background:#faf9f5;padding:6px 10px;font-size:14px;max-width:100%}.qs-pj img{width:56px;height:56px;object-fit:cover;border-radius:8px;flex:none}.qs-pj .qs-pdf{width:56px;height:56px;border-radius:8px;background:#0b1a2b;color:#e9d9a8;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}.qs-pj .qs-pn{min-width:0;overflow-wrap:anywhere}.qs-pl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0;font-size:14px}.qs-fl{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:12px}.qs-q .iv-bar{margin-top:6px}@media(max-width:700px){.qs-tg{justify-content:flex-start}}@media(max-width:1500px){#ed .ed-seg button{padding:10px 10px;font-size:14.5px}#ed .ed-top{gap:14px}}@media(max-width:1100px){.ed-seg{flex-wrap:wrap;justify-content:center;overflow-x:visible}.ed-seg button{white-space:nowrap}}"; document.head.appendChild(s); })();
   // Appel serveur avec gestion explicite de l'échec réseau (aucun « Chargement… » bloqué, aucune boucle)
   function qsAppel(nom, arg, ok, ko) { google.script.run.withSuccessHandler(ok).withFailureHandler(function () { if (ko) ko(); else msg("Connexion impossible, réessayez.", true); })[nom](CLE, arg); }
   function qsBadge() { return QS.aTraiter ? " (" + QS.aTraiter + ")" : ""; }
@@ -979,68 +1062,110 @@
   // Compteur du badge : chargé à l'ouverture de la fenêtre « Corrections » (hook additif sur le bouton) puis rafraîchi discrètement hors de l'onglet Questions
   function qsCompteur() { QS.err = null; qsCharge(); }
   setInterval(function () { if (ov.className === "on" && !document.hidden && onglet !== "qs" && !QS.err && !QS.chargement) qsCharge(); }, 60000);
+  // Correction / reformulation par IA (fonctions du serveur d'administration) au format attendu par IrisVoix : f(texte, cb(erreur, texte))
+  function qsReecrire(nom) { return function (t, cb) { qsAppel(nom, t, function (r) { cb(r && r.ok ? null : (r && r.msg) || "Indisponible pour le moment.", r && r.texte); }, function () { cb("Connexion impossible, réessayez."); }); }; }
+  var QS_OUTILS = { corriger: qsReecrire("corrigerTexte"), reformuler: qsReecrire("reformulerTexte") };
+  // Voix et écriture assistée dans TOUTE l'administration : barre Écouter / Dicter / Corriger / Reformuler sous chaque zone de texte, sauf champs sensibles, zones déjà équipées et mises en page en grille/tableau
+  function qsFiltreVoix(c) {
+    if (c.tagName !== "TEXTAREA" && c.getAttribute("data-iv") !== "oui") return false;   // seulement les zones de texte (et les champs explicitement marqués)
+    if (c.getAttribute("spellcheck") === "false" || c.getAttribute("autocomplete") === "off" || c.closest("#vk") || c.closest("table")) return false;
+    var p = c.parentNode; if (!p) return false;
+    var d = window.getComputedStyle(p).display; if (d === "grid" || d === "inline-grid" || d === "table-cell" || (d === "flex" && window.getComputedStyle(p).flexDirection.indexOf("row") === 0)) return false;
+    // zone déjà équipée de « Corriger l’orthographe » / « Reformuler (IA) » (Absences, commentaires) : pas de doublon
+    var a = p, n = 0; while (a && a !== ov && a !== document.body && n++ < 5) { if (a.querySelectorAll("textarea").length > 1) break; if (Array.prototype.some.call(a.querySelectorAll("button"), function (b) { return /Corriger l’orthographe|Reformuler \(IA\)/.test(b.textContent); })) return false; a = a.parentNode; }
+    return true;
+  }
+  // IrisVoix.decorer n'examine que les DESCENDANTS des nœuds ajoutés : une zone de texte ajoutée directement (sans conteneur) lui échappe ; ce complément la décore aussi (mêmes règles, jamais deux barres)
+  function qsDecorerDirect(c) {
+    if (c.getAttribute("data-iv-no") || c.disabled || c.readOnly || (c.nextSibling && c.nextSibling.getAttribute && c.nextSibling.getAttribute("data-iv")) || !qsFiltreVoix(c) || !c.parentNode) return;
+    c.parentNode.insertBefore(IrisVoix.barre(c, QS_OUTILS), c.nextSibling);
+  }
+  if (typeof IrisVoix !== "undefined") {
+    try { IrisVoix.lectureSelection(); IrisVoix.decorer(document.body, QS_OUTILS, qsFiltreVoix); } catch (e) { }
+    if (window.MutationObserver) new MutationObserver(function (ms) { ms.forEach(function (m) { Array.prototype.forEach.call(m.addedNodes, function (n) { if (n.nodeType === 1 && n.tagName === "TEXTAREA") qsDecorerDirect(n); }); }); }).observe(document.body, { childList: true, subtree: true });
+  }
   function qsLien(s) {
     var u = String((s && s.url) || ""), t = String((s && s.titre) || "Source");
     if (/^https?:\/\//i.test(u)) return h("a", { href: u, target: "_blank", rel: "noopener noreferrer", t: t });
     return h("span", { t: t });
   }
-  function qsMicro(ta, id) {
-    var SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR) return null;
-    var b = h("button", { c: "ed-b", t: "Dicter", type: "button", title: "Dicter la réponse (français)", "aria-label": "Dicter la réponse" }), rec = null, actif = false;
-    function fini() { actif = false; b.textContent = "Dicter"; }
-    b.onclick = function () {
-      if (actif && rec) { try { rec.stop(); } catch (e) { } return; }
-      try {
-        rec = new SR(); rec.lang = "fr-FR"; rec.interimResults = false; rec.continuous = false;
-        rec.onresult = function (e) { var t = ""; for (var i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) t += e.results[i][0].transcript; t = t.trim(); if (t) { ta.value = (ta.value && !/\s$/.test(ta.value) ? ta.value + " " : ta.value) + t; QS.brouillons[id] = ta.value; } };
-        rec.onerror = function (e) { msg("Dictée indisponible" + (e && e.error === "not-allowed" ? " : microphone refusé." : ", réessayez."), true); fini(); };
-        rec.onend = fini; rec.start(); actif = true; b.textContent = "Arrêter la dictée";
-      } catch (e) { fini(); msg("Dictée indisponible, réessayez.", true); }
-    };
-    return b;
-  }
+  function qsEcouter(texte) { return typeof IrisVoix !== "undefined" ? IrisVoix.boutonLire(texte, "Écouter") : null; }
   function qsAction(id, boutons, nom, arg, okMsg, apres) {
     if (QS.occupe[id]) return; QS.occupe[id] = true; boutons.forEach(function (b) { b.disabled = true; });
     function libre() { QS.occupe[id] = false; boutons.forEach(function (b) { b.disabled = false; }); }
     qsAppel(nom, arg, function (r) {
       libre();
-      if (r && r.ok) { msg(okMsg); if (apres) apres(); qsCharge(); } else msg((r && r.msg) || "Refusé.", true);
+      if (r && r.ok) { msg(typeof okMsg === "function" ? okMsg(r) : okMsg); if (apres) apres(); qsCharge(); } else msg((r && r.msg) || "Refusé.", true);
     }, function () { libre(); msg("Connexion impossible, réessayez.", true); });
+  }
+  function qsOctets(n) { return n > 1048576 ? (n / 1048576).toFixed(1).replace(".", ",") + " Mo" : Math.max(1, Math.round(n / 1024)) + " Ko"; }
+  function qsLireFichier(f, cb) {
+    var ext = (f.name.split(".").pop() || "").toLowerCase(); if (!/^(pdf|jpe?g|png)$/.test(ext)) { msg("Format non accepté : PDF, JPG ou PNG.", true); return; }
+    if (f.size > 8000000) { msg("Fichier trop lourd (8 Mo maximum).", true); return; }
+    var rd = new FileReader(); rd.onload = function () { var r = String(rd.result || ""), p = r.indexOf(","); if (p < 0) { msg("Fichier illisible.", true); return; } cb({ nom: f.name, b64: r.slice(p + 1), taille: f.size, mime: ext === "pdf" ? "application/pdf" : ext === "png" ? "image/png" : "image/jpeg" }); }; rd.onerror = function () { msg("Fichier illisible.", true); }; rd.readAsDataURL(f);
+  }
+  // Boîte « réponse » (texte lu, boutons d'écoute)
+  function qsBoite(cls, titre, texte, extra) {
+    var b = h("div", { c: "qs-r " + cls }), ec = qsEcouter(texte);
+    b.appendChild(h("div", { c: "qs-rb" }, [h("h5", { t: titre }), ec])); b.appendChild(h("div", { c: "qs-rt", t: texte })); if (extra) b.appendChild(extra); return b;
   }
   function qsLigne(q) {
     var id = q.id, bds = [h("span", { c: "qs-bd", style: "background:" + (QS_STATUT[q.statut] || "#8a93a1"), t: q.statut })];
     if (q.humainDemande) bds.unshift(h("span", { c: "qs-hd", t: "Réponse humaine demandée" }));
     var it = h("div", { c: "qs-q" }), nom = ((q.prenom || "") + " " + (q.nom || "")).trim() || "Agent";
-    it.appendChild(h("div", { c: "qs-h" }, [h("div", {}, [h("b", { t: nom }), h("div", { c: "qs-m", t: "Question déposée le " + (q.depose || "—") })]), h("div", { c: "qs-tg" }, bds)]));
-    it.appendChild(h("div", { c: "qs-t", t: q.question }));
-    // Réponse d'IRIS (automatique), repliable
-    var ouv = !!QS.ouvert[id], boite = h("div", { c: "qs-r" }), tg = h("button", { c: "ed-b", type: "button", t: (ouv ? "Masquer" : "Voir") + " la réponse d’IRIS (automatique)" });
-    tg.setAttribute("aria-expanded", ouv ? "true" : "false");
-    tg.onclick = function () { QS.ouvert[id] = !QS.ouvert[id]; dessiner(); };
-    it.appendChild(h("div", { c: "qs-ac" }, [tg]));
-    if (ouv) {
-      boite.appendChild(h("h5", { t: "Réponse d’IRIS (automatique)" }));
-      if (q.reponseIris) {
-        boite.appendChild(h("div", { t: q.reponseIris }));
-        var ss = (q.sources || []).filter(function (s) { return s && (s.url || s.titre); });
-        if (ss.length) { var ul = h("ul", { c: "qs-s" }); ss.forEach(function (s) { ul.appendChild(h("li", {}, [qsLien(s)])); }); boite.appendChild(h("div", { c: "qs-m", style: "margin-top:8px", t: "Sources :" })); boite.appendChild(ul); }
-      } else boite.appendChild(h("div", { t: "IRIS n’a pas pu répondre automatiquement à cette question." }));
-      it.appendChild(boite);
+    it.appendChild(h("div", { c: "qs-h" }, [h("div", {}, [h("b", { c: "qs-nom", t: nom }), h("div", { c: "qs-m", t: "Question déposée le " + (q.depose || "—") })]), h("div", { c: "qs-tg" }, bds)]));
+    // 1) la question, en entier
+    it.appendChild(h("div", { c: "qs-qb" }, [h("div", { c: "qs-t", t: q.question }), h("div", { c: "qs-ac", style: "margin-top:0" }, [qsEcouter(q.question)])]));
+    // 2) réponse d'IRIS (automatique) : dépliée par défaut quand elle existe
+    var ouv = !QS.ferme[id];
+    if (q.reponseIris) {
+      var tg = h("button", { c: "ed-b", type: "button", t: (ouv ? "Masquer" : "Afficher") + " la réponse d’IRIS" }); tg.setAttribute("aria-expanded", ouv ? "true" : "false");
+      tg.onclick = function () { QS.ferme[id] = ouv; dessiner(); };
+      if (ouv) {
+        var ss = (q.sources || []).filter(function (s) { return s && (s.url || s.titre); }), ex = null;
+        if (ss.length) { ex = h("div", {}, [h("div", { c: "qs-m", style: "margin-top:8px", t: "Sources :" })]); var ul = h("ul", { c: "qs-s" }); ss.forEach(function (s) { ul.appendChild(h("li", {}, [qsLien(s)])); }); ex.appendChild(ul); }
+        it.appendChild(qsBoite("", "Réponse d’IRIS (automatique)", q.reponseIris, ex));
+      }
+      it.appendChild(h("div", { c: "qs-ac", style: "margin-top:0" }, [tg]));
+    } else it.appendChild(h("div", { c: "qs-r" }, [h("h5", { t: "Réponse d’IRIS (automatique)" }), h("div", { t: "IRIS n’a pas pu répondre automatiquement à cette question." })]));
+    // 3) réponse déjà donnée par le responsable, avec ses pièces
+    if (q.reponseResponsable) {
+      var pl = null;
+      if ((q.pieces || []).length) {
+        pl = h("div", {}, [h("div", { c: "qs-m", style: "margin-top:8px", t: "Pièces jointes envoyées à l’agent :" })]);
+        q.pieces.forEach(function (p, n) { var v = h("button", { c: "ed-b", type: "button", t: "Voir" }); v.onclick = function () { if (v.disabled) return; v.disabled = true; qsAppel("qsAdminPiece", { id: id, n: n }, function (r) { v.disabled = false; if (r && r.ok) visionneuse(r); else msg((r && r.msg) || "Pièce indisponible.", true); }, function () { v.disabled = false; msg("Connexion impossible, réessayez.", true); }); }; pl.appendChild(h("div", { c: "qs-pl" }, [h("span", { t: p.nom + " (" + qsOctets(p.taille || 0) + ")" }), v])); });
+      }
+      it.appendChild(qsBoite("qs-rp", "Réponse du responsable" + (q.reponduLe ? " — " + q.reponduLe : ""), q.reponseResponsable, pl));
     }
-    if (q.reponseResponsable) it.appendChild(h("div", { c: "qs-r qs-rp" }, [h("h5", { t: "Réponse du responsable" + (q.reponduLe ? " — " + q.reponduLe : "") }), h("div", { t: q.reponseResponsable })]));
-    // Zone de réponse
-    var ta = h("textarea", { c: "qs-ta", placeholder: "Écrivez votre réponse, ou utilisez la dictée.", maxlength: "1500", "aria-label": "Votre réponse à l’agent" }); ta.value = QS.brouillons[id] || "";
+    // 4) zone de réponse : texte (voix, correction, reformulation) + photos / fichiers
+    var ta = h("textarea", { c: "qs-ta", placeholder: "Écrivez votre réponse, ou utilisez la dictée.", maxlength: "1500", "aria-label": "Votre réponse à l’agent", "data-iv-no": "1" }); ta.value = QS.brouillons[id] || "";
     ta.addEventListener("input", function () { QS.brouillons[id] = ta.value; QS.pos = ta.selectionStart; });
     ta.addEventListener("focus", function () { QS.foc = id; });
     ta.addEventListener("blur", function () { if (ta.isConnected && QS.foc === id) QS.foc = null; });
     it.appendChild(lab("Votre réponse à l’agent", ta));
+    if (typeof IrisVoix !== "undefined") it.appendChild(IrisVoix.barre(ta, QS_OUTILS));
+    var fl = QS.fich[id] = QS.fich[id] || [], zp = h("div", { c: "qs-pj" });
+    fl.forEach(function (p, n) {
+      var x = h("button", { c: "ed-b", type: "button", t: "Retirer" }); x.onclick = function () { fl.splice(n, 1); dessiner(); };
+      zp.appendChild(h("div", {}, [p.mime === "application/pdf" ? h("span", { c: "qs-pdf", t: "PDF" }) : h("img", { src: "data:" + p.mime + ";base64," + p.b64, alt: p.nom }), h("span", { c: "qs-pn", t: p.nom + " (" + qsOctets(p.taille) + ")" }), x]));
+    });
+    var fp = h("input", { type: "file", accept: "image/*", capture: "environment", style: "display:none", "data-iv-no": "1" }), ff = h("input", { type: "file", accept: "application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png", style: "display:none", "data-iv-no": "1" });
+    var ajout = function (e) { var f = e.target.files && e.target.files[0]; e.target.value = ""; if (!f) return; if (fl.length >= 4) { msg("Quatre pièces jointes au maximum.", true); return; } qsLireFichier(f, function (p) { if (fl.length >= 4) { msg("Quatre pièces jointes au maximum.", true); return; } fl.push(p); dessiner(); }); };
+    fp.onchange = ajout; ff.onchange = ajout;
+    var bph = h("button", { c: "ed-b", type: "button", t: "Prendre une photo" }), bfi = h("button", { c: "ed-b", type: "button", t: "Joindre un fichier" }); bph.onclick = function () { fp.click(); }; bfi.onclick = function () { ff.click(); };
+    it.appendChild(h("div", { c: "qs-ac" }, [bph, bfi, fp, ff, h("span", { c: "qs-m", t: "PDF, JPG ou PNG · 8 Mo maximum · 4 pièces au plus" })]));
+    if (fl.length) it.appendChild(zp);
     var br = h("button", { c: "ed-b ed-p", t: "Répondre", type: "button" }), bg = h("button", { c: "ed-b", t: "Régénérer la réponse d’IRIS", type: "button" }), bc = h("button", { c: "ed-b", t: "Clôturer", type: "button" }), bs = h("button", { c: "ed-b ed-d", t: "Supprimer…", type: "button" });
-    var tous = [br, bg, bc, bs], mic = qsMicro(ta, id); if (mic) tous.push(mic);
-    br.onclick = function () { var t = ta.value.trim(); if (t.length < 2) { msg("Écrivez votre réponse.", true); return; } qsAction(id, tous, "qsAdminRepondre", { id: id, reponse: t }, "Réponse envoyée à l’agent.", function () { QS.brouillons[id] = ""; QS.foc = null; }); };
-    bg.onclick = function () { qsAction(id, tous, "qsAdminRegenerer", { id: id }, "Réponse d’IRIS régénérée.", function () { QS.ouvert[id] = true; }); };
+    var tous = [br, bg, bc, bs];
+    br.onclick = function () {
+      var t = ta.value.trim(); if (t.length < 2 && !fl.length) { msg("Écrivez votre réponse ou joignez un document.", true); return; }
+      qsAction(id, tous, "qsAdminRepondre", { id: id, reponse: t, fichiers: fl.map(function (p) { return { nom: p.nom, b64: p.b64 }; }) },
+        function (r) { return "Réponse envoyée à l’agent." + (r.courriel ? " L’agent est aussi prévenu par e-mail." : ""); }, function () { QS.brouillons[id] = ""; QS.fich[id] = []; QS.foc = null; });
+    };
+    bg.onclick = function () { qsAction(id, tous, "qsAdminRegenerer", { id: id }, "Réponse d’IRIS régénérée.", function () { QS.ferme[id] = false; }); };
     bc.onclick = function () { qsAction(id, tous, "qsAdminClore", { id: id }, "Question clôturée."); };
-    bs.onclick = function () { if (confirm("Supprimer cette question ? Elle disparaîtra de l’espace de l’agent et de cette liste.") && prompt("Tapez SUPPRIMER pour confirmer.") === "SUPPRIMER") qsAction(id, tous, "qsAdminSupprimer", { id: id, confirmation: "SUPPRIMER" }, "Question supprimée.", function () { delete QS.brouillons[id]; delete QS.ouvert[id]; }); };
-    it.appendChild(h("div", { c: "qs-ac" }, [br, mic, bg, q.statut === "Clôturée" ? null : bc, bs]));
+    bs.onclick = function () { if (confirm("Supprimer cette question ? Elle disparaîtra de l’espace de l’agent et de cette liste.") && prompt("Tapez SUPPRIMER pour confirmer.") === "SUPPRIMER") qsAction(id, tous, "qsAdminSupprimer", { id: id, confirmation: "SUPPRIMER" }, "Question supprimée.", function () { delete QS.brouillons[id]; delete QS.ferme[id]; delete QS.fich[id]; }); };
+    it.appendChild(h("div", { c: "qs-ac" }, [br, bg, q.statut === "Clôturée" ? null : bc, bs]));
     if (QS.foc === id) setTimeout(function () { if (ta.isConnected) { ta.focus(); try { ta.setSelectionRange(QS.pos, QS.pos); } catch (e) { } } }, 0);
     return it;
   }
@@ -1056,7 +1181,7 @@
     var kb = h("div", { c: "qs-k" });
     QS_FILTRES.forEach(function (f) { var b = h("button", { type: "button" }, [h("b", { t: String(cpt[f[0]] || 0) }), h("span", { t: f[1] })]); if (F === f[0]) b.className = "on"; b.onclick = function () { QS.filtre = f[0]; dessiner(); }; kb.appendChild(b); });
     var ac = h("button", { c: "ed-b", t: "Actualiser", type: "button" }); ac.onclick = function () { qsCharge(); msg("Liste actualisée."); };
-    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Questions des agents" }), h("p", { c: "ed-note", t: "Chaque question posée par un agent reçoit d’abord une réponse automatique d’IRIS, fondée sur des sources officielles. Vous pouvez la relire, répondre vous-même à l’agent, régénérer la réponse d’IRIS ou clôturer la question." }), kb, h("div", { c: "qs-fl" }, [h("span", { c: "ed-note", t: QS.aTraiter ? QS.aTraiter + " question(s) à traiter." : "Aucune question à traiter." }), ac])]));
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Questions des agents" }), h("p", { c: "ed-note", t: "Chaque question posée par un agent reçoit d’abord une réponse automatique d’IRIS, fondée sur des sources officielles. Vous pouvez l’écouter, la relire, répondre vous-même à l’agent (texte, dictée, photo ou fichier), régénérer la réponse d’IRIS ou clôturer la question." }), kb, h("div", { c: "qs-fl" }, [h("span", { c: "ed-note", t: QS.aTraiter ? QS.aTraiter + " question(s) à traiter." : "Aucune question à traiter." }), ac])]));
     var vues = L.filter(function (q) { return F === "" ? true : F === "traiter" ? qsAttente(q) : q.statut === F; });
     var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Questions (" + vues.length + ")" })]);
     if (!vues.length) carte.appendChild(h("p", { c: "ed-vide", t: L.length ? "Aucune question pour ce filtre." : "Aucune question pour le moment." }));
@@ -1083,7 +1208,7 @@
   function dessiner() {
     var y = ov.scrollTop; ov.textContent = "";
     var np = ((DATA && DATA.conges) || []).filter(function (x) { return x.statut === "En attente"; }).length;
-    var seg = h("div", { c: "ed-seg" }, [["pt", "Pointages"], ["ab", "Absences et retards"], ["cg", "Congés" + (np ? " (" + np + ")" : "")], ["sg", "Signalements" + (SG ? (function () { var n = SG.signalements.filter(function (x) { return ["Correction acceptée", "Correction refusée", "Clôturée"].indexOf(x.statut) < 0; }).length; return n ? " (" + n + ")" : ""; })() : "")], ["ag", "Agents"], ["ga", "Gestion administrative"], ["qs", "Questions" + qsBadge()], ["pa", "Paramètres"]].map(function (o) { var b = h("button", { t: o[1], type: "button" }); if (o[0] === onglet) b.className = "on"; b.onclick = function () { onglet = o[0]; dessiner(); }; return b; }));
+    var seg = h("div", { c: "ed-seg" }, [["pt", "Pointages"], ["ab", "Absences et retards"], ["cg", "Congés" + (np ? " (" + np + ")" : "")], ["sg", "Signalements" + (SG ? (function () { var n = SG.signalements.filter(function (x) { return ["Correction acceptée", "Correction refusée", "Clôturée"].indexOf(x.statut) < 0; }).length; return n ? " (" + n + ")" : ""; })() : "")], ["qs", "Questions IRIS" + qsBadge()], ["ag", "Agents"], ["ga", "Gestion administrative"], ["pa", "Paramètres"]].map(function (o) { var b = h("button", { t: o[1], type: "button" }); if (o[0] === onglet) b.className = "on"; b.onclick = function () { onglet = o[0]; dessiner(); }; return b; }));
     var x = h("button", { c: "ed-x", t: "Fermer", type: "button" }); x.onclick = fermer;
     ov.appendChild(h("div", { c: "ed-top" }, [h("h2", { t: "Corrections" }), seg, x]));
     var corps = h("div", { c: "ed-body" }); ov.appendChild(corps);
