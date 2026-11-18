@@ -768,13 +768,63 @@ function rcGuide() {
   var f = el("button", "", "J’ai compris"); f.type = "button"; f.onclick = rcFerme; bx.appendChild(f);
   ov.appendChild(bx); document.body.appendChild(ov); RC.ov = ov;
 }
-// Bouton de l'espace de l'agent : invite d'installation du navigateur si disponible, sinon guide pas à pas
-function rcOuvre() {
-  if (RC.ev && RC.ev.prompt) {
-    var e = RC.ev; RC.ev = null;
+// Parcours : bouton -> question Oui/Non -> Oui : Android = fenêtre d'installation du navigateur ; iPhone = feuille Partager ouverte directement
+function rcLien() { return location.origin + location.pathname; }
+function rcAppli() { return /FBAN|FBAV|Instagram|Line\/|MicroMessenger|Snapchat|Twitter|LinkedInApp|TikTok|WhatsApp|Messenger/.test(navigator.userAgent || ""); }
+function rcBoite(titre) {
+  rcFerme();
+  var ov = el("div", "rcov"), bx = el("div", "rcc"); ov.setAttribute("role", "dialog"); ov.setAttribute("aria-label", titre);
+  bx.appendChild(el("h2", "", titre)); ov.appendChild(bx); document.body.appendChild(ov); RC.ov = ov; return bx;
+}
+function rcBtn(bx, txt, f, secondaire) { var b = el("button", "", txt); b.type = "button"; if (secondaire) b.style.background = "transparent"; b.onclick = f; bx.appendChild(b); return b; }
+function rcLigne(bx, n, html) { var l = el("div", "rcl"); l.appendChild(el("b", "", String(n))); var t = document.createElement("span"); t.innerHTML = html; l.appendChild(t); bx.appendChild(l); }
+function rcDemande(auto) {
+  if (RC.ov) return;
+  var bx = rcBoite("Voulez-vous mettre IRIS sur l’écran d’accueil de votre téléphone ?");
+  bx.appendChild(el("div", "rcl", "Vous ouvrirez IRIS d’un seul toucher, comme une application."));
+  function fin() { try { localStorage.setItem("rc_q", "1"); } catch (e) { } }
+  rcBtn(bx, "Oui", function () { fin(); rcOui(); });
+  rcBtn(bx, auto ? "Plus tard" : "Non", function () { fin(); rcFerme(); }, true);
+}
+function rcOui() {
+  if (RC.ev && RC.ev.prompt) {            // Android (Chrome, Edge, Samsung, Opera…) : fenêtre d'installation du navigateur
+    var e = RC.ev; RC.ev = null; rcFerme();
     try { e.prompt(); if (e.userChoice && e.userChoice.then) e.userChoice.then(function () { }, function () { }); return; } catch (x) { }
   }
+  if (rcNav().ios) { if (rcAppli()) rcSafari(); else rcEtapeIos(); return; }
   rcGuide();
+}
+// iPhone/iPad : Apple interdit l'ajout automatique. On ouvre directement la feuille « Partager » ; il reste 2 touches.
+function rcEtapeIos() {
+  try { history.replaceState(null, "", location.pathname); } catch (e) { }
+  var bx = rcBoite("Dernière étape");
+  bx.appendChild(el("div", "rcl", "Une fenêtre va s’ouvrir. Dedans :"));
+  rcLigne(bx, 1, "Touchez <strong>Sur l’écran d’accueil</strong> (descendez un peu si besoin).");
+  rcLigne(bx, 2, "Si on vous propose <strong>Ouvrir comme app web</strong>, laissez-le <strong>éteint</strong>.");
+  rcLigne(bx, 3, "Touchez <strong>Ajouter</strong>.");
+  rcBtn(bx, "Continuer", function () {
+    var fait = false;
+    try { if (navigator.share) { fait = true; navigator.share({ title: "IRIS", url: rcLien() }).then(function () { rcFerme(); }, function (e) { if (!e || e.name !== "AbortError") rcGuide(); }); } } catch (e) { fait = false; }
+    if (!fait) rcGuide();
+  });
+  rcBtn(bx, "Fermer", rcFerme, true);
+}
+// Navigateur intégré à une application (WhatsApp, Facebook, Instagram…) : l'ajout n'y existe pas -> ouvrir dans Safari
+function rcSafari() {
+  var bx = rcBoite("Ouvrez IRIS dans Safari");
+  bx.appendChild(el("div", "rcl", "Dans cette fenêtre, l’ajout à l’écran d’accueil n’est pas possible."));
+  rcLigne(bx, 1, "Touchez <strong>Copier le lien</strong> ci-dessous.");
+  rcLigne(bx, 2, "Ouvrez <strong>Safari</strong>, touchez la barre d’adresse, puis <strong>Coller</strong>.");
+  var b = rcBtn(bx, "Copier le lien", function () {
+    try { navigator.clipboard.writeText(rcLien()).then(function () { b.textContent = "Lien copié ✔"; }, function () { b.textContent = rcLien(); }); } catch (e) { b.textContent = rcLien(); }
+  });
+  rcBtn(bx, "Fermer", rcFerme, true);
+}
+function rcOuvre() { rcDemande(false); }
+function rcQuestion() {
+  try { if (localStorage.getItem("rc_q")) return; } catch (e) { return; }
+  if (rcInstalle() || RC.ov || document.querySelector(".psov")) return;
+  rcDemande(true);
 }
 function rcBouton() {
   if (rcInstalle()) return null;
@@ -782,16 +832,4 @@ function rcBouton() {
   return b;
 }
 
-// Question posée une seule fois par téléphone : « Voulez-vous IRIS sur votre écran d'accueil ? »
-function rcQuestion() {
-  try { if (localStorage.getItem("rc_q")) return; } catch (e) { return; }
-  if (rcInstalle() || RC.ov || document.querySelector(".psov")) return;
-  var ov = el("div", "rcov"), bx = el("div", "rcc"); ov.setAttribute("role", "dialog"); ov.setAttribute("aria-label", "Ajouter IRIS à l’écran d’accueil");
-  bx.appendChild(el("h2", "", "Voulez-vous mettre IRIS sur l’écran d’accueil de votre téléphone ?"));
-  bx.appendChild(el("div", "rcl", "Vous ouvrirez IRIS d’un seul toucher, comme une application."));
-  function fin() { try { localStorage.setItem("rc_q", "1"); } catch (e) { } rcFerme(); }
-  var oui = el("button", "", "Oui"); oui.type = "button"; oui.onclick = function () { fin(); rcOuvre(); };
-  var non = el("button", "", "Plus tard"); non.type = "button"; non.style.background = "transparent"; non.onclick = fin;
-  bx.appendChild(oui); bx.appendChild(non); ov.appendChild(bx); document.body.appendChild(ov); RC.ov = ov;
-}
 </script><link rel="stylesheet" href="../iris.css?v=20261116"></body></html>
