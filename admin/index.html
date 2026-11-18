@@ -1171,7 +1171,7 @@ var IrisVoix = (function () {
   }
     // ===== Communications (Phases 1 à 4 : annonces, accusés, participation, rappels, e-mails, messages privés) — inséré dans la portée de l'administration : réutilise h, lab, appel, msg, sure, dessiner =====
   var CM = { liste: null, cat: null, err: null, charge: false, vue: "liste", id: null, detail: null, form: null, filtre: "tous", sel: {}, rech: "", site: "",
-    flt: { categorie: "", site: "", agent: "", du: "", au: "" }, nonLus: 0, pollId: 0, pollEnCours: false, emb: false, cible: null,
+    flt: { categorie: "", site: "", agent: "", du: "", au: "", heureDu: "", heureAu: "" }, sitesListe: null, nonLus: 0, pollId: 0, pollEnCours: false, emb: false, cible: null,
     fils: null, fil: null, cle: "", rep: { texte: "", orig: "", commId: "" }, suivi: null, sv: { du: "", au: "" }, emails: null, emStatut: "", ajout: {}, rechAjout: "" };
   // Compteur affiché dans le libellé de l'onglet (texte seul) : « (3) », « (99+) »
   function cmBadge() { var n = Number(CM.nonLus) || 0; return n > 0 ? " (" + (n > 99 ? "99+" : n) + ")" : ""; }
@@ -1214,7 +1214,7 @@ var IrisVoix = (function () {
     }, true);
   }
   if (!CM.pollId) CM.pollId = setInterval(cmPoll, 45000);
-  function cmListeO() { var o = {}; ["categorie", "site", "agent", "du", "au"].forEach(function (k) { if (CM.flt[k]) o[k] = CM.flt[k]; }); return o; }
+  function cmListeO() { var o = {}; ["categorie", "site", "agent", "du", "au", "heureDu", "heureAu"].forEach(function (k) { if (CM.flt[k]) o[k] = CM.flt[k]; }); return o; }
   function cmCharge(apres) {
     if (CM.charge) return; CM.charge = true; CM.err = null;
     function liste() {
@@ -1237,6 +1237,35 @@ var IrisVoix = (function () {
   function cmDelai(n) { n = Number(n) || 0; return n >= 24 && n % 24 === 0 ? n + " h (" + (n / 24) + (n === 24 ? " jour)" : " jours)") : n + " h"; }
   var CM_EMAIL = { attente: "E-mail en attente", envoye: "E-mail envoyé", echec: "E-mail en échec", invalide: "Adresse e-mail invalide", aucun: "Pas d’e-mail" };
   var CM_PART = { present: "Présent", absent: "Absent", empechement: "Empêché", "": "Pas de réponse" };
+  // Barre de boutons sur UNE seule ligne (défilement horizontal si l'écran est étroit)
+  function cmLigne(k) {
+    var d = h("div", { c: "ed-row cm-ligne" }, k); d.style.cssText = "display:flex;flex-wrap:nowrap;overflow-x:auto;gap:8px;align-items:center;padding:4px 0;-webkit-overflow-scrolling:touch";
+    Array.prototype.forEach.call(d.children, function (e) { e.style.flex = "0 0 auto"; e.style.whiteSpace = "nowrap"; }); return d;
+  }
+  function cmGros(b) { b.style.cssText += ";min-height:56px;font-size:18px;font-weight:700;padding:10px 22px"; return b; }
+  // Sites proposés : catalogue.sites (agents + sites perso) ; à défaut, sites des agents
+  function cmSites() {
+    var L = CM.cat && Array.isArray(CM.cat.sites) ? CM.cat.sites.slice() : [];
+    if (!L.length && CM.cat) CM.cat.agents.forEach(function (a) { if (a.site && L.indexOf(a.site) < 0) L.push(a.site); });
+    return L;
+  }
+  // Champ Site : liste déroulante (datalist) avec saisie libre
+  function cmChampSite(id, valeur, ph, surChange) {
+    var i = h("input", { type: "text", list: id, placeholder: ph || "Choisir ou écrire un site", autocomplete: "off", "aria-label": "Site" }), dl = h("datalist", { id: id });
+    cmSites().forEach(function (n) { dl.appendChild(h("option", { value: n })); }); i.value = valeur || ""; i.oninput = i.onchange = function () { surChange(i.value); };
+    return h("span", {}, [i, dl]);
+  }
+  var CM_FORMATS = { pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", heic: "image/heic", heif: "image/heif" };
+  function cmOctets(n) { return n > 1048576 ? (n / 1048576).toFixed(1).replace(".", ",") + " Mo" : Math.max(1, Math.round(n / 1024)) + " Ko"; }
+  function cmLireFichier(f, cb) {
+    var ext = (f.name.split(".").pop() || "").toLowerCase(); if (!CM_FORMATS[ext]) { msg("Format non accepté : PDF, JPG, PNG ou HEIC.", true); return; }
+    if (f.size > 8000000) { msg("Fichier trop lourd (8 Mo maximum) : " + f.name, true); return; }
+    var rd = new FileReader(); rd.onload = function () { var r = String(rd.result || ""), p = r.indexOf(","); if (p < 0) { msg("Fichier illisible.", true); return; } cb({ nom: f.name, b64: r.slice(p + 1), taille: f.size, mime: CM_FORMATS[ext] }); }; rd.onerror = function () { msg("Fichier illisible.", true); }; rd.readAsDataURL(f);
+  }
+  function cmTelecharger(r) {
+    try { var bin = atob(r.b64), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); var url = URL.createObjectURL(new Blob([u], { type: r.mime || "application/octet-stream" })); var a = document.createElement("a"); a.href = url; a.download = r.nom || "piece-jointe"; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(url); }, 4000); }
+    catch (e) { msg("Téléchargement impossible.", true); }
+  }
   function cmTag(t) { return h("span", { c: "ed-tag", t: t }); }
   function cmCarteApercu(x) {
     var k = [h("div", { c: "ed-row" }, [h("span", { c: "ed-tag", t: x.categorie }), x.priorite && x.priorite !== "Normale" ? h("span", { c: "ed-tag", t: x.priorite }) : null]), h("h3", { t: x.titre || "(sans titre)" })];
@@ -1254,8 +1283,8 @@ var IrisVoix = (function () {
   function cmNouveau(x) {
     CM.vue = "form"; CM.sel = {}; CM.rech = ""; CM.site = "";
     CM.form = x ? { id: x.id, statut: x.statut, titre: x.titre, categorie: x.categorie, priorite: x.priorite, message: x.message, dateEv: x.dateEv, heureDeb: x.heureDeb, heureFin: x.heureFin, site: x.site, etage: x.etage, lieu: x.lieu, ref: x.ref, publication: "", destMode: x.destinataires === "tous" ? "tous" : "liste", verrou: x.statut === "Publiée",
-        accuse: !!x.accuse, participation: !!x.participation, confidentiel: !!x.confidentiel, rappels: (x.rappels || []).map(function (r) { return { h: Number(r.h), cible: r.cible === "tous" ? "tous" : "sans_reponse" }; }), reconfirmer: false, orig: x.texteOriginal || "", sigApercu: "" }
-      : { id: "", statut: "", titre: "", categorie: "Information générale", priorite: "Normale", message: "", dateEv: "", heureDeb: "", heureFin: "", site: "", etage: "", lieu: "", ref: "", publication: "", destMode: "tous", verrou: false, accuse: false, participation: false, confidentiel: false, rappels: [], reconfirmer: false, orig: "", sigApercu: "" };
+        accuse: !!x.accuse, participation: !!x.participation, confidentiel: !!x.confidentiel, rappels: (x.rappels || []).map(function (r) { return { h: Number(r.h), cible: r.cible === "tous" ? "tous" : "sans_reponse" }; }), reconfirmer: false, orig: x.texteOriginal || "", sigApercu: "", fichiers: [], pieces: (x.pieces || []).slice(), retirer: [] }
+      : { id: "", statut: "", titre: "", categorie: "Information générale", priorite: "Normale", message: "", dateEv: "", heureDeb: "", heureFin: "", site: "", etage: "", lieu: "", ref: "", publication: "", destMode: "tous", verrou: false, accuse: false, participation: false, confidentiel: false, rappels: [], reconfirmer: false, orig: "", sigApercu: "", fichiers: [], pieces: [], retirer: [] };
     if (x && x.destinataires && x.destinataires !== "tous") { try { JSON.parse(x.destinataires).forEach(function (c) { CM.sel[c] = true; }); } catch (e) { } }
     cmDess();
   }
@@ -1317,18 +1346,18 @@ var IrisVoix = (function () {
       b.onclick = function () { if (cle === "prives") { CM.vue = "prives"; CM.fils = null; } else { CM.vue = "liste"; } cmDess(); };
       return b;
     }
-    var ligne = h("div", { c: "ed-row" }, [onglet("annonces", "Annonces", cmPastille(pub, true), false), onglet("prives", "Messages privés", cmPastille(nl), nl > 0)]);
-    ligne.style.cssText = "display:flex;gap:10px;margin:10px 0;justify-content:center"; c.appendChild(ligne);
+    var ligne = h("div", {}, [onglet("annonces", "Annonces", cmPastille(pub, true), false), onglet("prives", "Messages privés", cmPastille(nl), nl > 0)]);
+    ligne = cmLigne([].slice.call(ligne.children)); ligne.style.margin = "10px 0"; Array.prototype.forEach.call(ligne.children, function (e) { e.style.minWidth = "170px"; }); c.appendChild(ligne);
   }
   function cmPaneListe(c) {
     var k = CM.liste.compteurs, cat = CM.cat;
     var nv = cmBtn("Nouvelle communication", function () { cmNouveau(null); }, true);
     var ac = cmBtn("Actualiser", function () { CM.liste = null; cmDess(); msg("Liste actualisée."); });
-    var sv = cmBtn("Tableau de suivi", function () { cmOuvrirSuivi(); }), em = cmBtn("E-mails", function () { cmOuvrirEmails(""); });
-    var bar = h("div", { c: "ed-row" }, [nv, ac, sv, em]);
-    var filtres = h("div", { c: "ed-row" }); [["tous", "En cours"], ["Brouillon", "Brouillons (" + k.brouillons + ")"], ["Programmée", "Programmées (" + k.programmees + ")"], ["Publiée", "Publiées (" + k.publiees + ")"], ["Archivée", "Archives (" + k.archivees + ")"]].forEach(function (f) {
-      var b = h("button", { c: "ed-b" + (CM.filtre === f[0] ? " ed-p" : ""), t: f[1], type: "button" }); b.onclick = function () { CM.filtre = f[0]; cmDess(); }; filtres.appendChild(b);
-    });
+    var sv = cmBtn("Tableau de suivi", function () { cmOuvrirSuivi(); }), em = cmBtn("E-mails", function () { cmOuvrirEmails(""); }), ms = cmBtn("Gérer mes sites", function () { cmOuvrirSites(); });
+    var bar = cmLigne([nv, ac, sv, em, ms]);
+    var filtres = []; [["tous", "En cours"], ["Brouillon", "Brouillons (" + k.brouillons + ")"], ["Programmée", "Programmées (" + k.programmees + ")"], ["Publiée", "Publiées (" + k.publiees + ")"], ["Archivée", "Archives (" + k.archivees + ")"]].forEach(function (f) {
+      var b = h("button", { c: "ed-b" + (CM.filtre === f[0] ? " ed-p" : ""), t: f[1], type: "button" }); b.onclick = function () { CM.filtre = f[0]; cmDess(); }; filtres.push(b);
+    }); filtres = cmLigne(filtres);
     var etat = cat.emailReel ? "Les e-mails réels sont activés : les agents reçoivent aussi un e-mail." : "Les e-mails réels sont désactivés : aucun e-mail n’est envoyé, les agents lisent les annonces dans IRIS.";
     c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Communications" }), h("p", { c: "ed-note", t: "Annoncez une réunion, un événement ou une consigne aux agents de votre choix. " + etat }), bar, filtres]));
     c.appendChild(cmCarteFiltres());
@@ -1337,7 +1366,7 @@ var IrisVoix = (function () {
     L.forEach(function (x) {
       var acts = [cmBtn("Ouvrir", function () { cmOuvrirDetail(x.id); })];
       if (x.statut !== "Archivée") { acts.push(cmBtn("Modifier", function () { cmNouveau(x); })); acts.push(sure("Archiver", true, function () { cmAppel("cmAdminArchiver", [x.id], function (r) { if (r && r.ok) { msg(r.msg); CM.liste = null; cmDess(); } else msg((r && r.msg) || "Échec.", true); }); })); }
-      var meta = x.statut === "Brouillon" ? "Brouillon" : x.statut === "Programmée" ? "Programmée pour le " + cmQuand(x.publication) : x.nbLus + " lu(s) sur " + x.nbDest + " destinataire(s)";
+      var nbp = (x.pieces || []).length, meta = (nbp ? nbp + " pièce(s) jointe(s) · " : "") + (x.statut === "Brouillon" ? "Brouillon" : x.statut === "Programmée" ? "Programmée pour le " + cmQuand(x.publication) : x.nbLus + " lu(s) sur " + x.nbDest + " destinataire(s)");
       var tags = [cmTag(x.statut), cmTag(x.categorie)]; if (x.priorite !== "Normale") tags.push(cmTag(x.priorite)); if (x.confidentiel) tags.push(cmTag("Confidentiel")); if (x.version > 1) tags.push(cmTag("Version " + x.version));
       var st = [];
       if (x.statut === "Publiée") {
@@ -1352,15 +1381,17 @@ var IrisVoix = (function () {
     });
   }
   function cmCarteFiltres() {
-    var cat = CM.cat, sites = []; cat.agents.forEach(function (a) { if (a.site && sites.indexOf(a.site) < 0) sites.push(a.site); });
+    var cat = CM.cat;
     function sel(cle, opts, vide) { var s = h("select", { "aria-label": vide }); opts.forEach(function (o) { var op = h("option", { t: o[1], value: o[0] }); if (CM.flt[cle] === o[0]) op.selected = true; s.appendChild(op); }); s.onchange = function () { CM.flt[cle] = s.value; }; return s; }
+    function tm(cle) { var i = h("input", { type: "time", "aria-label": cle }); i.value = CM.flt[cle] || ""; i.onchange = i.oninput = function () { CM.flt[cle] = i.value; }; return i; }
     function dt(cle) { var i = h("input", { type: "date" }); i.value = CM.flt[cle] || ""; i.onchange = i.oninput = function () { CM.flt[cle] = i.value; }; return i; }
-    var go = cmBtn("Appliquer les filtres", function () { CM.liste = null; cmDess(); }, true), rz = cmBtn("Effacer les filtres", function () { CM.flt = { categorie: "", site: "", agent: "", du: "", au: "" }; CM.liste = null; cmDess(); });
+    var go = cmBtn("Appliquer les filtres", function () { CM.liste = null; cmDess(); }, true), rz = cmBtn("Effacer les filtres", function () { CM.flt = { categorie: "", site: "", agent: "", du: "", au: "", heureDu: "", heureAu: "" }; CM.liste = null; cmDess(); });
     return h("div", { c: "ed-card" }, [h("h3", { t: "Filtrer la liste" }),
       lab("Catégorie", sel("categorie", [["", "Toutes les catégories"]].concat(cat.categories.map(function (x) { return [x, x]; })), "Catégorie")),
-      lab("Site", sel("site", [["", "Tous les sites"]].concat(sites.map(function (x) { return [x, x]; })), "Site")),
+      lab("Site (choisir dans la liste ou écrire)", cmChampSite("cm-sites-filtre", CM.flt.site, "Tous les sites", function (v) { CM.flt.site = v; })),
       lab("Agent destinataire", sel("agent", [["", "Tous les agents"]].concat(cat.agents.map(function (a) { return [a.cle, a.nom + " " + a.prenom]; })), "Agent")),
-      lab("Du (date de l’événement)", dt("du")), lab("Au", dt("au")), h("div", { c: "ed-row" }, [go, rz])]);
+      h("p", { c: "ed-note", t: "La liste des agents vient du catalogue : un nouvel agent y apparaît automatiquement." }),
+      lab("Du (date de l’événement)", dt("du")), lab("Au", dt("au")), lab("Heure de début : de", tm("heureDu")), lab("Heure de début : à", tm("heureAu")), h("div", { c: "ed-row" }, [go, rz])]);
   }
 
   // ---------- Détail ----------
@@ -1374,7 +1405,8 @@ var IrisVoix = (function () {
     (x.rappels || []).forEach(function (r) { opts.push(cmTag("Rappel " + cmDelai(r.h) + (r.cible === "tous" ? " (tous)" : " (sans réponse)"))); });
     var acts = []; var ec = null; try { ec = window.IrisVoix && IrisVoix.boutonLire ? IrisVoix.boutonLire(x.message || "", "Écouter le message") : null; } catch (e) { } if (ec) acts.push(ec);
     if (x.statut !== "Archivée") { acts.push(cmBtn("Modifier", function () { cmNouveau(x); })); acts.push(cmSure("Archiver", true, function (b) { cmAction(b, "cmAdminArchiver", [x.id], function (r) { if (r.ok) { msg(r.msg); CM.liste = null; cmRetour(); } else msg(r.msg || "Échec.", true); }); })); }
-    if (opts.length) c.appendChild(h("div", { c: "ed-row" }, opts)); if (acts.length) c.appendChild(h("div", { c: "ed-row" }, acts));
+    if (opts.length) c.appendChild(h("div", { c: "ed-row" }, opts)); if (acts.length) c.appendChild(cmLigne(acts.map(cmGros)));
+    if ((x.pieces || []).length) c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Pièces jointes" })].concat(x.pieces.map(function (pj, n) { return h("div", { c: "ed-la" }, [h("span", { t: pj.nom + " (" + cmOctets(pj.taille) + ")" }), cmBtn("Télécharger", function (b) { cmAction(b, "cmAdminPiece", [x.id, n], function (r) { if (r.ok) cmTelecharger(r); else msg(r.msg || "Téléchargement impossible.", true); }); })]); }))));
     var lus = D.filter(function (d) { return d.lu; }).length, acc = D.filter(function (d) { return d.accuseLe; }).length;
     var tete = "Destinataires : " + lus + " lu(s) sur " + D.length + (x.accuse ? " · " + acc + " accusé(s)" : "") + (x.participation ? " · " + D.filter(function (d) { return d.participation === "present"; }).length + " présent(s), " + D.filter(function (d) { return d.participation === "absent"; }).length + " absent(s), " + D.filter(function (d) { return d.participation === "empechement"; }).length + " empêché(s)" : "");
     var lignes = D.map(function (d) {
@@ -1423,7 +1455,7 @@ var IrisVoix = (function () {
     var titre = champ("text", "titre", "Titre de la communication", { maxlength: "120" });
     var message = h("textarea", { rows: "6", placeholder: "Écrivez votre message", maxlength: "5000", "data-iv-no": "1" }); message.value = F.message || ""; message.oninput = function () { F.message = message.value; };
     var blocQuand = h("div", { c: "ed-card" }, [h("h3", { t: "Date et lieu (facultatifs pour une information générale)" }), lab("Date de l’événement", champ("date", "dateEv")), lab("Heure de début", champ("time", "heureDeb")), lab("Heure de fin (facultative)", champ("time", "heureFin")),
-      lab("Site / Bâtiment", champ("text", "site", "Exemple : Tour B")), lab("Étage / Niveau", champ("text", "etage", "RDC, -1, 19e étage, N2…")), lab("Lieu / Espace", champ("text", "lieu", "Salle de réunion, Auditorium…")), lab("Numéro / Référence", champ("text", "ref", "1904, B12, Zone A…"))]);
+      lab("Site / Bâtiment (liste ou saisie libre)", cmChampSite("cm-sites-form", F.site, "Exemple : Tour B", function (v) { F.site = v; })), lab("Étage / Niveau", champ("text", "etage", "RDC, -1, 19e étage, N2…")), lab("Lieu / Espace", champ("text", "lieu", "Salle de réunion, Auditorium…")), lab("Numéro / Référence", champ("text", "ref", "1904, B12, Zone A…"))]);
     // Destinataires
     var zoneDest = h("div", {});
     function dessineDest() {
@@ -1480,7 +1512,7 @@ var IrisVoix = (function () {
     function corps(action) {
       var dest = F.destMode === "tous" ? "tous" : Object.keys(CM.sel).filter(function (k) { return CM.sel[k]; });
       var o = { id: F.id, action: action, titre: F.titre, categorie: F.categorie, priorite: F.priorite, message: F.message, dateEv: F.dateEv, heureDeb: F.heureDeb, heureFin: F.heureFin, site: F.site, etage: F.etage, lieu: F.lieu, ref: F.ref, publication: (F.publication || "").slice(0, 16), destinataires: dest,
-        rappels: F.rappels.map(function (r) { return { h: r.h, cible: r.cible }; }), accuse: !!F.accuse, participation: !!F.participation, confidentiel: !!F.confidentiel, reconfirmer: !!(F.verrou && F.reconfirmer) };
+        rappels: F.rappels.map(function (r) { return { h: r.h, cible: r.cible }; }), accuse: !!F.accuse, participation: !!F.participation, confidentiel: !!F.confidentiel, reconfirmer: !!(F.verrou && F.reconfirmer), fichiers: F.fichiers.map(function (f) { return { nom: f.nom, b64: f.b64 }; }), piecesRetirer: F.retirer.slice() };
       if (F.orig && F.orig !== F.message) o.texteOriginal = F.orig;   // champ complémentaire : texte saisi avant correction / reformulation
       return o;
     }
@@ -1497,19 +1529,67 @@ var IrisVoix = (function () {
       btn.disabled = true;
       cmAppel("cmAdminSauve", [corps(action)], function (r) { btn.disabled = false; if (r && r.ok) { msg(r.msg); CM.liste = null; cmRetour(); } else msg((r && r.msg) || "Échec.", true); });
     }
-    var brouillon = h("button", { c: "ed-b", t: F.verrou ? "Enregistrer les modifications" : "Enregistrer le brouillon", type: "button" });
-    brouillon.onclick = function () { envoyer(F.verrou ? "publier" : "brouillon", brouillon); };
-    var prev = cmBtn("Prévisualiser", montreApercu);
     var nDest = function () { return F.destMode === "tous" ? cat.agents.length : Object.keys(CM.sel).filter(function (k) { return CM.sel[k]; }).length; };
-    var publier = null;
-    if (!F.verrou) publier = cmSure("Publier / programmer", false, function (b) { envoyer("publier", b); });
-    var annuler = cmBtn("Annuler", cmRetour);
+    // Pièces jointes (4 au total, 8 Mo chacune ; PDF, JPG, PNG, HEIC)
+    var zonePj = h("div", {});
+    function nbPj() { return F.pieces.length - F.retirer.length + F.fichiers.length; }
+    function dessinePj() {
+      zonePj.textContent = "";
+      F.pieces.forEach(function (pj, n) {
+        var ret = F.retirer.indexOf(n) >= 0;
+        var b = cmBtn(ret ? "Garder cette pièce" : "Retirer", function () { if (ret) F.retirer.splice(F.retirer.indexOf(n), 1); else F.retirer.push(n); dessinePj(); });
+        zonePj.appendChild(h("div", { c: "ed-la" }, [h("span", { t: (ret ? "(sera retirée) " : "") + pj.nom + " (" + cmOctets(pj.taille) + ")" }), b]));
+      });
+      F.fichiers.forEach(function (pj, n) { zonePj.appendChild(h("div", { c: "ed-la" }, [h("span", { t: pj.nom + " (" + cmOctets(pj.taille) + ") — nouveau" }), cmBtn("Retirer", function () { F.fichiers.splice(n, 1); dessinePj(); })])); });
+      if (!F.pieces.length && !F.fichiers.length) zonePj.appendChild(h("p", { c: "ed-vide", t: "Aucune pièce jointe." }));
+      var fi = h("input", { type: "file", accept: ".pdf,.jpg,.jpeg,.png,.heic,.heif,application/pdf,image/*", "aria-label": "Choisir un fichier à joindre" }); fi.multiple = true; fi.style.cssText = "font-size:18px;padding:10px;margin:8px 0";
+      fi.onchange = function () {
+        var fl = [].slice.call(fi.files || []);
+        fl.forEach(function (f) { if (nbPj() >= 4) { msg("Quatre pièces jointes au maximum.", true); return; } cmLireFichier(f, function (pj) { if (nbPj() >= 4) { msg("Quatre pièces jointes au maximum.", true); return; } F.fichiers.push(pj); dessinePj(); }); });
+        fi.value = "";
+      };
+      zonePj.appendChild(h("p", { c: "ed-note", t: nbPj() + " pièce(s) jointe(s) sur 4 maximum. Formats : PDF, JPG, PNG, HEIC ; 8 Mo maximum chacune." })); zonePj.appendChild(fi);
+    }
+    dessinePj();
+    var blocPj = h("div", { c: "ed-card" }, [h("h3", { t: "Pièces jointes" }), zonePj]);
+    function actions() {
+      var brouillon = cmGros(h("button", { c: "ed-b ed-p", t: F.verrou ? "Enregistrer les modifications" : "Enregistrer le brouillon", type: "button" }));
+      brouillon.onclick = function () { envoyer(F.verrou ? "publier" : "brouillon", brouillon); };
+      var l = [brouillon, cmGros(cmBtn("Prévisualiser", montreApercu))];
+      if (!F.verrou) { var pb = cmGros(cmSure("Publier / programmer", false, function (b) { envoyer("publier", b); })); l.push(pb); }
+      l.push(cmGros(cmBtn("Annuler", cmRetour)));
+      var r = cmLigne(l); r.style.margin = "10px 0"; return r;
+    }
     var info = h("p", { c: "ed-note" }); function majInfo() { info.textContent = F.verrou ? "Communication déjà publiée : vous pouvez corriger le texte, la date ou le lieu (le numéro de version augmente). L’aperçu s’affiche avant l’enregistrement." : "Laissez la date de publication vide pour publier immédiatement. L’aperçu s’affiche avant l’envoi ; « Publier » enverra l’annonce à " + nDest() + " agent(s)."; } majInfo();
-    var bloc1 = h("div", { c: "ed-card" }, [h("h3", { t: F.id ? "Modifier la communication" : "Nouvelle communication" }), lab("Catégorie", liste("categorie", cat.categories)), lab("Priorité", liste("priorite", cat.priorites)), lab("Titre", titre), lab("Message", message), cmOutils(message, E, null)]);
-    var blocDest = h("div", { c: "ed-card" }, [h("h3", { t: "Destinataires" }), zoneDest]);
-    var blocPub = F.verrou ? null : h("div", { c: "ed-card" }, [h("h3", { t: "Publication" }), lab("Date et heure de publication (facultatif, heure de Paris)", pubIn), info]);
-    c.appendChild(bloc1); c.appendChild(blocQuand); c.appendChild(blocDest); c.appendChild(blocOpt); if (blocPub) c.appendChild(blocPub); else c.appendChild(h("div", { c: "ed-card" }, [info]));
-    c.appendChild(h("div", { c: "ed-row", style: "margin:14px 0" }, [brouillon, prev, publier, annuler])); c.appendChild(apercuBox);
+    function titreBloc(t) { var e = h("h3", { t: t }); e.style.cssText = "font-size:22px"; return e; }
+    var bloc0 = h("div", { c: "ed-card" }, [h("h3", { t: F.id ? "Modifier la communication" : "Nouvelle communication" }), h("p", { c: "ed-note", t: "Remplissez les cadres 1 à 5 ci-dessous. Les boutons Enregistrer le brouillon, Prévisualiser et Publier sont ici en haut et aussi en bas de la page." })]);
+    var bloc1 = h("div", { c: "ed-card" }, [titreBloc("1. Le message"), lab("Catégorie", liste("categorie", cat.categories)), lab("Priorité", liste("priorite", cat.priorites)), lab("Titre", titre), lab("Message", message), cmOutils(message, E, null)]);
+    blocQuand.insertBefore(titreBloc("2. Date, heure et lieu (facultatifs pour une information générale)"), blocQuand.firstChild); blocQuand.removeChild(blocQuand.childNodes[1]);
+    var blocDest = h("div", { c: "ed-card" }, [titreBloc("3. Destinataires"), zoneDest]);
+    blocOpt.replaceChild(titreBloc("4. Accusé, participation, confidentialité et rappels"), blocOpt.firstChild);
+    var blocPub = F.verrou ? null : h("div", { c: "ed-card" }, [titreBloc("5. Publication"), lab("Date et heure de publication programmée (facultatif, heure de Paris)", pubIn), info]);
+    c.appendChild(bloc0); c.appendChild(actions()); c.appendChild(apercuBox);
+    c.appendChild(bloc1); c.appendChild(blocQuand); c.appendChild(blocDest); c.appendChild(blocOpt); c.appendChild(blocPj); if (blocPub) c.appendChild(blocPub); else c.appendChild(h("div", { c: "ed-card" }, [info]));
+    c.appendChild(actions());
+  }
+
+  // ---------- Gérer mes sites ----------
+  function cmOuvrirSites() { CM.vue = "sites"; CM.sitesListe = null; cmDess(); cmChargeSites(); }
+  function cmChargeSites(fin) { cmAppel("cmAdminSites", [], function (r) { if (!r || !r.ok) { msg((r && r.msg) || "Sites indisponibles.", true); CM.vue = "liste"; cmDess(); return; } CM.sitesListe = r.sites || []; if (CM.cat) CM.cat.sites = CM.sitesListe.map(function (x) { return x.nom; }); if (fin) fin(); cmDess(); }); }
+  function cmPaneSites(c) {
+    c.appendChild(cmLigne([cmGros(cmBtn("← Retour", cmRetour))]));
+    var nom = h("input", { type: "text", placeholder: "Nom du nouveau site", maxlength: "80", autocomplete: "off", "aria-label": "Nom du nouveau site" });
+    var aj = cmGros(cmBtn("Ajouter ce site", function (b) { var v = nom.value.trim(); if (!v) { msg("Écrivez le nom du site.", true); return; } cmAction(b, "cmAdminSiteAjouter", [v], function (r) { if (r.ok) { msg(r.msg || "Site ajouté."); cmChargeSites(); } else msg(r.msg || "Échec.", true); }); }, true));
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Gérer mes sites" }), h("p", { c: "ed-note", t: "Ces sites sont proposés dans les communications et les filtres. Vous pouvez aussi écrire un site librement dans un formulaire." }), lab("Nouveau site", nom), cmLigne([aj])]));
+    if (!CM.sitesListe) { c.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); return; }
+    if (!CM.sitesListe.length) c.appendChild(h("p", { c: "ed-vide", t: "Aucun site." }));
+    CM.sitesListe.forEach(function (st) {
+      if (st.source !== "perso") { c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: st.nom }), h("p", { c: "ed-note", t: "Ce site vient de la fiche agent : il se modifie dans la fiche de l’agent." })])); return; }
+      var ni = h("input", { type: "text", maxlength: "80", autocomplete: "off", "aria-label": "Nouveau nom pour " + st.nom }); ni.value = st.nom;
+      var ren = cmBtn("Renommer", function (b) { var v = ni.value.trim(); if (!v || v === st.nom) { msg("Écrivez un nouveau nom.", true); return; } cmAction(b, "cmAdminSiteRenommer", [{ ancien: st.nom, nouveau: v }], function (r) { if (r.ok) { msg(r.msg || "Site renommé."); CM.liste = null; cmChargeSites(); } else msg(r.msg || "Échec.", true); }); });
+      var sup = cmSure("Supprimer", true, function (b) { cmAction(b, "cmAdminSiteSupprimer", [st.nom], function (r) { if (r.ok) { msg(r.msg || "Site supprimé."); cmChargeSites(); } else msg(r.msg || "Échec.", true); }); });
+      c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: st.nom }), h("p", { c: "ed-note", t: "Site personnel." }), ni, cmLigne([ren, sup])]));
+    });
   }
 
   // ---------- Tableau de suivi ----------
@@ -1614,6 +1694,7 @@ var IrisVoix = (function () {
     if (v === "form") { cmPaneForm(c); return; }
     if (v === "detail") { cmPaneDetail(c); return; }
     if (v === "suivi") { cmPaneSuivi(c); return; }
+    if (v === "sites") { cmPaneSites(c); return; }
     if (v === "emails") { cmPaneEmails(c); return; }
     if (v === "fil") { cmPaneFil(c); return; }
     cmSousOnglets(c);
