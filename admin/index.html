@@ -806,16 +806,16 @@ var IrisVoix = (function () {
     return z;
   }
   function paneParam(c) {
-    var an = h("input", { type: "password", autocomplete: "current-password", placeholder: "Ancien mot de passe" }), nv = h("input", { type: "password", autocomplete: "new-password", placeholder: "Nouveau mot de passe (8 caractères minimum)" }), cf = h("input", { type: "password", autocomplete: "new-password", placeholder: "Confirmer le nouveau mot de passe" });
+    var an = h("input", { type: "password", autocomplete: "current-password", placeholder: "Ancien mot de passe" }), nv = h("input", { type: "password", autocomplete: "new-password", placeholder: "Nouveau mot de passe (10 caractères minimum, lettre + chiffre)" }), cf = h("input", { type: "password", autocomplete: "new-password", placeholder: "Confirmer le nouveau mot de passe" }), cd = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Code de sécurité (obligatoire)" });
     var ok = h("button", { c: "ed-b ed-p", t: "Modifier mon mot de passe", type: "button" });
     ok.onclick = function () {
-      if (!an.value || !nv.value) { msg("Remplissez les champs.", true); return; }
-      if (nv.value.length < 8) { msg("Le nouveau mot de passe doit faire 8 caractères minimum.", true); return; }
+      if (!an.value || !nv.value || !cd.value) { msg("Remplissez tous les champs, y compris le code de sécurité.", true); return; }
+      if (nv.value.length < 10 || !/[A-Za-z]/.test(nv.value) || !/\d/.test(nv.value)) { msg("Le nouveau mot de passe doit faire 10 caractères minimum, avec au moins une lettre et un chiffre.", true); return; }
       if (nv.value !== cf.value) { msg("La confirmation est différente du nouveau mot de passe.", true); return; }
       ok.disabled = true;
-      appel("adminChangerMotDePasse", { ancien: an.value, nouveau: nv.value }, function (r) { ok.disabled = false; if (r && r.ok) { an.value = nv.value = cf.value = ""; msg(r.msg); } else msg((r && r.msg) || "Échec.", true); });
+      appel("adminChangerMotDePasse", { ancien: an.value, nouveau: nv.value, code: cd.value }, function (r) { ok.disabled = false; cd.value = ""; if (r && r.ok) { an.value = nv.value = cf.value = ""; msg(r.msg); if (r.reconnexion) setTimeout(function () { location.reload(); }, 1800); } else msg((r && r.msg) || "Échec.", true); });
     };
-    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Modifier mon mot de passe" }), h("p", { c: "ed-vide", t: "Vous pouvez le changer à tout moment. Il faut saisir l’ancien mot de passe." }), lab("Ancien mot de passe", an), lab("Nouveau mot de passe", nv), lab("Confirmer", cf), h("div", { c: "ed-row", style: "margin-top:14px" }, [ok])]));
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Modifier mon mot de passe" }), h("p", { c: "ed-vide", t: "Vous pouvez le changer à tout moment. Il faut saisir l’ancien mot de passe ET votre code de sécurité. Une alerte est envoyée par e-mail et toutes les sessions sont fermées." }), lab("Ancien mot de passe", an), lab("Nouveau mot de passe", nv), lab("Confirmer", cf), lab("Code de sécurité", cd), h("div", { c: "ed-row", style: "margin-top:14px" }, [ok])]));
   }
   function paneAg(c) {
     c.appendChild(carteAg({ nom: "", prenom: "", tel: "", jours: "" }, true));
@@ -1283,7 +1283,80 @@ hmaj();setInterval(hmaj,120000);</script><div id="vk" style="position:fixed;top:
   ["mousemove", "keydown", "click", "touchstart", "scroll"].forEach(function (n) { document.addEventListener(n, actif, true); });
   setInterval(function () { if (CLE && Date.now() - derAct > IDLE) verrouiller(); }, 5000);
   setTimeout(function () { pw.focus(); }, 300);
-})((function(){try{return localStorage.getItem("iris_admin")||""}catch(e){return ""}})());</script><script>(function(){var b=document.getElementById("btndemo"),bn=document.getElementById("demob");if(!b)return;b.onclick=function(){window.DEMO=!window.DEMO;b.className="dmb"+(window.DEMO?" on":"");b.setAttribute("aria-pressed",window.DEMO?"true":"false");b.textContent=window.DEMO?"Quitter la démonstration":"Mode démonstration";bn.style.display=window.DEMO?"block":"none";try{ADM=null;PERD=null;if(FICHE)fermeFiche()}catch(e){}try{maj()}catch(e){}try{admMaj()}catch(e){}}})();</script><script>function hsRow(id,nb,den,min,u,dep){var e=document.getElementById(id);if(!e)return;e.innerHTML="";var p=den>0?Math.round(100*nb/den):0,l=document.createElement("div");l.className="hsl";var d=document.createElement("span");d.className="hsd";var t=document.createElement("span");t.className="hst";t.textContent="Heures supplémentaires potentielles (à valider)";var v=document.createElement("span");v.className="hsv";v.textContent=nb+" "+(nb>1?u[1]:u[0])+" · "+(min>0?fm(min):"0 h")+" · dépassement constaté "+(dep>0?fm(dep):"0 h");var pc=document.createElement("span");pc.className="hsp";pc.textContent=p+" %";var br=document.createElement("span");br.className="hsb";var i=document.createElement("i");i.style.width=p+"%";br.appendChild(i);l.appendChild(d);l.appendChild(t);l.appendChild(v);l.appendChild(pc);l.appendChild(br);e.appendChild(l);var sm=document.createElement("small");sm.textContent="Chaque minute de dépassement à la sortie est enregistrée, mais un dépassement n’est pas une heure supplémentaire payable : les heures potentielles excluent l’horaire simplement décalé et restent à qualifier selon les règles applicables.";e.appendChild(sm)}</script><script>(function(){
+})((function(){try{return localStorage.getItem("iris_admin")||""}catch(e){return ""}})());</script><script>/* IRIS admin — récupération du mot de passe / du lien (écran de verrouillage). Ajout isolé : n'altère pas la connexion existante. */
+(function () {
+  var vk = document.getElementById("vk"); if (!vk) return;
+  function E(t, st, tx) { var e = document.createElement(t); if (st) e.style.cssText = st; if (tx) e.textContent = tx; return e; }
+  var STI = "width:280px;max-width:80vw;font-size:17px;padding:13px 14px;border-radius:14px;border:1px solid #c9973f;background:rgba(255,255,255,.08);color:#fff;text-align:center;outline:none;box-sizing:border-box;margin-top:10px";
+  var STB = "margin-top:14px;width:280px;max-width:80vw;font-size:17px;font-weight:700;padding:14px;border:0;border-radius:14px;background:linear-gradient(180deg,#e9cd6b,#c9973f);color:#0b1a2b;cursor:pointer";
+  var STS = "margin-top:10px;width:280px;max-width:80vw;font-size:15px;padding:11px;border-radius:14px;border:1px solid #c9973f;background:transparent;color:#cdb88a;cursor:pointer";
+  var principaux = ["vkp", "vkb", "vke"].map(function (i) { return document.getElementById(i); });
+  var lien = E("a", "margin-top:6px;color:#cdb88a;font-size:15px;cursor:pointer;text-decoration:underline", "Mot de passe ou lien oublié ?");
+  lien.setAttribute("role", "button"); lien.tabIndex = 0;
+  var pan = E("div", "display:none;flex-direction:column;align-items:center;text-align:center;max-height:70vh;overflow:auto");
+  var msg = E("div", "margin-top:12px;min-height:22px;font-size:15px;color:#f0a5a5;max-width:80vw");
+  vk.appendChild(lien); vk.appendChild(pan);
+  vk.style.overflowY = "auto";
+  function appelSrv(nom, args, ok) {
+    var f = google.script.run.withSuccessHandler(ok).withFailureHandler(function () { occupe(false); dire("Connexion impossible, réessayez.", true); });
+    f[nom].apply(f, args);
+  }
+  var bouton = null;
+  function occupe(o) { if (bouton) bouton.disabled = !!o; }
+  function dire(t, mal) { msg.textContent = t || ""; msg.style.color = mal ? "#f0a5a5" : "#9fe0b0"; }
+  function montrer(oui) { principaux.forEach(function (e) { if (e) e.style.display = oui ? "" : "none"; }); lien.style.display = oui ? "" : "none"; pan.style.display = oui ? "none" : "flex"; if (oui) dire(""); }
+  function retour() { pan.textContent = ""; montrer(true); setTimeout(function () { var p = document.getElementById("vkp"); if (p) p.focus(); }, 50); }
+  function entete(titre) { pan.textContent = ""; pan.appendChild(E("div", "font-size:19px;letter-spacing:.08em;color:#cdb88a;margin-bottom:6px", titre)); }
+  function pied() { var r = E("button", STS, "Retour"); r.type = "button"; r.onclick = retour; pan.appendChild(msg); pan.appendChild(r); }
+  function champ(ph, type, mode) { var i = E("input", STI); i.type = type; i.placeholder = ph; i.autocomplete = "off"; if (mode) i.setAttribute("inputmode", mode); return i; }
+
+  function etape1() {
+    entete("Récupération");
+    var objet = "mdp";
+    var cm = E("button", STB, "Nouveau mot de passe"), cl = E("button", STS, "Recevoir mon lien d’accès");
+    cm.type = cl.type = "button"; cm.style.marginTop = "8px"; cl.style.marginTop = "8px";
+    function choix(o) { objet = o; cm.style.cssText = o === "mdp" ? STB : STS; cl.style.cssText = o === "lien" ? STB : STS; cm.style.marginTop = cl.style.marginTop = "8px"; }
+    cm.onclick = function () { choix("mdp"); }; cl.onclick = function () { choix("lien"); };
+    pan.appendChild(cm); pan.appendChild(cl); choix("mdp");
+    var tel = champ("Numéro de portable", "tel", "tel"), code = champ("Code de sécurité", "password", "numeric");
+    pan.appendChild(tel); pan.appendChild(code);
+    var go = E("button", STB, "Recevoir le code par e-mail"); go.type = "button"; bouton = go; pan.appendChild(go);
+    go.onclick = function () {
+      if (!tel.value || !code.value) { dire("Saisissez votre portable et votre code de sécurité.", true); return; }
+      occupe(true); dire("");
+      appelSrv("secAdmRecupDemande", [tel.value, code.value, objet], function (r) { occupe(false); if (r && r.ok) { code.value = ""; etape2(objet); dire(r.msg, false); } else dire((r && r.msg) || "Échec.", true); });
+    };
+    pied(); setTimeout(function () { tel.focus(); }, 50);
+  }
+  function etape2(objet) {
+    entete(objet === "lien" ? "Code reçu par e-mail" : "Nouveau mot de passe");
+    var otp = champ("Code à 6 chiffres reçu par e-mail", "text", "numeric"); otp.maxLength = 6; pan.appendChild(otp);
+    var nv = null, cf = null;
+    if (objet !== "lien") {
+      nv = champ("Nouveau mot de passe (10 caractères, lettre + chiffre)", "password"); nv.autocomplete = "new-password";
+      cf = champ("Confirmer le nouveau mot de passe", "password"); cf.autocomplete = "new-password";
+      pan.appendChild(nv); pan.appendChild(cf);
+    }
+    var go = E("button", STB, objet === "lien" ? "Recevoir mon lien" : "Enregistrer le mot de passe"); go.type = "button"; bouton = go; pan.appendChild(go);
+    go.onclick = function () {
+      if (!/^\d{6}$/.test(otp.value.replace(/\s/g, ""))) { dire("Saisissez le code à 6 chiffres.", true); return; }
+      if (nv) {
+        if (nv.value.length < 10 || !/[A-Za-z]/.test(nv.value) || !/\d/.test(nv.value)) { dire("10 caractères minimum, avec au moins une lettre et un chiffre.", true); return; }
+        if (nv.value !== cf.value) { dire("La confirmation est différente.", true); return; }
+      }
+      occupe(true); dire("");
+      appelSrv("secAdmRecupValide", [otp.value, nv ? nv.value : ""], function (r) {
+        occupe(false);
+        if (r && r.ok) { pan.textContent = ""; pan.appendChild(E("div", "font-size:17px;max-width:80vw;color:#9fe0b0;margin-top:6px", r.msg)); pan.appendChild(msg); dire(""); var b = E("button", STB, "Retour à la connexion"); b.type = "button"; b.onclick = retour; pan.appendChild(b); }
+        else dire((r && r.msg) || "Échec.", true);
+      });
+    };
+    pied(); setTimeout(function () { otp.focus(); }, 50);
+  }
+  lien.onclick = function () { montrer(false); etape1(); };
+  lien.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") lien.onclick(); };
+})();
+</script><script>(function(){var b=document.getElementById("btndemo"),bn=document.getElementById("demob");if(!b)return;b.onclick=function(){window.DEMO=!window.DEMO;b.className="dmb"+(window.DEMO?" on":"");b.setAttribute("aria-pressed",window.DEMO?"true":"false");b.textContent=window.DEMO?"Quitter la démonstration":"Mode démonstration";bn.style.display=window.DEMO?"block":"none";try{ADM=null;PERD=null;if(FICHE)fermeFiche()}catch(e){}try{maj()}catch(e){}try{admMaj()}catch(e){}}})();</script><script>function hsRow(id,nb,den,min,u,dep){var e=document.getElementById(id);if(!e)return;e.innerHTML="";var p=den>0?Math.round(100*nb/den):0,l=document.createElement("div");l.className="hsl";var d=document.createElement("span");d.className="hsd";var t=document.createElement("span");t.className="hst";t.textContent="Heures supplémentaires potentielles (à valider)";var v=document.createElement("span");v.className="hsv";v.textContent=nb+" "+(nb>1?u[1]:u[0])+" · "+(min>0?fm(min):"0 h")+" · dépassement constaté "+(dep>0?fm(dep):"0 h");var pc=document.createElement("span");pc.className="hsp";pc.textContent=p+" %";var br=document.createElement("span");br.className="hsb";var i=document.createElement("i");i.style.width=p+"%";br.appendChild(i);l.appendChild(d);l.appendChild(t);l.appendChild(v);l.appendChild(pc);l.appendChild(br);e.appendChild(l);var sm=document.createElement("small");sm.textContent="Chaque minute de dépassement à la sortie est enregistrée, mais un dépassement n’est pas une heure supplémentaire payable : les heures potentielles excluent l’horaire simplement décalé et restent à qualifier selon les règles applicables.";e.appendChild(sm)}</script><script>(function(){
 var VK="iris_vide_pt",arme=null,occ=false;
 function vs(){try{return JSON.parse(localStorage.getItem(VK)||"{}")}catch(e){return {}}}
 function vsSet(o){try{localStorage.setItem(VK,JSON.stringify(o))}catch(e){}}
