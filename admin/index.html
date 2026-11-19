@@ -276,9 +276,13 @@ var IrisVoix = (function () {
     return lireTel(t, etat);
   }
   function dispoLecture() { return !!((synth && window.SpeechSynthesisUtterance) || cloud); }
-  function dispoDictee() { return !!SR; }
+  function dispoDictee() { return !!SR || IOS; }
   // Dictée : appelle onTexte(texteReconnu) ; onEtat('ecoute'|'arret'|'erreur', message)
+  var IOS = /iP(hone|ad|od)/.test(navigator.userAgent || '') || (/Macintosh/.test(navigator.userAgent || '') && navigator.maxTouchPoints > 1), dernierChamp = null;
+  if (IOS) document.addEventListener('focusin', function (e) { var t = e.target; if (t && (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && /^(text|search|)$/.test(t.type)))) dernierChamp = t; });
   function dicter(onTexte, onEtat) {
+    // iPhone/iPad : la dictée intégrée au navigateur est peu fiable ; on guide vers le micro du clavier, qui fonctionne partout
+    if (IOS && (SR || true)) return { demarrer: function () { if (dernierChamp) { try { dernierChamp.focus(); } catch (e) { } } onEtat('erreur', 'Sur iPhone : touchez le micro 🎤 en bas à droite du clavier pour parler.'); }, arreter: function () { onEtat('arret'); } };
     if (!SR) return null; var r = new SR(), actif = false; r.lang = 'fr-FR'; r.continuous = false; r.interimResults = false; r.maxAlternatives = 1;
     r.onresult = function (e) { var t = ''; for (var i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript; if (t.trim()) onTexte(t.trim()); };
     r.onerror = function (e) { actif = false; var m = e && e.error; onEtat('erreur', m === 'not-allowed' || m === 'service-not-allowed' ? 'Le micro est refusé : autorisez-le dans les réglages du navigateur.' : m === 'no-speech' ? 'Je n’ai rien entendu.' : 'La dictée a échoué.'); };
