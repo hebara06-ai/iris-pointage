@@ -9,7 +9,7 @@
   }
   function make(ok, ko) {
     var o = { withSuccessHandler: function (f) { return make(f, ko); }, withFailureHandler: function (f) { return make(ok, f); } };
-    ["etat", "verifier", "pointer", "ouvrirScan", "congesEtat", "congesDemander", "congesAnnuler","congesConnexion","congesPiece","congesAjouterPiece","stampDonnees","recupDemander","recupVerifier","recupStatut","agentBilan","agentDetails","agentSignaler","agentSignalements","meteoDonnees","gaMesDossiers","gaDeposer","gaMaPiece","gaAjouterPieces","qsPoser","qsIrisRepondre","qsMesQuestions","qsDemanderHumain","qsReecrire","qsMaPiece","cmCompteur","cmMesCommunications","cmLire","cmAccuse","cmParticipation","cmMesMessages","cmLireMessages","cmEnvoyerMessage","cmReecrire","cmMaPiece"].forEach(function (n) { o[n] = function () { appelle(n, Array.prototype.slice.call(arguments), ok, ko); }; });
+    ["etat", "verifier", "pointer", "ouvrirScan", "congesEtat", "congesDemander", "congesAnnuler","congesConnexion","congesPiece","congesAjouterPiece","stampDonnees","recupDemander","recupVerifier","recupStatut","agentBilan","agentDetails","agentSignaler","agentSignalements","meteoDonnees","gaMesDossiers","gaDeposer","gaMaPiece","gaAjouterPieces","qsPoser","qsIrisRepondre","qsMesQuestions","qsDemanderHumain","qsReecrire","qsMaPiece","cmCompteur","cmMesCommunications","cmLire","cmAccuse","cmParticipation","cmMesMessages","cmLireMessages","cmEnvoyerMessage","cmReecrire","cmMaPiece","cmLireMessage","cmMaPieceMessage","cmMesPrefs","cmMesPrefsSauve"].forEach(function (n) { o[n] = function () { appelle(n, Array.prototype.slice.call(arguments), ok, ko); }; });
     return o;
   }
   window.google = { script: { run: make(null, null) } };
@@ -837,7 +837,7 @@ function rcBouton() {
    Ajout isolé. Réutilise : el, c, DEV, DEMOP, toastD, conges, IrisVoix (lecture/dictée du navigateur, si présent).
    N'appelle jamais run() (son échec remplacerait la page) : appels directs et silencieux via google.script.run.
    Noms à autoriser dans la liste blanche du shim de la page : cmMaPiece, cmCompteur, cmMesCommunications, cmLire, cmAccuse, cmParticipation,
-   cmMesMessages, cmLireMessages, cmEnvoyerMessage, cmReecrire. Tout texte est inséré avec textContent. */
+   cmMesMessages, cmLireMessage, cmEnvoyerMessage, cmReecrire, cmMaPieceMessage, cmMesPrefs, cmMesPrefsSauve. Tout texte est inséré avec textContent. */
 var CMA = { seq: 0, appl: 0, etat: null, an: 0, pr: 0, tmr: 0, ov: null, liste: null, bouton: null, tabs: null, sec: "ann", lien: null, brouillon: null, m: null, dict: null };
 (function () {
   if (document.getElementById("cm-css")) return;
@@ -860,7 +860,7 @@ var CMA = { seq: 0, appl: 0, etat: null, an: 0, pr: 0, tmr: 0, ov: null, liste: 
     ".cmbtn.pri{background:#04112c;color:#fff}.cmbtn.on{background:#04112c;color:#fff;box-shadow:0 0 0 3px #d9b44a}.cmbtn[disabled]{opacity:.55;cursor:default}" +
     ".cmx textarea,.cmz textarea{width:100%;box-sizing:border-box;font-size:20px;line-height:1.4;padding:12px 14px;border-radius:14px;border:2px solid #b9b49f;background:#fff;color:#04112c;font-family:inherit;resize:vertical}" +
     ".cmx textarea{min-height:84px}.cmz textarea{min-height:150px}" +
-    ".cmm{flex:1;min-height:0;display:flex;flex-direction:column}.cmfil{flex:1;overflow:auto;padding:14px;-webkit-overflow-scrolling:touch}" +
+    ".cmm{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto}.cmfil{flex:1 0 260px;overflow:auto;padding:14px;-webkit-overflow-scrolling:touch}" +
     ".cmr{display:flex;margin:0 0 12px}.cmr.ag{justify-content:flex-end}.cmr.ad{justify-content:flex-start}" +
     ".cmbu{max-width:86%;border-radius:18px;padding:12px 15px;font-size:19px;line-height:1.4;word-break:break-word;white-space:pre-wrap}.cmbu.ag{background:#04112c;color:#fff;border-bottom-right-radius:4px}.cmbu.ad{background:#fff;border:2px solid #b9b49f;border-bottom-left-radius:4px}" +
     ".cmbu .qui{font-size:14px;font-weight:700;opacity:.85;margin-bottom:4px;letter-spacing:.03em}.cmbu .sur{font-size:15px;font-weight:600;margin-top:6px;opacity:.9}.cmbu .ori{font-size:15px;margin-top:8px;padding-top:6px;border-top:1px dashed currentColor;opacity:.85}.cmbu .dt{font-size:13px;margin-top:6px;opacity:.75}" +
@@ -870,6 +870,9 @@ var CMA = { seq: 0, appl: 0, etat: null, an: 0, pr: 0, tmr: 0, ov: null, liste: 
     ".cmlien{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#f0e2b0;border-radius:12px;padding:8px 12px;font-size:17px;font-weight:600;margin-bottom:8px}.cmlien .cmbtn{width:auto;min-height:40px;margin:0;font-size:15px;padding:6px 12px}" +
     ".cmap{background:#fff;border:2px solid #d9b44a;border-radius:14px;padding:12px 14px;margin-top:10px}.cmap .pp{font-size:19px;line-height:1.4;white-space:pre-wrap;word-break:break-word;margin:6px 0}.cmap .lb{font-size:15px;font-weight:700;color:#7a6a3a}.cmap .av{font-size:17px;font-weight:700;color:#8b1d1d;margin:6px 0}" +
     ".cmpj{margin-top:12px}.cmpj .li{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#f4f1ea;border-radius:12px;padding:8px 12px;margin-top:8px;font-size:17px;font-weight:600;word-break:break-word}.cmpj .li .cmbtn{width:auto;min-width:110px;min-height:46px;margin:0;font-size:17px}.cmpj .tl{font-size:15px;font-weight:700;color:#7a6a3a}.cmad{display:flex;padding:10px 12px 0;background:#e9e5d8}.cmad .cmbtn{margin:0;background:#04112c;color:#fff;min-height:60px;font-size:19px;max-width:720px;margin:0 auto}" +
+    ".cmbu .nv{display:inline-block;background:#8b1d1d;color:#fff;border-radius:999px;padding:1px 9px;margin-left:8px;font-size:13px}.cmbu.ad.nl{border-color:#04112c;box-shadow:0 0 0 3px rgba(139,29,29,.25)}.cmbu .cmpj{margin-top:8px}.cmbu .cmpj .li{color:#04112c}" +
+    ".cmfl .li{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border:1px solid #b9b49f;border-radius:12px;padding:6px 10px;margin-top:8px;font-size:17px;font-weight:600;word-break:break-word}.cmfl .cmbtn{width:auto;min-height:42px;margin:0;font-size:16px;padding:6px 12px}" +
+    ".cmnot{background:#faf8f2;border-bottom:1px solid #d3cfbf;padding:8px 14px}.cmnot .in{max-width:720px;margin:0 auto}.cmnot .cmbtn{margin:0}.cmnot .sw{justify-content:space-between;text-align:left;gap:12px;margin-top:10px}.cmnot .sw .et{white-space:nowrap}.cmnot .tx{font-size:17px;line-height:1.4;margin:10px 0 0}" +
     ".cmv{text-align:center;color:#6b6755;font-size:18px;padding:30px 10px}" +
     "@media(max-width:420px){.cmout{grid-template-columns:1fr 1fr}.cmbu{max-width:94%}}";
   document.head.appendChild(s);
@@ -958,7 +961,7 @@ function cmaDemarre() {
 }
 function cmaFerme() {
   cmaStopVoix();
-  if (CMA.m && CMA.m.ta) CMA.brouillon = { t: CMA.m.ta.value, orig: CMA.m.orig || "" };   // le brouillon est conservé pour la prochaine ouverture
+  if (CMA.m && CMA.m.ta) CMA.brouillon = { t: CMA.m.ta.value, orig: CMA.m.orig || "", fichiers: CMA.m.fichiers || [] };   // le brouillon est conservé pour la prochaine ouverture
   if (CMA.ov && CMA.ov.parentNode) CMA.ov.parentNode.removeChild(CMA.ov);
   CMA.ov = null; CMA.tabs = null; CMA.m = null; CMA.dict = null; document.documentElement.style.overflow = ""; cmaCompteur();
 }
@@ -977,15 +980,16 @@ function cmaOuvrePiece(r) {
   if (!w) { var a = document.createElement("a"); a.href = url; a.download = r.nom || "piece"; a.style.display = "none"; document.body.appendChild(a); a.click(); document.body.removeChild(a); }
   setTimeout(function () { try { URL.revokeObjectURL(url); } catch (e) { } }, 120000);
 }
-function cmaPieces(x, zx) {
-  if (!x.pieces || !x.pieces.length) return;
-  var z = cmaDiv("cmpj"); z.appendChild(cmaDiv("tl", x.pieces.length > 1 ? "Pièces jointes" : "Pièce jointe")); var nt = cmaDiv("nt"); nt.setAttribute("role", "status");
-  x.pieces.forEach(function (p, idx) {
+// Liste de pièces jointes avec bouton « Ouvrir » ; fn = fonction serveur (cmMaPiece ou cmMaPieceMessage), id = annonce ou message
+function cmaPiecesBloc(pieces, fn, id, zx) {
+  if (!pieces || !pieces.length) return;
+  var z = cmaDiv("cmpj"); z.appendChild(cmaDiv("tl", pieces.length > 1 ? "Pièces jointes" : "Pièce jointe")); var nt = cmaDiv("nt"); nt.setAttribute("role", "status");
+  pieces.forEach(function (p, idx) {
     var li = cmaDiv("li"); li.appendChild(cmaDiv("", (p.nom || "Document") + (p.taille ? " (" + cmaTaille(p.taille) + ")" : "")));
     var b = cmaBtn("Ouvrir", "pri", function () {
       if (b._en) return; b._en = true; b.disabled = true; nt.className = "nt"; nt.textContent = "Ouverture de « " + (p.nom || "Document") + " »…";
       function fin(err) { b._en = false; b.disabled = false; nt.className = err ? "nt er" : "nt"; nt.textContent = err || ""; }
-      cmaAppel("cmMaPiece", [DEV, x.id, idx], function (r) {
+      cmaAppel(fn, [DEV, id, idx], function (r) {
         if (!r || !r.ok || !r.b64) { fin((r && r.msg) || "Ce document n’a pas pu être ouvert. Réessayez."); return; }
         try { cmaOuvrePiece(r); fin(""); } catch (e) { fin("Ce document est illisible ou trop volumineux pour cet appareil."); }
       }, function () { fin("Connexion impossible. Le document n’a pas été ouvert : réessayez."); });
@@ -994,6 +998,10 @@ function cmaPieces(x, zx) {
   });
   z.appendChild(nt); zx.appendChild(z);
 }
+function cmaPieces(x, zx) { cmaPiecesBloc(x.pieces, "cmMaPiece", x.id, zx); }
+var CMA_TYPES = { pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", heic: "image/heic", heif: "image/heif" }, CMA_MAXF = 4, CMA_MAXO = 8 * 1024 * 1024;
+function cmaTypeFichier(f) { var m = String(f.name || "").toLowerCase().match(/\.([a-z0-9]+)$/); return m && CMA_TYPES[m[1]] ? CMA_TYPES[m[1]] : ""; }
+function cmaLitFichier(f, cb) { try { var fr = new FileReader(); fr.onload = function () { var r = String(fr.result || ""), i = r.indexOf(","); cb(i >= 0 ? r.slice(i + 1) : ""); }; fr.onerror = function () { cb(null); }; fr.readAsDataURL(f); } catch (e) { cb(null); } }
 
 /* ---------- Annonces ---------- */
 function cmaCarte(x, zone) {
@@ -1090,13 +1098,72 @@ function cmaParticipation(x, zx) {
 }
 
 /* ---------- Messages privés ---------- */
+// Bloc « Mes notifications » : deux interrupteurs (cmMesPrefs / cmMesPrefsSauve), replié par défaut
+function cmaNotif(pm) {
+  var P = { prefs: null, env: false, ouvert: false }, z = cmaDiv("cmnot"), in_ = cmaDiv("in"); z.appendChild(in_);
+  var tete = cmaBtn("Mes notifications", "", function () { P.ouvert = !P.ouvert; corps.style.display = P.ouvert ? "block" : "none"; tete.setAttribute("aria-expanded", P.ouvert ? "true" : "false"); tete.textContent = (P.ouvert ? "▲ " : "▼ ") + "Mes notifications"; if (P.ouvert && !P.prefs) charge(); });
+  tete.setAttribute("aria-expanded", "false"); tete.textContent = "▼ Mes notifications"; in_.appendChild(tete);
+  var corps = cmaDiv("cmnc"); corps.style.display = "none"; in_.appendChild(corps);
+  var nt = cmaDiv("nt"); nt.setAttribute("role", "status"); nt.style.cssText = "font-size:17px;margin-top:8px;min-height:20px;font-weight:700";
+  var LIGNES = [["emailReponse", "Recevoir un e-mail quand l’administration m’écrit"], ["emailRappel", "Recevoir un e-mail de rappel avant un événement"]], bs = {};
+  function note(t, err) { nt.textContent = t || ""; nt.style.color = err ? "#8b1d1d" : "#04112c"; }
+  function rend() {
+    LIGNES.forEach(function (d) {
+      var b = bs[d[0]], on = !!(P.prefs && P.prefs[d[0]]); b.textContent = ""; b.appendChild(cmaDiv("", d[1])); b.appendChild(cmaDiv("et", P.prefs ? (on ? "OUI" : "NON") : "…"));
+      b.className = "cmbtn sw" + (on ? " on" : ""); b.setAttribute("aria-checked", on ? "true" : "false"); b.disabled = !P.prefs || P.env;
+    });
+  }
+  function charge() {
+    note("Chargement…");
+    cmaAppel("cmMesPrefs", [DEV], function (r) { if (r && r.ok && r.prefs) { P.prefs = { emailReponse: !!r.prefs.emailReponse, emailRappel: !!r.prefs.emailRappel }; note(""); rend(); } else note((r && r.msg) || "Vos réglages n’ont pas pu être chargés. Fermez puis rouvrez ce bloc.", true); },
+      function () { note("Connexion impossible : vos réglages n’ont pas pu être chargés. Fermez puis rouvrez ce bloc.", true); });
+  }
+  LIGNES.forEach(function (d) {
+    var b = cmaBtn("", "sw", function () {
+      if (P.env || !P.prefs) return; P.env = true; rend(); note("Enregistrement…");
+      var nv = { emailReponse: P.prefs.emailReponse, emailRappel: P.prefs.emailRappel }; nv[d[0]] = !nv[d[0]];
+      cmaAppel("cmMesPrefsSauve", [DEV, nv], function (r) {
+        P.env = false;
+        if (r && r.ok) { P.prefs = r.prefs ? { emailReponse: !!r.prefs.emailReponse, emailRappel: !!r.prefs.emailRappel } : nv; rend(); note("Enregistré."); } else { rend(); note((r && r.msg) || "Votre choix n’a pas pu être enregistré. Il est inchangé.", true); }
+      }, function () { P.env = false; rend(); note("Connexion impossible. Votre choix n’est pas enregistré.", true); });
+    });
+    b.setAttribute("role", "switch"); bs[d[0]] = b; corps.appendChild(b);
+  });
+  corps.appendChild(cmaDiv("tx", "Les e-mails de publication et de modification d’une annonce sont toujours envoyés : ils ne peuvent pas être désactivés."));
+  corps.appendChild(nt); rend(); pm.appendChild(z);
+}
 function cmaMessages(pm) {
-  var M = { liste: [], charge: false, env: false, rew: false, orig: "", ta: null, suspect: null, lecEnCours: false };
+  var M = { liste: [], charge: false, env: false, rew: false, orig: "", ta: null, suspect: null, fichiers: [], lect: 0 };
   CMA.m = M;
+  cmaNotif(pm);
   var fil = cmaDiv("cmfil"); fil.setAttribute("role", "log"); fil.setAttribute("aria-label", "Messages avec l’administration"); pm.appendChild(fil);
   var zc = cmaDiv("cmz"), in_ = cmaDiv("in"); zc.appendChild(in_); pm.appendChild(zc);
   var lien = cmaDiv("cmlien"); lien.style.display = "none"; in_.appendChild(lien);
   var ta = document.createElement("textarea"); ta.setAttribute("data-iv-no", "1"); ta.maxLength = 2000; ta.placeholder = "Écrivez votre message à l’administration ici"; ta.setAttribute("aria-label", "Votre message à l’administration"); in_.appendChild(ta); M.ta = ta;
+  var fl = cmaDiv("cmfl"); in_.appendChild(fl);
+  var inp = document.createElement("input"); inp.type = "file"; inp.multiple = true; inp.accept = ".pdf,.jpg,.jpeg,.png,.heic,.heif"; inp.style.display = "none"; inp.setAttribute("aria-label", "Joindre un fichier"); in_.appendChild(inp); M.inp = inp;
+  var bj = cmaBtn("Joindre un document ou une photo", "", function () { inp.click(); }); in_.appendChild(bj);
+  function rendFichiers() {
+    fl.textContent = "";
+    M.fichiers.forEach(function (f, i) { var li = cmaDiv("li"); li.appendChild(cmaDiv("", f.nom + " (" + cmaTaille(f.taille) + ")")); li.appendChild(cmaBtn("Retirer", "", function () { if (M.env) return; M.fichiers.splice(i, 1); rendFichiers(); note(""); })); fl.appendChild(li); });
+  }
+  M.rendFichiers = rendFichiers;
+  inp.onchange = function () {
+    var liste = [].slice.call(inp.files || []); inp.value = "";
+    liste.forEach(function (f) {
+      var mime = cmaTypeFichier(f);
+      if (!mime) { note("« " + f.name + " » n’est pas accepté : PDF, JPG, PNG ou HEIC seulement.", true); return; }
+      if (f.size > CMA_MAXO) { note("« " + f.name + " » dépasse 8 Mo.", true); return; }
+      if (M.fichiers.length + M.lect >= CMA_MAXF) { note("4 fichiers au maximum par message.", true); return; }
+      if (M.fichiers.some(function (g) { return g.nom === f.name && g.taille === f.size; })) { note("« " + f.name + " » est déjà joint.", true); return; }
+      M.lect++; env.disabled = true; note("Chargement de « " + f.name + " »…");
+      cmaLitFichier(f, function (b64) {
+        M.lect--; if (CMA.m !== M) return; env.disabled = M.env || M.lect > 0 || ap.style.display !== "none";
+        if (b64 === null || !b64) { note("« " + f.name + " » n’a pas pu être lu.", true); return; }
+        M.fichiers.push({ nom: f.name, taille: f.size, mime: mime, b64: b64 }); rendFichiers(); note("");
+      });
+    });
+  };
   var out = cmaDiv("cmout"); in_.appendChild(out);
   var ap = cmaDiv("cmap"); ap.style.display = "none"; in_.appendChild(ap);
   var nt = cmaDiv("nt"); nt.style.cssText = "font-size:16px;color:#6b6755;margin:8px 0 0;min-height:20px"; nt.setAttribute("role", "status"); in_.appendChild(nt);
@@ -1110,33 +1177,53 @@ function cmaMessages(pm) {
   };
   M.invalide = function () { M.charge = false; };
 
+  // Lecture message par message : une réponse de l'administrateur est marquée lue quand elle reste affichée à l'écran (0,6 s) ou quand on la touche (jamais d'un bloc à l'ouverture)
+  var tmV = 0;
+  function marque(m, bu) {
+    if (m.lu || m._lec) return; m._lec = true; m.lu = true;
+    var nv = bu.querySelector(".nv"); if (nv) nv.style.display = "none"; bu.classList.remove("nl");
+    if (CMA.pr > 0) CMA.pr--; if (typeof CMA.etat === "number" && CMA.etat > 0) CMA.etat--; cmaMajBouton(); cmaMajOnglets();
+    var tok = ++CMA.seq;
+    function retour() { m._lec = false; m.lu = false; CMA.pr++; if (typeof CMA.etat === "number") CMA.etat++; cmaMajBouton(); cmaMajOnglets(); if (nv) nv.style.display = ""; bu.classList.add("nl"); cmaCompteur(); bu._vu = 0; }
+    cmaAppel("cmLireMessage", [DEV, m.id], function (r) { m._lec = false; if (r && r.ok) cmaSetC(r, tok); else retour(); }, retour);
+  }
   function rendFil() {
     fil.textContent = "";
     if (!M.liste.length) { fil.appendChild(cmaDiv("cmv", "Aucun message pour le moment. Écrivez à l’administration dans la zone ci-dessous.")); return; }
     M.liste.forEach(function (m) {
-      var ag = m.sens === "agent", r = cmaDiv("cmr " + (ag ? "ag" : "ad")), bu = cmaDiv("cmbu " + (ag ? "ag" : "ad"));
-      bu.appendChild(cmaDiv("qui", ag ? "Vous" : "Administration" + (!m.lu ? " · Nouveau" : "")));
-      bu.appendChild(cmaDiv("", m.texte));
+      var ag = m.sens === "agent", r = cmaDiv("cmr " + (ag ? "ag" : "ad")), bu = cmaDiv("cmbu " + (ag ? "ag" : "ad") + (!ag && !m.lu ? " nl" : "")), qui = cmaDiv("qui", ag ? "Vous" : "Administration");
+      if (!ag) { var nv = document.createElement("span"); nv.className = "nv"; nv.textContent = "Nouveau"; if (m.lu) nv.style.display = "none"; qui.appendChild(nv); }
+      bu.appendChild(qui);
+      if (m.texte) bu.appendChild(cmaDiv("", m.texte));
+      cmaPiecesBloc(m.pieces, "cmMaPieceMessage", m.id, bu);
       if (m.commTitre) bu.appendChild(cmaDiv("sur", "À propos de : " + m.commTitre));
       if (ag && m.texteOriginal && m.texteOriginal !== m.texte) bu.appendChild(cmaDiv("ori", "Votre texte d’origine : " + m.texteOriginal));
       var d = cmaQuand(m.date); if (d) bu.appendChild(cmaDiv("dt", d));
-      if (!ag && cmaPeutLire()) { var l = cmaBtn("Écouter", "", function () { cmaLit(m.texte, function () { l.classList.remove("on"); }, l); l.classList.toggle("on"); }); bu.appendChild(l); }
+      if (!ag && m.texte && cmaPeutLire()) { var l = cmaBtn("Écouter", "", function () { cmaLit(m.texte, function () { l.classList.remove("on"); }, l); l.classList.toggle("on"); }); bu.appendChild(l); }
+      if (!ag) { bu._m = m; bu.addEventListener("click", function () { marque(m, bu); }); }
       r.appendChild(bu); fil.appendChild(r);
     });
-    fil.scrollTop = fil.scrollHeight;
+    var nl = fil.querySelector(".cmbu.nl");   // on se place sur la première réponse non lue, sinon sur la dernière
+    if (nl) fil.scrollTop += nl.getBoundingClientRect().top - fil.getBoundingClientRect().top - 8; else fil.scrollTop = fil.scrollHeight;
   }
-  function lecture() {                                  // marque les réponses de l'administrateur comme lues, une seule fois par ouverture
-    if (M.lecEnCours || !M.liste.some(function (m) { return m.sens === "admin" && !m.lu; })) return;
-    M.lecEnCours = true; var tok = ++CMA.seq;
-    cmaAppel("cmLireMessages", [DEV], function (r) { M.lecEnCours = false; if (r && r.ok) { M.liste.forEach(function (m) { if (m.sens === "admin") m.lu = true; }); cmaSetC(r, tok); } }, function () { M.lecEnCours = false; });
+  // Surveillance de l'affichage (toutes les 0,3 s tant que le fil est à l'écran) : une réponse visible à 40 % pendant 0,6 s est lue
+  function surveille() {
+    if (CMA.m !== M || !document.body.contains(fil)) { clearInterval(tmV); return; }
+    var R0 = fil.getBoundingClientRect(), now = Date.now(); if (!R0.height || document.hidden) return;
+    [].slice.call(fil.querySelectorAll(".cmbu.ad.nl")).forEach(function (bu) {
+      var r = bu.getBoundingClientRect(), h = Math.min(r.bottom, R0.bottom) - Math.max(r.top, R0.top), vis = r.height > 0 && h >= Math.min(r.height * 0.4, R0.height * 0.4);
+      if (!vis) { bu._vu = 0; return; }
+      if (!bu._vu) bu._vu = now; else if (now - bu._vu >= 550 && bu._m) marque(bu._m, bu);
+    });
   }
+  tmV = setInterval(surveille, 300);
   M.ouvre = function (force) {
     if (M.charge && !force) { fil.scrollTop = fil.scrollHeight; return; }
     fil.textContent = ""; fil.appendChild(cmaDiv("cmv", "Chargement…"));
     cmaAppel("cmMesMessages", [DEV], function (r) {
       if (CMA.m !== M) return;
       if (!r || !r.ok) { cmaErreur(fil, (r && r.msg) || "Impossible de charger les messages.", function () { M.ouvre(true); }); return; }
-      M.liste = r.messages || []; M.charge = true; rendFil(); lecture();
+      M.liste = r.messages || []; M.charge = true; rendFil();
     }, function () { if (CMA.m !== M) return; cmaErreur(fil, "Connexion impossible. Vérifiez votre réseau puis réessayez.", function () { M.ouvre(true); }); });
   };
 
@@ -1150,12 +1237,12 @@ function cmaMessages(pm) {
     });
     bd.onclick = function () { if (!CMA.dict) return; if (ec) CMA.dict.arreter(); else CMA.dict.demarrer(); }; out.appendChild(bd);
   }
-  function ferme() { ap.style.display = "none"; ap.textContent = ""; env.disabled = M.env; }
+  function ferme() { ap.style.display = "none"; ap.textContent = ""; env.disabled = M.env || M.lect > 0; }
   function reecrire(mode, libelle) {
     if (M.rew || M.env) return;
     var t = ta.value.trim(); if (t.length < 3) { note("Écrivez d’abord quelques mots.", true); return; }
     M.rew = true; bloque(true); env.disabled = true; note(libelle);
-    function fin() { M.rew = false; bloque(false); env.disabled = M.env || ap.style.display !== "none"; }
+    function fin() { M.rew = false; bloque(false); env.disabled = M.env || M.lect > 0 || ap.style.display !== "none"; }
     cmaAppel("cmReecrire", [DEV, t, mode], function (r) {
       if (!r || !r.ok || !r.texte) { fin(); note((r && r.msg) || "Le service est occupé. Réessayez dans un instant.", true); return; }
       fin(); propose(t, String(r.texte), mode);
@@ -1182,35 +1269,35 @@ function cmaMessages(pm) {
   ta.addEventListener("input", function () { if (!ta.value.trim()) M.orig = ""; });
 
   /* Envoi : un seul envoi à la fois ; après une coupure réseau on vérifie d'abord que le message n'est pas déjà parti */
-  function fini(id, t, orig, cid, titre, deja) {
-    if (!deja) M.liste.push({ id: id || ("L" + Date.now()), sens: "agent", texte: t, texteOriginal: orig, date: Date.now(), commId: cid, commTitre: titre, lu: true });
-    M.suspect = null; ta.value = ""; M.orig = ""; CMA.lien = null; M.majLien(); M.env = false; env.disabled = false; bloque(false); rendFil(); note("Message envoyé à l’administration.");
+  function fini(id, t, orig, cid, titre, deja, fich) {
+    if (!deja) M.liste.push({ id: id || ("L" + Date.now()), sens: "agent", texte: t, texteOriginal: orig, date: Date.now(), commId: cid, commTitre: titre, lu: true, pieces: (fich || []).map(function (f) { return { nom: f.nom, taille: f.taille, mime: f.mime }; }) });
+    M.fichiers = []; rendFichiers(); M.suspect = null; ta.value = ""; M.orig = ""; CMA.lien = null; M.majLien(); M.env = false; env.disabled = false; bloque(false); rendFil(); note("Message envoyé à l’administration.");
   }
   env.onclick = function () {
-    if (M.env || M.rew) return;
-    var t = ta.value.trim(); if (!t) { note("Écrivez d’abord votre message.", true); return; }
+    if (M.env || M.rew || M.lect > 0) return;
+    var t = ta.value.trim(), fich = M.fichiers.slice(); if (!t && !fich.length) { note("Écrivez d’abord un message ou joignez un fichier.", true); return; }
     M.env = true; env.disabled = true; bloque(true); note("Envoi en cours…");
-    var orig = M.orig && M.orig.trim() !== t ? M.orig.trim() : "", cid = CMA.lien ? CMA.lien.id : "", titre = CMA.lien ? CMA.lien.titre : "";
+    var orig = t && M.orig && M.orig.trim() !== t ? M.orig.trim() : "", cid = CMA.lien ? CMA.lien.id : "", titre = CMA.lien ? CMA.lien.titre : "";
     function echec(msg) { M.env = false; env.disabled = false; bloque(false); note(msg, true); }
     function envoie() {
-      cmaAppel("cmEnvoyerMessage", [DEV, t, cid, orig], function (r) {
-        if (r && r.ok) { fini(r.id, t, orig, cid, titre); return; }
+      cmaAppel("cmEnvoyerMessage", [DEV, t, cid, orig, fich.map(function (f) { return { nom: f.nom, b64: f.b64 }; })], function (r) {
+        if (r && r.ok) { fini(r.id, t, orig, cid, titre, false, fich); return; }
         M.suspect = null; echec((r && r.msg) || "Votre message n’a pas pu être envoyé. Il est conservé : réessayez.");
       }, function () {
-        M.suspect = { t: t, ids: M.liste.map(function (m) { return m.id; }) };
+        M.suspect = { t: t, nf: fich.length, ids: M.liste.map(function (m) { return m.id; }) };
         echec("Connexion interrompue. Votre message est conservé : appuyez de nouveau sur « Envoyer ». Il ne sera pas envoyé deux fois.");
       });
     }
-    if (M.suspect && M.suspect.t === t) {               // l'envoi précédent a pu aboutir malgré la coupure : on vérifie avant de renvoyer
+    if (M.suspect && M.suspect.t === t && M.suspect.nf === fich.length) {               // l'envoi précédent a pu aboutir malgré la coupure : on vérifie avant de renvoyer
       var s = M.suspect;
       cmaAppel("cmMesMessages", [DEV], function (r) {
-        var trouve = r && r.ok && (r.messages || []).filter(function (m) { return m.sens === "agent" && m.texte === t && s.ids.indexOf(m.id) < 0; })[0];
-        if (trouve) { M.liste = r.messages; fini(trouve.id, t, orig, cid, titre, true); } else envoie();
+        var trouve = r && r.ok && (r.messages || []).filter(function (m) { return m.sens === "agent" && m.texte === t && (m.pieces || []).length === fich.length && s.ids.indexOf(m.id) < 0; })[0];
+        if (trouve) { M.liste = r.messages; fini(trouve.id, t, orig, cid, titre, true, fich); } else envoie();
       }, function () { echec("Connexion impossible : votre message est conservé, réessayez dans un instant."); });
     } else envoie();
   };
   M.majLien();
-  if (CMA.brouillon) { ta.value = CMA.brouillon.t || ""; M.orig = CMA.brouillon.orig || ""; CMA.brouillon = null; }
+  if (CMA.brouillon) { ta.value = CMA.brouillon.t || ""; M.orig = CMA.brouillon.orig || ""; M.fichiers = CMA.brouillon.fichiers || []; CMA.brouillon = null; rendFichiers(); }
 }
 function cmaSection(sec) {
   if (!CMA.ov) return; CMA.sec = sec;
