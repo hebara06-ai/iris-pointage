@@ -1171,10 +1171,20 @@ var IrisVoix = (function () {
   }
     // ===== Communications (Phases 1 à 4 : annonces, accusés, participation, rappels, e-mails, messages privés) — inséré dans la portée de l'administration : réutilise h, lab, appel, msg, sure, dessiner =====
   var CM = { liste: null, cat: null, err: null, charge: false, vue: "liste", id: null, detail: null, form: null, filtre: "tous", sel: {}, rech: "", site: "",
-    flt: { categorie: "", site: "", agent: "", du: "", au: "", heureDu: "", heureAu: "" }, sitesListe: null, nonLus: 0, pollId: 0, pollEnCours: false, emb: false, cible: null,
+    flt: { categorie: "", site: "", agent: "", du: "", au: "", heureDu: "", heureAu: "" }, sitesListe: null, grp: null, rechGrp: "", rechAg: "", sauv: null, restaurer: null, nonLus: 0, pollId: 0, pollEnCours: false, emb: false, cible: null,
     fils: null, fil: null, cle: "", rep: { texte: "", orig: "", commId: "" }, suivi: null, sv: { du: "", au: "" }, emails: null, emStatut: "", ajout: {}, rechAjout: "" };
   // Compteur affiché dans le libellé de l'onglet (texte seul) : « (3) », « (99+) »
-  function cmBadge() { var n = Number(CM.nonLus) || 0; return n > 0 ? " (" + (n > 99 ? "99+" : n) + ")" : ""; }
+  // Le libellé de l'onglet principal reste « Communications » : la pastille ronde y est insérée par cmMajPastilleOnglet()
+  function cmBadge() { try { setTimeout(cmMajPastilleOnglet, 0); } catch (e) { } return ""; }
+  function cmMajPastilleOnglet() {
+    var bs = document.querySelectorAll("button"), n = Number(CM.nonLus) || 0, i, b = null;
+    for (i = 0; i < bs.length; i++) { var f = bs[i].firstChild; if (f && f.nodeType === 3 && /^Communications/.test(f.data)) { b = bs[i]; break; } }
+    if (!b) return;
+    var anc = b.querySelector(".cm-pastille-onglet"); if (anc) b.removeChild(anc);
+    if (n <= 0) return;
+    var p = cmPastille(n); p.className = "cm-pastille-onglet"; p.style.cssText = "display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 5px;box-sizing:border-box;border-radius:11px;background:#8b1d1d;color:#fff;font-weight:700;font-size:13px;line-height:1;margin-left:6px;vertical-align:middle;flex:0 0 auto";
+    b.appendChild(p);
+  }
   // Pastille ronde rouge foncé, chiffre blanc, 99+ ; null si zéro (sauf option « gris »)
   function cmPastille(n, gris) {
     n = Number(n) || 0; if (n <= 0 && !gris) return null;
@@ -1183,7 +1193,7 @@ var IrisVoix = (function () {
     return p;
   }
   // Redessin : dans la fenêtre d'administration, ou dans un conteneur embarqué (voir paneCmEmbarque)
-  function cmDess() { if (CM.emb && CM.cible) { CM.cible.textContent = ""; cmCorps(CM.cible); } else dessiner(); }
+  function cmDess() { if (CM.emb && CM.cible) { CM.cible.textContent = ""; cmCorps(CM.cible); } else dessiner(); setTimeout(cmMajPastilleOnglet, 0); }
   // Appel serveur à plusieurs arguments : fn(CLE, a1, a2…). mute = appel silencieux (aucun message en cas d'échec). Rappelle toujours ok(...)
   function cmAppel(nom, args, ok, mute) {
     args = args || []; var fini = false;
@@ -1201,7 +1211,7 @@ var IrisVoix = (function () {
   function cmSure(label, danger, fn) { var b = sure(label, danger, function () { fn(b); }); return b; }
   function cmBtn(t, fn, prim) { var b = h("button", { c: "ed-b" + (prim ? " ed-p" : ""), t: t, type: "button" }); b.onclick = function () { fn(b); }; return b; }
   function cmErreur(t) { CM.err = t; CM.charge = false; cmDess(); }
-  function cmCompteurMaj(fin) { cmAppel("cmAdminCompteur", [], function (r) { if (r && r.ok) { var n = Number(r.nonLus) || 0, ch = n !== CM.nonLus; CM.nonLus = n; if (fin) fin(ch); } }, true); }
+  function cmCompteurMaj(fin) { cmAppel("cmAdminCompteur", [], function (r) { if (r && r.ok) { var n = Number(r.nonLus) || 0, ch = n !== CM.nonLus; CM.nonLus = n; cmMajPastilleOnglet(); if (fin) fin(ch); } }, true); }
   // Rafraîchissement discret du compteur (~45 s) : jamais de redessin pendant une saisie (formulaire, détail, conversation)
   function cmPoll() {
     if (document.hidden || CM.pollEnCours) return;
@@ -1209,7 +1219,7 @@ var IrisVoix = (function () {
     CM.pollEnCours = true;
     cmAppel("cmAdminCompteur", [], function (r) {
       CM.pollEnCours = false; if (!r || !r.ok) return;
-      var n = Number(r.nonLus) || 0; if (n === CM.nonLus) return; CM.nonLus = n;
+      var n = Number(r.nonLus) || 0; if (n === CM.nonLus) { cmMajPastilleOnglet(); return; } CM.nonLus = n; cmMajPastilleOnglet();
       if (CM.liste && CM.cat && (CM.vue === "liste" || CM.vue === "prives" || CM.vue === "suivi")) { if (CM.vue === "prives") CM.fils = null; cmDess(); }
     }, true);
   }
@@ -1244,6 +1254,8 @@ var IrisVoix = (function () {
   }
   function cmGros(b) { b.style.cssText += ";min-height:56px;font-size:18px;font-weight:700;padding:10px 22px"; return b; }
   // Sites proposés : catalogue.sites (agents + sites perso) ; à défaut, sites des agents
+  function cmActifs() { return CM.cat.agents.filter(function (a) { return a.actif !== false; }); }
+  function cmRechargeCat(fin) { cmAppel("cmAdminCatalogue", [{}], function (c) { if (c && c.ok) CM.cat = c; if (fin) fin(); }); }
   function cmSites() {
     var L = CM.cat && Array.isArray(CM.cat.sites) ? CM.cat.sites.slice() : [];
     if (!L.length && CM.cat) CM.cat.agents.forEach(function (a) { if (a.site && L.indexOf(a.site) < 0) L.push(a.site); });
@@ -1336,6 +1348,28 @@ var IrisVoix = (function () {
     zone.appendChild(row); zone.appendChild(note); zone.appendChild(prop); return zone;
   }
 
+  // Zone de choix de fichiers (4 au total, 8 Mo chacun ; PDF, JPG, PNG, HEIC). F = { fichiers:[], pieces?:[], retirer?:[] }
+  function cmZoneFichiers(F) {
+    var zone = h("div", {}); F.pieces = F.pieces || []; F.retirer = F.retirer || [];
+    function nb() { return F.pieces.length - F.retirer.length + F.fichiers.length; }
+    function dessine() {
+      zone.textContent = "";
+      F.pieces.forEach(function (pj, n) {
+        var ret = F.retirer.indexOf(n) >= 0;
+        zone.appendChild(h("div", { c: "ed-la" }, [h("span", { t: (ret ? "(sera retirée) " : "") + pj.nom + " (" + cmOctets(pj.taille) + ")" }), cmBtn(ret ? "Garder cette pièce" : "Retirer", function () { if (ret) F.retirer.splice(F.retirer.indexOf(n), 1); else F.retirer.push(n); dessine(); })]));
+      });
+      F.fichiers.forEach(function (pj, n) { zone.appendChild(h("div", { c: "ed-la" }, [h("span", { t: pj.nom + " (" + cmOctets(pj.taille) + ") — nouveau" }), cmBtn("Retirer", function () { F.fichiers.splice(n, 1); dessine(); })])); });
+      if (!F.pieces.length && !F.fichiers.length) zone.appendChild(h("p", { c: "ed-vide", t: "Aucune pièce jointe." }));
+      var fi = h("input", { type: "file", accept: ".pdf,.jpg,.jpeg,.png,.heic,.heif,application/pdf,image/*", "aria-label": "Choisir un fichier à joindre" }); fi.multiple = true; fi.style.cssText = "font-size:18px;padding:10px;margin:8px 0";
+      fi.onchange = function () {
+        var fl = [].slice.call(fi.files || []);
+        fl.forEach(function (f) { if (nb() >= 4) { msg("Quatre pièces jointes au maximum.", true); return; } cmLireFichier(f, function (pj) { if (nb() >= 4) { msg("Quatre pièces jointes au maximum.", true); return; } F.fichiers.push(pj); dessine(); }); });
+        fi.value = "";
+      };
+      zone.appendChild(h("p", { c: "ed-note", t: nb() + " pièce(s) jointe(s) sur 4 maximum. Formats : PDF, JPG, PNG, HEIC ; 8 Mo maximum chacune." })); zone.appendChild(fi);
+    }
+    dessine(); return zone;
+  }
   // ---------- Sous-onglets Annonces / Messages privés ----------
   function cmSousOnglets(c) {
     var pub = CM.liste && CM.liste.compteurs ? CM.liste.compteurs.publiees : 0, nl = Number(CM.nonLus) || 0;
@@ -1353,8 +1387,8 @@ var IrisVoix = (function () {
     var k = CM.liste.compteurs, cat = CM.cat;
     var nv = cmBtn("Nouvelle communication", function () { cmNouveau(null); }, true);
     var ac = cmBtn("Actualiser", function () { CM.liste = null; cmDess(); msg("Liste actualisée."); });
-    var sv = cmBtn("Tableau de suivi", function () { cmOuvrirSuivi(); }), em = cmBtn("E-mails", function () { cmOuvrirEmails(""); }), ms = cmBtn("Gérer mes sites", function () { cmOuvrirSites(); });
-    var bar = cmLigne([nv, ac, sv, em, ms]);
+    var sv = cmBtn("Tableau de suivi", function () { cmOuvrirSuivi(); }), em = cmBtn("E-mails", function () { cmOuvrirEmails(""); }), ms = cmBtn("Gérer mes sites", function () { cmOuvrirSites(); }), gr = cmBtn("Gérer mes groupes", function () { cmOuvrirGroupes(); }), ag = cmBtn("Agents autorisés", function () { cmOuvrirAgents(); }), sa = cmBtn("Sauvegardes", function () { cmOuvrirSauv(); });
+    var bar = cmLigne([nv, ac, sv, em, ms, gr, ag, sa]);
     var filtres = []; [["tous", "En cours"], ["Brouillon", "Brouillons (" + k.brouillons + ")"], ["Programmée", "Programmées (" + k.programmees + ")"], ["Publiée", "Publiées (" + k.publiees + ")"], ["Archivée", "Archives (" + k.archivees + ")"]].forEach(function (f) {
       var b = h("button", { c: "ed-b" + (CM.filtre === f[0] ? " ed-p" : ""), t: f[1], type: "button" }); b.onclick = function () { CM.filtre = f[0]; cmDess(); }; filtres.push(b);
     }); filtres = cmLigne(filtres);
@@ -1376,6 +1410,7 @@ var IrisVoix = (function () {
         if (x.rappelsProgrammes || x.rappelsEnvoyes) st.push("Rappels : " + (x.rappelsEnvoyes || 0) + " envoyé(s), " + (x.rappelsProgrammes || 0) + " programmé(s)");
       }
       var k2 = [h("div", { c: "ed-row" }, tags), h("h3", { t: x.titre }), h("p", { c: "ed-note", t: meta + (x.publication && x.statut === "Publiée" ? " · publiée le " + cmQuand(x.publication) : "") })];
+      if (x.cree) k2.push(h("p", { c: "ed-note cm-cree", t: "Créée le " + cmDate(x.cree) }));
       if (st.length) k2.push(h("p", { c: "ed-note cm-stats", t: st.join(" — ") }));
       k2.push(h("div", { c: "ed-row" }, acts)); c.appendChild(h("div", { c: "ed-card" }, k2));
     });
@@ -1400,6 +1435,7 @@ var IrisVoix = (function () {
     if (!CM.detail) { c.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); return; }
     var x = CM.detail.communication, D = CM.detail.destinataires || [], H = CM.detail.historique || [];
     c.appendChild(cmCarteApercu(x));
+    if (x.cree) c.appendChild(h("p", { c: "ed-note cm-cree", t: "Créée le " + cmDate(x.cree) }));
     if (x.texteOriginal && x.texteOriginal !== x.message) { var o = h("p", {}); o.style.whiteSpace = "pre-wrap"; o.textContent = x.texteOriginal; c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Texte d’origine (avant correction ou reformulation)" }), o])); }
     var opts = []; if (x.accuse) opts.push(cmTag("Accusé de réception demandé")); if (x.participation) opts.push(cmTag("Confirmation de participation demandée")); if (x.confidentiel) opts.push(cmTag("Confidentiel")); if (x.version > 1) opts.push(cmTag("Version " + x.version));
     (x.rappels || []).forEach(function (r) { opts.push(cmTag("Rappel " + cmDelai(r.h) + (r.cible === "tous" ? " (tous)" : " (sans réponse)"))); });
@@ -1421,7 +1457,7 @@ var IrisVoix = (function () {
     });
     c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: tete })].concat(lignes.length ? lignes : [h("p", { c: "ed-vide", t: "Pas encore de destinataires (brouillon)." })])));
     if (x.statut === "Publiée") c.appendChild(cmBlocAjout(x, D));
-    var hl = H.map(function (e) { return h("div", { c: "ed-la" }, [h("b", { t: cmDate(e.date) + " — " + e.action }), h("span", { c: "ed-note", t: e.detail || "" })]); });
+    var hl = H.map(function (e) { return h("div", { c: "ed-la" }, [h("b", { t: cmDate(e.date) + " — " + (e.action === "lecture" ? "Lecture" : e.action) }), h("span", { c: "ed-note", t: e.detail || e.agent || "" })]); });
     c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Historique" })].concat(hl.length ? hl : [h("p", { c: "ed-vide", t: "Aucun événement enregistré." })])));
   }
   // Ajout de destinataires après publication (retrait : bouton « Retirer » de chaque ligne) — toujours avec confirmation
@@ -1429,7 +1465,7 @@ var IrisVoix = (function () {
     var deja = {}; D.forEach(function (d) { deja[d.cle] = true; });
     var rech = h("input", { type: "search", placeholder: "Rechercher un agent à ajouter", autocomplete: "off" }); rech.value = CM.rechAjout;
     var boite = h("div", {}), cpt = h("p", { c: "ed-note" }), zone = h("div", {});
-    function candidats() { var q = CM.rechAjout.toLowerCase(); return CM.cat.agents.filter(function (a) { return !deja[a.cle] && (!q || (a.nom + " " + a.prenom + " " + a.email).toLowerCase().indexOf(q) >= 0); }); }
+    function candidats() { var q = CM.rechAjout.toLowerCase(); return cmActifs().filter(function (a) { return !deja[a.cle] && (!q || (a.nom + " " + a.prenom + " " + a.email).toLowerCase().indexOf(q) >= 0); }); }
     function choisis() { return Object.keys(CM.ajout).filter(function (k) { return CM.ajout[k] && !deja[k]; }); }
     function maj() { cpt.textContent = choisis().length + " agent(s) à ajouter"; }
     function dessine() {
@@ -1463,14 +1499,14 @@ var IrisVoix = (function () {
       var tous = h("input", { type: "radio", name: "cmd" }), ch = h("input", { type: "radio", name: "cmd" }); tous.checked = F.destMode === "tous"; ch.checked = F.destMode === "liste";
       if (F.verrou) { tous.disabled = ch.disabled = true; zoneDest.appendChild(h("p", { c: "ed-note", t: "La liste des destinataires ne peut plus être modifiée ici après la publication : ouvrez le détail de la communication, puis « Gérer les destinataires »." })); }
       tous.onchange = function () { if (tous.checked) { F.destMode = "tous"; dessineDest(); } }; ch.onchange = function () { if (ch.checked) { F.destMode = "liste"; dessineDest(); } };
-      zoneDest.appendChild(h("label", { c: "ed-lab" }, [tous, h("span", { t: " Tous les agents (" + cat.agents.length + ")" })]));
+      zoneDest.appendChild(h("label", { c: "ed-lab" }, [tous, h("span", { t: " Tous les agents actifs (" + cmActifs().length + ")" })]));
       zoneDest.appendChild(h("label", { c: "ed-lab" }, [ch, h("span", { t: " Choisir les agents" })]));
       if (F.destMode !== "liste") return;
       var rech = h("input", { type: "search", placeholder: "Rechercher un nom, un prénom ou un e-mail", autocomplete: "off" }); rech.value = CM.rech;
       var sites = []; cat.agents.forEach(function (a) { if (a.site && sites.indexOf(a.site) < 0) sites.push(a.site); });
       var ss = h("select", {}); [""].concat(sites).forEach(function (s) { var o = h("option", { t: s || "Tous les sites", value: s }); if (CM.site === s) o.selected = true; ss.appendChild(o); });
       var cpt = h("p", { c: "ed-note" }), boite = h("div", {});
-      function visibles() { var q = CM.rech.toLowerCase(); return cat.agents.filter(function (a) { return (!CM.site || a.site === CM.site) && (!q || (a.nom + " " + a.prenom + " " + a.email).toLowerCase().indexOf(q) >= 0); }); }
+      function visibles() { var q = CM.rech.toLowerCase(); return cmActifs().filter(function (a) { return (!CM.site || a.site === CM.site) && (!q || (a.nom + " " + a.prenom + " " + a.email).toLowerCase().indexOf(q) >= 0); }); }
       function maj() { var n = Object.keys(CM.sel).filter(function (k) { return CM.sel[k]; }).length; cpt.textContent = n + " destinataire(s) sélectionné(s)"; }
       function liste2() {
         boite.textContent = ""; visibles().forEach(function (a) {
@@ -1482,7 +1518,10 @@ var IrisVoix = (function () {
       var tt = h("button", { c: "ed-b", t: "Tout sélectionner", type: "button" }), td = h("button", { c: "ed-b", t: "Tout désélectionner", type: "button" });
       tt.onclick = function () { visibles().forEach(function (a) { CM.sel[a.cle] = true; }); liste2(); }; td.onclick = function () { visibles().forEach(function (a) { CM.sel[a.cle] = false; }); liste2(); };
       if (F.verrou) { tt.disabled = td.disabled = true; }
-      zoneDest.appendChild(rech); zoneDest.appendChild(ss); zoneDest.appendChild(h("div", { c: "ed-row" }, [tt, td])); zoneDest.appendChild(cpt); zoneDest.appendChild(boite); liste2();
+      var gs = h("select", { "aria-label": "Ajouter un groupe" }); gs.appendChild(h("option", { value: "", t: (cat.groupes || []).length ? "Ajouter un groupe…" : "Aucun groupe (voir « Gérer mes groupes »)" }));
+      (cat.groupes || []).forEach(function (g) { gs.appendChild(h("option", { value: g.nom, t: g.nom + " (" + g.membres.length + ")" })); }); gs.disabled = F.verrou;
+      gs.onchange = function () { var g = (cat.groupes || []).filter(function (x) { return x.nom === gs.value; })[0]; if (!g) return; var act = {}; cmActifs().forEach(function (a) { act[a.cle] = 1; }); var n = 0; g.membres.forEach(function (k) { if (act[k]) { CM.sel[k] = true; n++; } }); msg(n + " agent(s) ajouté(s) depuis le groupe « " + g.nom + " »."); gs.value = ""; liste2(); };
+      zoneDest.appendChild(lab("Ajouter un groupe", gs)); zoneDest.appendChild(rech); zoneDest.appendChild(ss); zoneDest.appendChild(h("div", { c: "ed-row" }, [tt, td])); zoneDest.appendChild(cpt); zoneDest.appendChild(boite); liste2();
     }
     dessineDest();
     // Suivi et rappels
@@ -1529,29 +1568,8 @@ var IrisVoix = (function () {
       btn.disabled = true;
       cmAppel("cmAdminSauve", [corps(action)], function (r) { btn.disabled = false; if (r && r.ok) { msg(r.msg); CM.liste = null; cmRetour(); } else msg((r && r.msg) || "Échec.", true); });
     }
-    var nDest = function () { return F.destMode === "tous" ? cat.agents.length : Object.keys(CM.sel).filter(function (k) { return CM.sel[k]; }).length; };
-    // Pièces jointes (4 au total, 8 Mo chacune ; PDF, JPG, PNG, HEIC)
-    var zonePj = h("div", {});
-    function nbPj() { return F.pieces.length - F.retirer.length + F.fichiers.length; }
-    function dessinePj() {
-      zonePj.textContent = "";
-      F.pieces.forEach(function (pj, n) {
-        var ret = F.retirer.indexOf(n) >= 0;
-        var b = cmBtn(ret ? "Garder cette pièce" : "Retirer", function () { if (ret) F.retirer.splice(F.retirer.indexOf(n), 1); else F.retirer.push(n); dessinePj(); });
-        zonePj.appendChild(h("div", { c: "ed-la" }, [h("span", { t: (ret ? "(sera retirée) " : "") + pj.nom + " (" + cmOctets(pj.taille) + ")" }), b]));
-      });
-      F.fichiers.forEach(function (pj, n) { zonePj.appendChild(h("div", { c: "ed-la" }, [h("span", { t: pj.nom + " (" + cmOctets(pj.taille) + ") — nouveau" }), cmBtn("Retirer", function () { F.fichiers.splice(n, 1); dessinePj(); })])); });
-      if (!F.pieces.length && !F.fichiers.length) zonePj.appendChild(h("p", { c: "ed-vide", t: "Aucune pièce jointe." }));
-      var fi = h("input", { type: "file", accept: ".pdf,.jpg,.jpeg,.png,.heic,.heif,application/pdf,image/*", "aria-label": "Choisir un fichier à joindre" }); fi.multiple = true; fi.style.cssText = "font-size:18px;padding:10px;margin:8px 0";
-      fi.onchange = function () {
-        var fl = [].slice.call(fi.files || []);
-        fl.forEach(function (f) { if (nbPj() >= 4) { msg("Quatre pièces jointes au maximum.", true); return; } cmLireFichier(f, function (pj) { if (nbPj() >= 4) { msg("Quatre pièces jointes au maximum.", true); return; } F.fichiers.push(pj); dessinePj(); }); });
-        fi.value = "";
-      };
-      zonePj.appendChild(h("p", { c: "ed-note", t: nbPj() + " pièce(s) jointe(s) sur 4 maximum. Formats : PDF, JPG, PNG, HEIC ; 8 Mo maximum chacune." })); zonePj.appendChild(fi);
-    }
-    dessinePj();
-    var blocPj = h("div", { c: "ed-card" }, [h("h3", { t: "Pièces jointes" }), zonePj]);
+    var nDest = function () { return F.destMode === "tous" ? cmActifs().length : Object.keys(CM.sel).filter(function (k) { return CM.sel[k]; }).length; };
+    var blocPj = h("div", { c: "ed-card" }, [h("h3", { t: "Pièces jointes" }), cmZoneFichiers(F)]);
     function actions() {
       var brouillon = cmGros(h("button", { c: "ed-b ed-p", t: F.verrou ? "Enregistrer les modifications" : "Enregistrer le brouillon", type: "button" }));
       brouillon.onclick = function () { envoyer(F.verrou ? "publier" : "brouillon", brouillon); };
@@ -1618,8 +1636,14 @@ var IrisVoix = (function () {
   }
 
   // ---------- E-mails ----------
-  function cmOuvrirEmails(statut) { CM.vue = "emails"; CM.emStatut = statut || ""; CM.emails = null; cmDess(); cmChargeEmails(); }
+  function cmOuvrirEmails(statut) { CM.vue = "emails"; CM.emStatut = statut || ""; CM.emails = null; cmDess(); cmChargeEmails(); cmAppel("cmAdminPrefs", [], function (r) { if (r && r.ok && r.prefs) { var avant = !!(CM.cat.prefs && CM.cat.prefs.emailAdminReponse); CM.cat.prefs = r.prefs; if (CM.vue === "emails" && avant !== !!r.prefs.emailAdminReponse) cmDess(); } }, true); }
   function cmChargeEmails() { cmAppel("cmAdminEmails", [CM.emStatut ? { statut: CM.emStatut } : {}], function (r) { if (!r || !r.ok) { msg((r && r.msg) || "E-mails indisponibles.", true); CM.vue = "liste"; cmDess(); return; } CM.emails = r; cmDess(); }); }
+  function cmCasePref() {
+    var cb = h("input", { type: "checkbox", "aria-label": "Recevoir un e-mail quand un agent m’écrit" }); cb.checked = !!(CM.cat.prefs && CM.cat.prefs.emailAdminReponse);
+    cb.onchange = function () { var v = cb.checked; cb.disabled = true; cmAppel("cmAdminPrefsSauve", [{ emailAdminReponse: v }], function (r) { cb.disabled = false; if (r && r.ok) { CM.cat.prefs = { emailAdminReponse: v }; msg("Préférence enregistrée."); } else { cb.checked = !v; msg((r && r.msg) || "Échec.", true); } }); };
+    var l = h("label", { c: "ed-lab" }, [cb, h("span", { t: " Recevoir un e-mail (sans contenu) quand un agent m’écrit" })]); l.style.fontSize = "18px";
+    return h("div", {}, [l, h("p", { c: "ed-note", t: "L’e-mail vous prévient seulement qu’un message vous attend dans IRIS ; il ne contient pas le texte du message." })]);
+  }
   function cmPaneEmails(c) {
     var cat = CM.cat; c.appendChild(h("div", { c: "ed-row" }, [cmBtn("← Retour", cmRetour)]));
     // Interrupteur des e-mails réels : désactivé par défaut, texte clair, confirmation explicite
@@ -1629,7 +1653,7 @@ var IrisVoix = (function () {
     var inter = cmSure(actif ? "Désactiver les e-mails réels" : "Activer les e-mails réels", actif, function (b) { cmAction(b, "cmAdminEmailReel", [!actif], function (r) { if (r.ok) { cat.emailReel = !!r.emailReel; msg(r.emailReel ? "E-mails réels activés." : "E-mails réels désactivés."); cmDess(); } else msg(r.msg || "Échec.", true); }); });
     var essaiOk = !!cat.emailEssaiPossible;
     var essai = cmBtn("Envoyer un e-mail d’essai (à vous seul)", function (b) { cmAction(b, "cmAdminEmailEssai", [], function (r) { msg(r.ok ? (r.msg || "E-mail d’essai envoyé.") : (r.msg || "Échec."), !r.ok); }); }); if (!essaiOk) essai.disabled = true;
-    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Envoi réel des e-mails" }), etat, h("p", { c: "ed-note", t: "L’e-mail d’essai part uniquement vers les adresses de l’administrateur, jamais vers les agents." + (essaiOk ? "" : " Indisponible : aucune adresse d’administrateur n’est configurée.") }), h("div", { c: "ed-row" }, [inter, essai])]));
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Envoi réel des e-mails" }), etat, h("p", { c: "ed-note", t: "L’e-mail d’essai part uniquement vers les adresses de l’administrateur, jamais vers les agents." + (essaiOk ? "" : " Indisponible : aucune adresse d’administrateur n’est configurée.") }), h("div", { c: "ed-row" }, [inter, essai]), cmCasePref()]));
     var fr = h("div", { c: "ed-row" }); [["", "Tous"], ["attente", "En attente"], ["envoye", "Envoyés"], ["echec", "En échec"], ["invalide", "Invalides"]].forEach(function (f) { var b = h("button", { c: "ed-b" + (CM.emStatut === f[0] ? " ed-p" : ""), t: f[1], type: "button" }); b.onclick = function () { cmOuvrirEmails(f[0]); }; fr.appendChild(b); });
     var rel = cmSure("Relancer les e-mails en échec", false, function (b) { cmAction(b, "cmAdminEmailsRelancer", [], function (r) { if (r.ok) { msg(r.msg || "Relance lancée."); cmOuvrirEmails(CM.emStatut); } else msg(r.msg || "Échec.", true); }); });
     c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "E-mails de communication" }), fr, h("div", { c: "ed-row" }, [rel])]));
@@ -1653,37 +1677,130 @@ var IrisVoix = (function () {
       c.appendChild(h("div", { c: "ed-card" }, [tete, h("p", { c: "ed-note", t: d + (f.derniereDate ? " — " + cmDate(f.derniereDate) : "") }), h("div", { c: "ed-row" }, [cmBtn("Ouvrir la conversation", function () { cmOuvrirFil(f.cle); }, f.nonLus > 0)])]));
     });
   }
+  function cmRepVide() { return { texte: "", orig: "", commId: "", fichiers: [] }; }
   function cmOuvrirFil(cle) {
-    CM.vue = "fil"; CM.cle = cle; CM.fil = null; CM.rep = { texte: "", orig: "", commId: "" }; cmDess();
-    cmAppel("cmAdminFil", [cle], function (r) { if (!r || !r.ok) { msg((r && r.msg) || "Conversation introuvable.", true); CM.vue = "prives"; CM.fils = null; cmDess(); return; } CM.fil = r; cmCompteurMaj(function () { cmDess(); }); cmDess(); });
+    CM.vue = "fil"; CM.cle = cle; CM.fil = null; CM.rep = cmRepVide(); cmDess();
+    cmAppel("cmAdminFil", [cle], function (r) { if (!r || !r.ok) { msg((r && r.msg) || "Conversation introuvable.", true); CM.vue = "prives"; CM.fils = null; cmDess(); return; } CM.fil = r; cmDess(); });
+  }
+  // Lecture message par message : au toucher de la carte (ou du bouton « Marquer comme lu »), jamais en bloc
+  function cmMarquerLu(m, carte, parts) {
+    if (m.lu || m.lecture) return; m.lecture = true;
+    cmAppel("cmAdminLireMessage", [m.id], function (r) {
+      m.lecture = false;
+      if (r && r.ok) { m.lu = true; CM.nonLus = Number(r.nonLus) || 0; parts.forEach(function (e) { if (e && e.parentNode) e.parentNode.removeChild(e); }); carte.style.borderLeft = ""; cmMajPastilleOnglet(); }
+      else if (r && !r.silencieux) msg(r.msg || "Impossible de marquer ce message comme lu.", true);
+    });
   }
   function cmPaneFil(c) {
-    c.appendChild(h("div", { c: "ed-row" }, [cmBtn("← Retour aux messages", function () { CM.vue = "prives"; CM.fils = null; cmDess(); })]));
+    c.appendChild(cmLigne([cmGros(cmBtn("← Retour aux messages", function () { CM.vue = "prives"; CM.fils = null; cmDess(); }))]));
     if (!CM.fil) { c.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); return; }
-    var F = CM.fil; c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Conversation avec " + F.nom + " " + F.prenom })]));
+    var F = CM.fil; c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Conversation avec " + F.nom + " " + F.prenom }), h("p", { c: "ed-note", t: "Un message passe en « lu » quand vous le touchez ou appuyez sur « Marquer comme lu »." })]));
     if (!F.messages.length) c.appendChild(h("p", { c: "ed-vide", t: "Pas encore de message." }));
     F.messages.forEach(function (m) {
-      var mien = m.sens === "admin", t = h("p", {}); t.style.cssText = "white-space:pre-wrap;font-size:18px"; t.textContent = m.texte;
-      var k = [h("div", { c: "ed-row" }, [cmTag(mien ? "Vous" : F.prenom + " " + F.nom), m.commTitre ? cmTag("À propos de : " + m.commTitre) : null]), t, h("p", { c: "ed-note", t: cmDate(m.date) + (mien ? (m.lu ? " · lu par l’agent" : " · pas encore lu") : "") })];
+      var mien = m.sens === "admin", t = h("p", {}); t.style.cssText = "white-space:pre-wrap;font-size:18px"; t.textContent = m.texte || "";
+      var nonLu = !mien && !m.lu, nouveau = nonLu ? cmTag("Nouveau") : null;
+      var k = [h("div", { c: "ed-row" }, [cmTag(mien ? "Vous" : F.prenom + " " + F.nom), m.commTitre ? cmTag("À propos de : " + m.commTitre) : null, nouveau]), t, h("p", { c: "ed-note", t: cmDate(m.date) + (mien ? (m.lu ? " · lu par l’agent" : " · pas encore lu") : "") })];
       if (m.texteOriginal && m.texteOriginal !== m.texte) { var o = h("p", { c: "ed-note" }); o.style.whiteSpace = "pre-wrap"; o.textContent = "Texte d’origine : " + m.texteOriginal; k.push(o); }
+      (m.pieces || []).forEach(function (pj, n) { k.push(cmBtn("Télécharger " + pj.nom + " (" + cmOctets(pj.taille) + ")", function (b) { cmAction(b, "cmAdminPieceMessage", [m.id, n], function (r) { if (r.ok) cmTelecharger(r); else msg(r.msg || "Téléchargement impossible.", true); }); })); });
       var acts = []; try { var ec = window.IrisVoix && IrisVoix.boutonLire ? IrisVoix.boutonLire(m.texte, "Écouter") : null; if (ec) acts.push(ec); } catch (e) { }
       if (m.commId && !mien) acts.push(cmBtn("Répondre à ce sujet", function () { CM.rep.commId = m.commId; msg("Votre réponse sera liée à : " + (m.commTitre || m.commId)); }));
-      if (acts.length) k.push(h("div", { c: "ed-row" }, acts));
-      var carte = h("div", { c: "ed-card cm-msg" }, k); carte.style.cssText = "margin-" + (mien ? "left" : "right") + ":8%;" + (mien ? "background:#eef2fb" : ""); c.appendChild(carte);
+      var carte = h("div", { c: "ed-card cm-msg" }, []), bl = null;
+      if (nonLu) { bl = cmGros(cmBtn("Marquer comme lu", function () { cmMarquerLu(m, carte, [nouveau, bl]); })); acts.push(bl); }
+      if (acts.length) k.push(cmLigne(acts));
+      k.forEach(function (e) { if (e) carte.appendChild(e); });
+      carte.style.cssText = "margin-" + (mien ? "left" : "right") + ":8%;" + (mien ? "background:#eef2fb" : "") + (nonLu ? ";border-left:6px solid #8b1d1d" : "");
+      if (nonLu) carte.addEventListener("click", function () { cmMarquerLu(m, carte, [nouveau, bl]); });
+      c.appendChild(carte);
     });
-    // Réponse : outils IA, aperçu avant envoi
+    // Réponse : outils IA, pièces jointes, aperçu avant envoi
     var R = CM.rep, ta = h("textarea", { rows: "4", placeholder: "Votre réponse", maxlength: "2000", "data-iv-no": "1" }); ta.value = R.texte; ta.oninput = function () { R.texte = ta.value; };
     var E = { get orig() { return R.orig; }, set orig(v) { R.orig = v; } };
     var apercu = h("div", {});
-    var envoi = cmBtn("Voir avant d’envoyer", function () {
-      apercu.textContent = ""; var t = ta.value.trim(); if (!t) { msg("Écrivez votre réponse.", true); return; }
-      var p = h("p", {}); p.style.cssText = "white-space:pre-wrap;font-size:18px"; p.textContent = t;
-      var ok = cmBtn("Confirmer l’envoi", function (b) {
-        cmAction(b, "cmAdminRepondre", [CM.cle, t, R.commId || "", R.orig && R.orig !== t ? R.orig : ""], function (r) { if (r.ok) { msg("Réponse envoyée."); CM.rep = { texte: "", orig: "", commId: "" }; cmOuvrirFil(CM.cle); } else msg(r.msg || "Échec de l’envoi.", true); });
-      }, true);
-      apercu.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Aperçu avant envoi" }), p, h("div", { c: "ed-row" }, [ok, cmBtn("Modifier", function () { apercu.textContent = ""; })])]));
-    }, true);
-    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Répondre" }), ta, cmOutils(ta, E, null), h("div", { c: "ed-row" }, [envoi]), apercu]));
+    var envoi = cmGros(cmBtn("Voir avant d’envoyer", function () {
+      apercu.textContent = ""; var t = ta.value.trim(); if (!t && !R.fichiers.length) { msg("Écrivez votre réponse.", true); return; }
+      var p = h("p", {}); p.style.cssText = "white-space:pre-wrap;font-size:18px"; p.textContent = t || "(sans texte)";
+      var fl = R.fichiers.slice(), noms = fl.length ? h("p", { c: "ed-note", t: "Pièces jointes : " + fl.map(function (f) { return f.nom; }).join(", ") }) : null;
+      var ok = cmGros(cmBtn("Confirmer l’envoi", function (b) {
+        cmAction(b, "cmAdminRepondre", [CM.cle, t, R.commId || "", R.orig && R.orig !== t ? R.orig : "", fl.map(function (f) { return { nom: f.nom, b64: f.b64 }; })], function (r) { if (r.ok) { msg("Réponse envoyée."); CM.rep = cmRepVide(); cmOuvrirFil(CM.cle); } else msg(r.msg || "Échec de l’envoi.", true); });
+      }, true));
+      apercu.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Aperçu avant envoi" }), p, noms, cmLigne([ok, cmGros(cmBtn("Modifier", function () { apercu.textContent = ""; }))])]));
+    }, true));
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Répondre" }), ta, cmOutils(ta, E, null), h("h3", { t: "Pièces jointes de la réponse" }), cmZoneFichiers(R), cmLigne([envoi]), apercu]));
+  }
+
+  // ---------- Groupes de destinataires ----------
+  function cmOuvrirGroupes() {
+    CM.vue = "groupes"; CM.grp = null; cmDess();
+    cmAppel("cmAdminGroupes", [], function (r) { if (!r || !r.ok) { msg((r && r.msg) || "Groupes indisponibles.", true); CM.vue = "liste"; cmDess(); return; } CM.cat.groupes = r.groupes || []; cmDess(); });
+  }
+  function cmPaneGroupes(c) {
+    c.appendChild(cmLigne([cmGros(cmBtn("← Retour", cmRetour))]));
+    var G = CM.cat.groupes || [];
+    if (CM.grp) { cmEditeurGroupe(c); return; }
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Gérer mes groupes" }), h("p", { c: "ed-note", t: "Un groupe est une liste d’agents enregistrée (par exemple « Équipe du matin »). Dans une communication, « Ajouter un groupe » coche tous ses membres actifs." }), cmLigne([cmGros(cmBtn("Créer un groupe", function () { CM.grp = { ancien: "", nom: "", membres: {} }; CM.rechGrp = ""; cmDess(); }, true))])]));
+    if (!G.length) c.appendChild(h("p", { c: "ed-vide", t: "Aucun groupe pour le moment." }));
+    G.forEach(function (g) {
+      var sup = cmSure("Supprimer", true, function (b) { cmAction(b, "cmAdminGroupeSupprimer", [g.nom], function (r) { if (r.ok) { msg(r.msg || "Groupe supprimé."); cmOuvrirGroupes(); } else msg(r.msg || "Échec.", true); }); });
+      c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: g.nom }), h("p", { c: "ed-note", t: g.membres.length + " membre(s)" }), cmLigne([cmGros(cmBtn("Modifier", function () { var m = {}; g.membres.forEach(function (k) { m[k] = true; }); CM.grp = { ancien: g.nom, nom: g.nom, membres: m }; CM.rechGrp = ""; cmDess(); })), cmGros(sup)])]));
+    });
+  }
+  function cmEditeurGroupe(c) {
+    var Gp = CM.grp, nom = h("input", { type: "text", maxlength: "80", placeholder: "Nom du groupe", autocomplete: "off", "aria-label": "Nom du groupe" }); nom.value = Gp.nom; nom.oninput = function () { Gp.nom = nom.value; };
+    var rech = h("input", { type: "search", placeholder: "Rechercher un agent", autocomplete: "off", "aria-label": "Rechercher un agent du groupe" }); rech.value = CM.rechGrp;
+    var boite = h("div", {}), cpt = h("p", { c: "ed-note" });
+    function maj() { cpt.textContent = Object.keys(Gp.membres).filter(function (k) { return Gp.membres[k]; }).length + " membre(s) dans ce groupe"; }
+    function liste() { var q = CM.rechGrp.toLowerCase(); boite.textContent = ""; cmActifs().filter(function (a) { return !q || (a.nom + " " + a.prenom + " " + a.email).toLowerCase().indexOf(q) >= 0; }).forEach(function (a) { var cb = h("input", { type: "checkbox" }); cb.checked = !!Gp.membres[a.cle]; cb.onchange = function () { Gp.membres[a.cle] = cb.checked; maj(); }; boite.appendChild(h("label", { c: "ed-lab" }, [cb, h("span", { t: " " + a.nom + " " + a.prenom + (a.site ? " — " + a.site : "") })])); }); maj(); }
+    rech.oninput = function () { CM.rechGrp = rech.value; liste(); }; liste();
+    var sv = cmGros(cmBtn("Enregistrer le groupe", function (b) {
+      var n = Gp.nom.trim(); if (!n) { msg("Donnez un nom au groupe.", true); return; }
+      cmAction(b, "cmAdminGroupeSauve", [{ ancien: Gp.ancien, nom: n, membres: Object.keys(Gp.membres).filter(function (k) { return Gp.membres[k]; }) }], function (r) { if (r.ok) { msg(r.msg || "Groupe enregistré."); cmOuvrirGroupes(); } else msg(r.msg || "Échec.", true); });
+    }, true));
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: Gp.ancien ? "Modifier le groupe" : "Nouveau groupe" }), lab("Nom du groupe", nom), rech, cpt, boite, cmLigne([sv, cmGros(cmBtn("Annuler", function () { CM.grp = null; cmDess(); }))])]));
+  }
+
+  // ---------- Agents autorisés ----------
+  function cmOuvrirAgents() { CM.vue = "agents"; CM.rechAg = ""; cmRechargeCat(cmDess); cmDess(); }
+  function cmPaneAgents(c) {
+    c.appendChild(cmLigne([cmGros(cmBtn("← Retour", cmRetour))]));
+    var A = CM.cat.agents, na = A.filter(function (a) { return a.actif !== false; }).length;
+    var rech = h("input", { type: "search", placeholder: "Rechercher un agent", autocomplete: "off", "aria-label": "Rechercher un agent" }); rech.value = CM.rechAg;
+    var boite = h("div", {});
+    function liste() {
+      var q = CM.rechAg.toLowerCase(); boite.textContent = "";
+      A.filter(function (a) { return !q || (a.nom + " " + a.prenom + " " + a.email).toLowerCase().indexOf(q) >= 0; }).forEach(function (a) {
+        var actif = a.actif !== false;
+        var bt = actif ? cmSure("Rendre inactif", true, function (b) { cmChange(b, a, false); }) : cmBtn("Rendre actif", function (b) { cmChange(b, a, true); }, true);
+        boite.appendChild(h("div", { c: "ed-card cm-agent" }, [h("div", { c: "ed-row" }, [h("h3", { t: a.nom + " " + a.prenom }), cmTag(actif ? "Actif" : "Inactif")]), h("p", { c: "ed-note", t: (a.site || "Site non renseigné") + (a.email ? " — " + a.email : "") }), cmLigne([cmGros(bt)])]));
+      });
+    }
+    function cmChange(b, a, v) { cmAction(b, "cmAdminAgentActif", [{ cle: a.cle, actif: v }], function (r) { if (r.ok) { msg(r.msg || "Agent mis à jour."); cmRechargeCat(cmDess); } else msg(r.msg || "Échec.", true); }); }
+    rech.oninput = function () { CM.rechAg = rech.value; liste(); }; liste();
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Agents autorisés (" + na + " actif(s) sur " + A.length + ")" }), h("p", { c: "ed-note", t: "Un agent inactif ne reçoit plus de nouvelles communications et n’apparaît plus dans le choix des destinataires. Son historique et les communications déjà reçues sont conservés. Vous pouvez le réactiver à tout moment." }), rech]));
+    c.appendChild(boite);
+  }
+
+  // ---------- Sauvegardes ----------
+  function cmOuvrirSauv() { CM.vue = "sauv"; CM.sauv = null; CM.restaurer = null; cmDess(); cmChargeSauv(); }
+  function cmChargeSauv() { cmAppel("cmAdminSauvegardes", [], function (r) { if (!r || !r.ok) { msg((r && r.msg) || "Sauvegardes indisponibles.", true); CM.vue = "liste"; cmDess(); return; } CM.sauv = r.sauvegardes || []; cmDess(); }); }
+  function cmPaneSauv(c) {
+    c.appendChild(cmLigne([cmGros(cmBtn("← Retour", cmRetour))]));
+    var now = cmGros(cmBtn("Sauvegarder maintenant", function (b) { cmAction(b, "cmAdminSauvegarder", [], function (r) { if (r.ok) { msg(r.msg || "Sauvegarde effectuée."); cmChargeSauv(); } else msg(r.msg || "Échec de la sauvegarde.", true); }); }, true));
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Sauvegardes" }), h("p", { c: "ed-note", t: "Les 10 dernières sauvegardes des communications sont listées. Restaurer remplace les communications actuelles par celles de la sauvegarde choisie ; une sauvegarde automatique est faite juste avant." }), cmLigne([now])]));
+    if (!CM.sauv) { c.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); return; }
+    if (!CM.sauv.length) c.appendChild(h("p", { c: "ed-vide", t: "Aucune sauvegarde." }));
+    CM.sauv.forEach(function (sv) {
+      var k = [h("h3", { t: sv.nom || sv.id }), h("p", { c: "ed-note", t: cmDate(sv.date) + (sv.taille ? " · " + cmOctets(sv.taille) : "") })];
+      if (CM.restaurer === sv.id) {
+        var mot = h("input", { type: "text", placeholder: "Écrivez RESTAURER", autocomplete: "off", "aria-label": "Écrivez RESTAURER pour confirmer" });
+        var go = cmSure("Confirmer la restauration", true, function (b) {
+          cmAction(b, "cmAdminRestaurer", [{ id: sv.id, confirmation: "RESTAURER" }], function (r) { if (r.ok) { msg(r.msg || "Restauration effectuée."); CM.restaurer = null; CM.liste = null; CM.cat = null; CM.detail = null; CM.vue = "liste"; cmDess(); } else msg(r.msg || "Échec de la restauration.", true); });
+        }); cmGros(go); go.disabled = true;
+        mot.oninput = function () { go.disabled = mot.value.trim() !== "RESTAURER"; };
+        var av = h("p", { c: "ed-note", role: "alert", t: "Attention : opération sensible. Les communications actuelles seront remplacées par cette sauvegarde. Écrivez le mot RESTAURER, puis appuyez deux fois sur le bouton rouge." }); av.style.cssText = "color:#8b1d1d;font-weight:700";
+        k.push(av, mot, cmLigne([go, cmGros(cmBtn("Annuler", function () { CM.restaurer = null; cmDess(); }))]));
+      } else k.push(cmLigne([cmGros(cmBtn("Restaurer", function () { CM.restaurer = sv.id; cmDess(); }))]));
+      c.appendChild(h("div", { c: "ed-card" }, k));
+    });
   }
 
   // ---------- Assemblage ----------
@@ -1695,6 +1812,9 @@ var IrisVoix = (function () {
     if (v === "detail") { cmPaneDetail(c); return; }
     if (v === "suivi") { cmPaneSuivi(c); return; }
     if (v === "sites") { cmPaneSites(c); return; }
+    if (v === "groupes") { cmPaneGroupes(c); return; }
+    if (v === "agents") { cmPaneAgents(c); return; }
+    if (v === "sauv") { cmPaneSauv(c); return; }
     if (v === "emails") { cmPaneEmails(c); return; }
     if (v === "fil") { cmPaneFil(c); return; }
     cmSousOnglets(c);
