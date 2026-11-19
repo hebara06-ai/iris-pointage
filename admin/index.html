@@ -1588,7 +1588,7 @@ var IrisVoix = (function () {
       b.onclick = function () { if (cle === "prives") { CM.vue = "prives"; CM.fils = null; } else { CM.vue = "liste"; } cmDess(); };
       return b;
     }
-    var ligne = h("div", {}, [onglet("annonces", "Annonces", cmPastille(pub, true), false), onglet("prives", "Messages privés", cmPastille(nl), nl > 0)]);
+    var ligne = h("div", {}, [onglet("annonces", "Information", cmPastille(pub, true), false), onglet("prives", "Messages privés", cmPastille(nl), nl > 0)]);
     ligne = cmLigne([].slice.call(ligne.children)); ligne.style.margin = "10px 0"; Array.prototype.forEach.call(ligne.children, function (e) { e.style.minWidth = "170px"; }); c.appendChild(ligne);
   }
   function cmPaneListe(c) {

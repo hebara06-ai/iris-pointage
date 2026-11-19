@@ -924,7 +924,7 @@ var CMA = { seq: 0, appl: 0, etat: null, an: 0, pr: 0, tmr: 0, ov: null, liste: 
   if (document.getElementById("cm-css")) return;
   var s = document.createElement("style"); s.id = "cm-css";
   s.textContent = ".seg.gnav button.cmb{flex:1 0 100%;order:9;margin-top:2px;padding:15px 8px;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:12px;border:1px solid #d3d0c6;background:#ecebe6;color:#1b2230}" +
-    ".seg.gnav button.cmb.non{background:#04112c;color:#fff;border-color:#04112c}.seg.gnav button.cmb svg{width:26px;height:26px;flex:none}" +
+    ".seg.gnav button.cmb.non{background:#0a7e7a;color:#fff;border-color:#0a7e7a}.seg.gnav button.cmb svg{width:26px;height:26px;flex:none}" +
     ".cmp{min-width:26px;height:26px;border-radius:13px;background:#8b1d1d;color:#fff;font-size:15px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0 7px;box-sizing:border-box;line-height:1;border:2px solid #fff}" +
     ".cmov{position:fixed;left:0;top:0;width:100%;height:100vh;height:100dvh;z-index:200002;background:#f4f1ea;color:#04112c;display:flex;flex-direction:column;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif}" +
     ".cmh{padding:max(14px,env(safe-area-inset-top)) 16px 12px;background:#04112c;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:10px}.cmh h2{margin:0;font-size:22px;display:flex;align-items:center;gap:10px}" +
@@ -1015,12 +1015,12 @@ function cmaMajBouton() {
   b.textContent = ""; b.insertAdjacentHTML("beforeend", cmaIcone());
   var t = document.createElement("span"); t.textContent = "Communications"; b.appendChild(t);
   if (n > 0) b.appendChild(cmaPastille(n));
-  var det = n > 0 ? " (" + CMA.an + (CMA.an > 1 ? " annonces" : " annonce") + ", " + CMA.pr + (CMA.pr > 1 ? " messages privés" : " message privé") + ")" : "";
+  var det = n > 0 ? " (" + CMA.an + (CMA.an > 1 ? " informations" : " information") + ", " + CMA.pr + (CMA.pr > 1 ? " messages privés" : " message privé") + ")" : "";
   b.setAttribute("aria-label", n > 0 ? "Communications, " + n + (n > 1 ? " messages non lus" : " message non lu") + det : "Communications, aucun message non lu");
 }
 function cmaMajOnglets() {
   if (!CMA.tabs) return;
-  [["ann", "Annonces", CMA.an, " non lue"], ["prv", "Messages privés", CMA.pr, " non lu"]].forEach(function (d) {
+  [["ann", "Information", CMA.an, " non lue"], ["prv", "Messages privés", CMA.pr, " non lu"]].forEach(function (d) {
     var b = CMA.tabs[d[0]], n = d[2]; b.textContent = ""; var t = document.createElement("span"); t.textContent = d[1]; b.appendChild(t);
     if (n > 0) b.appendChild(cmaPastille(n));
     b.className = CMA.sec === d[0] ? "on" : ""; b.setAttribute("aria-selected", CMA.sec === d[0] ? "true" : "false");
@@ -1104,7 +1104,7 @@ function cmaCarte(x, zone) {
     var l = [x.site, x.etage ? "Étage " + x.etage : "", x.lieu, x.ref ? "Réf. " + x.ref : ""].filter(Boolean).join(" · ");
     if (l) { var b = document.createElement("div"); b.className = "qu"; b.textContent = "Où : " + l; det.appendChild(b); }
     var c2 = document.createElement("div"); c2.className = "co"; c2.textContent = x.message; det.appendChild(c2);
-    var lire = cmaPeutLire() ? cmaBtn("Écouter l’annonce", "", function () { cmaLit(x.titre + ". " + x.message, function () { lire.classList.remove("on"); }, lire); lire.classList.toggle("on"); }) : null;
+    var lire = cmaPeutLire() ? cmaBtn("Écouter l’information", "", function () { cmaLit(x.titre + ". " + x.message, function () { lire.classList.remove("on"); }, lire); lire.classList.toggle("on"); }) : null;
     var zx = cmaDiv("cmx");
     if (lire) zx.appendChild(lire);
     cmaPieces(x, zx);
@@ -1210,7 +1210,7 @@ function cmaNotif(pm) {
     });
     b.setAttribute("role", "switch"); bs[d[0]] = b; corps.appendChild(b);
   });
-  corps.appendChild(cmaDiv("tx", "Les e-mails de publication et de modification d’une annonce sont toujours envoyés : ils ne peuvent pas être désactivés."));
+  corps.appendChild(cmaDiv("tx", "Les e-mails de publication et de modification d’une information sont toujours envoyés : ils ne peuvent pas être désactivés."));
   corps.appendChild(nt); rend(); pm.appendChild(z);
 }
 function cmaMessages(pm) {
@@ -1414,7 +1414,7 @@ function cmaOuvre() {
       if (!CMA.ov) return; zone.textContent = "";
       if (!r || !r.ok) { cmaErreur(zone, (r && r.msg) || "Impossible de charger les communications.", charge); return; }
       cmaSetC(r, tok);
-      if (!r.communications.length) { zone.appendChild(cmaDiv("cmv", "Aucune annonce pour le moment.")); return; }
+      if (!r.communications.length) { zone.appendChild(cmaDiv("cmv", "Aucune information pour le moment.")); return; }
       CMA.liste = r.communications; r.communications.forEach(function (x) { cmaCarte(x, zone); });
     }, function () { if (!CMA.ov) return; cmaErreur(zone, "Connexion impossible. Vérifiez votre réseau puis réessayez.", charge); });
   }
