@@ -184,7 +184,34 @@ var IrisVoix = (function () {
   function ico(svg, txt) { var f = document.createElement('span'); f.style.display = 'inline-flex'; f.innerHTML = svg; var t = document.createElement('span'); t.textContent = txt; var w = document.createDocumentFragment(); w.appendChild(f); w.appendChild(t); return w; }
   function bouton(svg, txt) { var b = document.createElement('button'); b.type = 'button'; b.className = 'iv-b'; b.appendChild(ico(svg, txt)); b.setAttribute('aria-label', txt); return b; }
   function nettoyer(t) { return String(t || '').replace(/\*\*/g, '').replace(/\s+/g, ' ').replace(/https?:\/\/\S+/g, 'lien').trim().slice(0, 3000); }
-  function voixFr() { var v = synth && synth.getVoices ? synth.getVoices() : [], i; for (i = 0; i < v.length; i++) if (/^fr[-_]FR/i.test(v[i].lang)) return v[i]; for (i = 0; i < v.length; i++) if (/^fr/i.test(v[i].lang)) return v[i]; return null; }
+  // Choix automatique de la meilleure voix française installée sur l'appareil (voix « améliorées », « premium », « neurales » ou Google en priorité)
+  var voixCache = null;
+  function noteVoix(v) {
+    var n = (v.name || '') + ' ' + (v.voiceURI || ''), l = String(v.lang || '').replace('_', '-'), s = 0;
+    if (!/^fr/i.test(l)) return -1000;
+    if (/espeak|robot|compact/i.test(n)) s -= 60;
+    if (/premium|enhanced|am[eé]lior|neural|natural|online|wavenet|studio|siri/i.test(n)) s += 60;
+    if (/google/i.test(n)) s += 35;
+    if (/network|-x-.*-network/i.test(n)) s += 25;
+    if (/am[eé]lie|audrey|thomas|vivienne|denise|eloise|henri|marie|aurelie|julie|hortense|paul/i.test(n)) s += 8;
+    if (/^fr-fr$/i.test(l)) s += 20; else if (/^fr-(ca|be|ch)$/i.test(l)) s += 6;
+    if (v.localService === false) s += 4;
+    if (v.default) s += 2;
+    return s;
+  }
+  function voixFr() {
+    var v = synth && synth.getVoices ? synth.getVoices() : [], best = null, bs = -999, i;
+    if (voixCache && v.indexOf(voixCache) >= 0) return voixCache;
+    for (i = 0; i < v.length; i++) { var s = noteVoix(v[i]); if (s > bs) { bs = s; best = v[i]; } }
+    voixCache = bs > -500 ? best : null; return voixCache;
+  }
+  try { if (synth && synth.addEventListener) synth.addEventListener('voiceschanged', function () { voixCache = null; }); } catch (e) { }
+  // Découpe le texte en phrases courtes (les longues lectures sont coupées net sur certains téléphones)
+  function morceaux(t) {
+    var ph = t.match(/[^.!?;:\n]+[.!?;:]*\s*/g) || [t], out = [], cur = '';
+    ph.forEach(function (p) { if ((cur + p).length > 180 && cur) { out.push(cur.trim()); cur = ''; } cur += p; while (cur.length > 220) { var k = cur.lastIndexOf(' ', 200); if (k < 60) k = 200; out.push(cur.slice(0, k).trim()); cur = cur.slice(k); } });
+    if (cur.trim()) out.push(cur.trim()); return out.length ? out : [t];
+  }
   function arreter() { try { if (synth) synth.cancel(); } catch (e) { } if (lecteur) { var l = lecteur; lecteur = null; if (l.fin) l.fin(); } }
   // Lecture à voix haute ; un 2e appel avec le même bouton arrête la lecture
   function lire(texte, onFin, cle) {
@@ -192,10 +219,15 @@ var IrisVoix = (function () {
     var t = nettoyer(texte); if (!t) return false;
     if (lecteur && lecteur.cle && lecteur.cle === cle) { arreter(); return true; }
     arreter();
-    var u = new SpeechSynthesisUtterance(t); u.lang = 'fr-FR'; u.rate = 0.95; var v = voixFr(); if (v) u.voice = v;
     var etat = { cle: cle, fin: function () { if (onFin) { var f = onFin; onFin = null; f(); } } }; lecteur = etat;
-    u.onend = u.onerror = function () { if (lecteur === etat) lecteur = null; etat.fin(); };
-    try { synth.speak(u); } catch (e) { lecteur = null; return false; }
+    var parts = morceaux(t), v = voixFr(), reste = parts.length;
+    try {
+      parts.forEach(function (p) {
+        var u = new SpeechSynthesisUtterance(p); u.lang = (v && v.lang) || 'fr-FR'; u.rate = 0.92; u.pitch = 1; u.volume = 1; if (v) u.voice = v;
+        u.onend = u.onerror = function () { reste--; if (reste <= 0) { if (lecteur === etat) lecteur = null; etat.fin(); } };
+        synth.speak(u);
+      });
+    } catch (e) { lecteur = null; return false; }
     return true;
   }
   function dispoLecture() { return !!(synth && window.SpeechSynthesisUtterance); }
