@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; frame-src blob:; connect-src https://script.google.com https://script.googleusercontent.com https://api.open-meteo.com https://api-bdc.io; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin><link rel="prefetch" href="jsQR.min.js"><title>IRIS</title><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#0b1a2b"><link rel="icon" href="../icon-192.png"><link rel="apple-touch-icon" href="../icon-192.png"><meta name="apple-mobile-web-app-title" content="IRIS"><script>(function shim(){
+<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; frame-src 'self' blob:; connect-src https://script.google.com https://script.googleusercontent.com https://api.open-meteo.com https://api-bdc.io; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin><link rel="prefetch" href="jsQR.min.js"><title>IRIS</title><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#0b1a2b"><link rel="icon" href="../icon-192.png"><link rel="apple-touch-icon" href="../icon-192.png"><meta name="apple-mobile-web-app-title" content="IRIS"><script>(function shim(){
   var URL_APP = "https://script.google.com/macros/s/AKfycbzAc5Ge9XGmOE5bBbOxkN528oSBNvgw3MZEGRZVH15HxMZnVB_MwputipQMebgHXAxO/exec";
   function appelle(nom, args, ok, ko) {
     var x = new XMLHttpRequest();
@@ -9,7 +9,7 @@
   }
   function make(ok, ko) {
     var o = { withSuccessHandler: function (f) { return make(f, ko); }, withFailureHandler: function (f) { return make(ok, f); } };
-    ["etat", "verifier", "pointer", "ouvrirScan", "congesEtat", "congesDemander", "congesAnnuler","congesConnexion","congesPiece","congesAjouterPiece","stampDonnees","recupDemander","recupVerifier","recupStatut","agentBilan","agentDetails","agentSignaler","agentSignalements","meteoDonnees","gaMesDossiers","gaDeposer","gaMaPiece","gaAjouterPieces","qsPoser","qsIrisRepondre","qsMesQuestions","qsDemanderHumain","qsReecrire","qsMaPiece","cmCompteur","cmMesCommunications","cmLire","cmAccuse","cmParticipation","cmMesMessages","cmLireMessages","cmEnvoyerMessage","cmReecrire"].forEach(function (n) { o[n] = function () { appelle(n, Array.prototype.slice.call(arguments), ok, ko); }; });
+    ["etat", "verifier", "pointer", "ouvrirScan", "congesEtat", "congesDemander", "congesAnnuler","congesConnexion","congesPiece","congesAjouterPiece","stampDonnees","recupDemander","recupVerifier","recupStatut","agentBilan","agentDetails","agentSignaler","agentSignalements","meteoDonnees","gaMesDossiers","gaDeposer","gaMaPiece","gaAjouterPieces","qsPoser","qsIrisRepondre","qsMesQuestions","qsDemanderHumain","qsReecrire","qsMaPiece","cmCompteur","cmMesCommunications","cmLire","cmAccuse","cmParticipation","cmMesMessages","cmLireMessages","cmEnvoyerMessage","cmReecrire","cmMaPiece"].forEach(function (n) { o[n] = function () { appelle(n, Array.prototype.slice.call(arguments), ok, ko); }; });
     return o;
   }
   window.google = { script: { run: make(null, null) } };
@@ -836,7 +836,7 @@ function rcBouton() {
 </script><script>/* IRIS — rubrique « Communications » de MON ESPACE (phases 1 à 4 : annonces, accusé de réception, participation, messages privés avec l'administrateur).
    Ajout isolé. Réutilise : el, c, DEV, DEMOP, toastD, conges, IrisVoix (lecture/dictée du navigateur, si présent).
    N'appelle jamais run() (son échec remplacerait la page) : appels directs et silencieux via google.script.run.
-   Noms à autoriser dans la liste blanche du shim de la page : cmCompteur, cmMesCommunications, cmLire, cmAccuse, cmParticipation,
+   Noms à autoriser dans la liste blanche du shim de la page : cmMaPiece, cmCompteur, cmMesCommunications, cmLire, cmAccuse, cmParticipation,
    cmMesMessages, cmLireMessages, cmEnvoyerMessage, cmReecrire. Tout texte est inséré avec textContent. */
 var CMA = { seq: 0, appl: 0, etat: null, an: 0, pr: 0, tmr: 0, ov: null, liste: null, bouton: null, tabs: null, sec: "ann", lien: null, brouillon: null, m: null, dict: null };
 (function () {
@@ -869,6 +869,7 @@ var CMA = { seq: 0, appl: 0, etat: null, an: 0, pr: 0, tmr: 0, ov: null, liste: 
     ".cmout{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.cmout .cmbtn{margin:0;min-height:52px;font-size:18px}" +
     ".cmlien{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#f0e2b0;border-radius:12px;padding:8px 12px;font-size:17px;font-weight:600;margin-bottom:8px}.cmlien .cmbtn{width:auto;min-height:40px;margin:0;font-size:15px;padding:6px 12px}" +
     ".cmap{background:#fff;border:2px solid #d9b44a;border-radius:14px;padding:12px 14px;margin-top:10px}.cmap .pp{font-size:19px;line-height:1.4;white-space:pre-wrap;word-break:break-word;margin:6px 0}.cmap .lb{font-size:15px;font-weight:700;color:#7a6a3a}.cmap .av{font-size:17px;font-weight:700;color:#8b1d1d;margin:6px 0}" +
+    ".cmpj{margin-top:12px}.cmpj .li{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#f4f1ea;border-radius:12px;padding:8px 12px;margin-top:8px;font-size:17px;font-weight:600;word-break:break-word}.cmpj .li .cmbtn{width:auto;min-width:110px;min-height:46px;margin:0;font-size:17px}.cmpj .tl{font-size:15px;font-weight:700;color:#7a6a3a}.cmad{display:flex;padding:10px 12px 0;background:#e9e5d8}.cmad .cmbtn{margin:0;background:#04112c;color:#fff;min-height:60px;font-size:19px;max-width:720px;margin:0 auto}" +
     ".cmv{text-align:center;color:#6b6755;font-size:18px;padding:30px 10px}" +
     "@media(max-width:420px){.cmout{grid-template-columns:1fr 1fr}.cmbu{max-width:94%}}";
   document.head.appendChild(s);
@@ -966,6 +967,34 @@ function cmaErreur(zone, msg, relance) {
   var re = cmaBtn("Réessayer", "", function () { zone.textContent = ""; relance(); }); re.style.maxWidth = "320px"; re.style.margin = "10px auto 0"; zone.appendChild(re);
 }
 
+/* ---------- Pièces jointes ---------- */
+function cmaTaille(n) { n = Number(n) || 0; return n >= 1048576 ? (Math.round(n / 104857.6) / 10).toString().replace(".", ",") + " Mo" : n >= 1024 ? Math.max(1, Math.round(n / 1024)) + " Ko" : n + " o"; }
+// base64 -> Blob ; les types qui pourraient exécuter du code (HTML, SVG…) ne sont jamais ouverts dans l'application : téléchargement seulement
+function cmaOuvrePiece(r) {
+  var bin = atob(String(r.b64 || "")), oc = new Uint8Array(bin.length), i; for (i = 0; i < bin.length; i++) oc[i] = bin.charCodeAt(i);
+  var sur = /^(application\/pdf|image\/(png|jpe?g|gif|webp)|text\/plain)$/i.test(r.mime || ""), blob = new Blob([oc], { type: sur ? r.mime : "application/octet-stream" }), url = URL.createObjectURL(blob), w = null;
+  if (sur) { try { w = window.open(url, "_blank"); } catch (e) { w = null; } }
+  if (!w) { var a = document.createElement("a"); a.href = url; a.download = r.nom || "piece"; a.style.display = "none"; document.body.appendChild(a); a.click(); document.body.removeChild(a); }
+  setTimeout(function () { try { URL.revokeObjectURL(url); } catch (e) { } }, 120000);
+}
+function cmaPieces(x, zx) {
+  if (!x.pieces || !x.pieces.length) return;
+  var z = cmaDiv("cmpj"); z.appendChild(cmaDiv("tl", x.pieces.length > 1 ? "Pièces jointes" : "Pièce jointe")); var nt = cmaDiv("nt"); nt.setAttribute("role", "status");
+  x.pieces.forEach(function (p, idx) {
+    var li = cmaDiv("li"); li.appendChild(cmaDiv("", (p.nom || "Document") + (p.taille ? " (" + cmaTaille(p.taille) + ")" : "")));
+    var b = cmaBtn("Ouvrir", "pri", function () {
+      if (b._en) return; b._en = true; b.disabled = true; nt.className = "nt"; nt.textContent = "Ouverture de « " + (p.nom || "Document") + " »…";
+      function fin(err) { b._en = false; b.disabled = false; nt.className = err ? "nt er" : "nt"; nt.textContent = err || ""; }
+      cmaAppel("cmMaPiece", [DEV, x.id, idx], function (r) {
+        if (!r || !r.ok || !r.b64) { fin((r && r.msg) || "Ce document n’a pas pu être ouvert. Réessayez."); return; }
+        try { cmaOuvrePiece(r); fin(""); } catch (e) { fin("Ce document est illisible ou trop volumineux pour cet appareil."); }
+      }, function () { fin("Connexion impossible. Le document n’a pas été ouvert : réessayez."); });
+    });
+    b.setAttribute("aria-label", "Ouvrir " + (p.nom || "le document")); li.appendChild(b); z.appendChild(li);
+  });
+  z.appendChild(nt); zx.appendChild(z);
+}
+
 /* ---------- Annonces ---------- */
 function cmaCarte(x, zone) {
   var k = document.createElement("div"); k.className = "cmc" + (x.lu ? "" : " nl"); k.setAttribute("role", "button"); k.tabIndex = 0;
@@ -989,6 +1018,7 @@ function cmaCarte(x, zone) {
     var lire = cmaPeutLire() ? cmaBtn("Écouter l’annonce", "", function () { cmaLit(x.titre + ". " + x.message, function () { lire.classList.remove("on"); }, lire); lire.classList.toggle("on"); }) : null;
     var zx = cmaDiv("cmx");
     if (lire) zx.appendChild(lire);
+    cmaPieces(x, zx);
     if (x.accuseRequis) cmaAccuse(x, zx);
     if (x.participationActive) cmaParticipation(x, zx);
     zx.appendChild(cmaBtn("Écrire à l’administration à ce sujet", "", function () { CMA.lien = { id: x.id, titre: x.titre }; cmaSection("prv"); if (CMA.m) { CMA.m.majLien(); CMA.m.ta.focus(); } }));
@@ -1196,6 +1226,9 @@ function cmaOuvre() {
   var ov = document.createElement("div"); ov.className = "cmov"; ov.setAttribute("role", "dialog"); ov.setAttribute("aria-label", "Communications");
   var h = document.createElement("div"); h.className = "cmh"; var h2 = document.createElement("h2"); h2.textContent = "Communications"; h.appendChild(h2);
   var f = document.createElement("button"); f.type = "button"; f.textContent = "Fermer"; f.onclick = cmaFerme; h.appendChild(f); ov.appendChild(h);
+  if (typeof cmaAdminDispo === "function" && typeof cmaAdminOuvre === "function" && cmaAdminDispo()) {
+    var ba = cmaDiv("cmad"); ba.appendChild(cmaBtn("Créer / gérer les communications (administrateur)", "pri", function () { cmaAdminOuvre(); })); ba.firstChild.setAttribute("data-adm", "1"); ov.appendChild(ba);
+  }
   var onglets = cmaDiv("cmo"); onglets.setAttribute("role", "tablist"); ov.appendChild(onglets);
   CMA.tabs = { ann: document.createElement("button"), prv: document.createElement("button") };
   CMA.tabs.ann.type = CMA.tabs.prv.type = "button"; CMA.tabs.ann.setAttribute("role", "tab"); CMA.tabs.prv.setAttribute("role", "tab");
@@ -1237,7 +1270,21 @@ function cmaAdminOuvre() {
   var ov = document.createElement("div"); ov.className = "cmov"; ov.setAttribute("role", "dialog"); ov.setAttribute("aria-label", "Administration des communications");
   var h = document.createElement("div"); h.className = "cmh"; var h2 = document.createElement("h2"); h2.textContent = "Administration"; h.appendChild(h2);
   var f = document.createElement("button"); f.type = "button"; f.textContent = "Fermer"; f.onclick = function () { cmaAdminFerme(); if (typeof cmaCompteur === "function") cmaCompteur(); }; h.appendChild(f); ov.appendChild(h);
-  var fr = document.createElement("iframe"); fr.src = "../admin/?cm=1"; fr.title = "Administration IRIS — Communications"; fr.style.cssText = "flex:1;width:100%;border:0;background:#f4f1ea"; ov.appendChild(fr);
+  var URL_ADM = "../admin/?cm=1", corps = document.createElement("div"); corps.style.cssText = "flex:1;position:relative;display:flex;min-height:0;background:#f4f1ea"; ov.appendChild(corps);
+  var fr = document.createElement("iframe"); fr.src = URL_ADM; fr.title = "Administration IRIS — Communications"; fr.style.cssText = "flex:1;width:100%;border:0;background:#f4f1ea"; corps.appendChild(fr);
+  var etat = document.createElement("div"); etat.className = "cmv"; etat.setAttribute("role", "status"); etat.setAttribute("data-adm-etat", "1"); etat.style.cssText = "position:absolute;left:0;top:0;right:0;bottom:0;background:#f4f1ea;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-size:20px;padding:20px;box-sizing:border-box"; etat.textContent = "Chargement de l’administration…"; corps.appendChild(etat);
+  var fini = false;
+  function lien(msg) {
+    if (fini) return; fini = true; clearTimeout(tm); etat.textContent = ""; var p = document.createElement("div"); p.textContent = msg; etat.appendChild(p);
+    var a = document.createElement("a"); a.href = URL_ADM; a.target = "_blank"; a.rel = "noopener"; a.textContent = "Ouvrir dans une page"; a.style.cssText = "display:inline-block;font-size:20px;font-weight:700;padding:16px 24px;border-radius:14px;background:#04112c;color:#fff;text-decoration:none"; etat.appendChild(a);
+  }
+  function pret() { if (fini) return; fini = true; clearTimeout(tm); etat.style.display = "none"; }
+  var tm = setTimeout(function () { lien("Le chargement est long ou a échoué."); }, 15000);
+  fr.onerror = function () { lien("L’administration n’a pas pu s’afficher ici."); };
+  fr.onload = function () {
+    var vide = false; try { var d = fr.contentDocument; vide = !d || !d.body || !d.body.children.length || /^about:blank/.test(String(fr.contentWindow.location.href)); } catch (e) { vide = true; }
+    if (vide) lien("L’administration n’a pas pu s’afficher ici."); else pret();
+  };
   document.body.appendChild(ov); CMA_ADM.ov = ov; document.documentElement.style.overflow = "hidden";
 }
 function cmaAdminBouton() {
