@@ -9,7 +9,7 @@
   }
   function make(ok, ko) {
     var o = { withSuccessHandler: function (f) { return make(f, ko); }, withFailureHandler: function (f) { return make(ok, f); } };
-    ["etat", "verifier", "pointer", "ouvrirScan", "congesEtat", "congesDemander", "congesAnnuler","congesConnexion","congesPiece","congesAjouterPiece","stampDonnees","recupDemander","recupVerifier","recupStatut","agentBilan","agentDetails","agentSignaler","agentSignalements","meteoDonnees","gaMesDossiers","gaDeposer","gaMaPiece","gaAjouterPieces","qsPoser","qsIrisRepondre","qsMesQuestions","qsDemanderHumain","qsReecrire","qsMaPiece","cmCompteur","cmMesCommunications","cmLire","cmAccuse","cmParticipation","cmMesMessages","cmLireMessages","cmEnvoyerMessage","cmReecrire","cmMaPiece","cmLireMessage","cmMaPieceMessage","cmMesPrefs","cmMesPrefsSauve","vxLire"].forEach(function (n) { o[n] = function () { appelle(n, Array.prototype.slice.call(arguments), ok, ko); }; });
+    ["etat", "verifier", "pointer", "ouvrirScan", "congesEtat", "congesDemander", "congesAnnuler","congesConnexion","congesPiece","congesAjouterPiece","stampDonnees","recupDemander","recupVerifier","recupStatut","agentBilan","agentDetails","agentSignaler","agentSignalements","meteoDonnees","gaMesDossiers","gaDeposer","gaMaPiece","gaAjouterPieces","qsPoser","qsIrisRepondre","qsMesQuestions","qsDemanderHumain","qsReecrire","qsMaPiece","cmCompteur","cmMesCommunications","cmLire","cmAccuse","cmParticipation","cmMesMessages","cmLireMessages","cmEnvoyerMessage","cmReecrire","cmMaPiece","cmLireMessage","cmMaPieceMessage","cmMesPrefs","cmMesPrefsSauve","vxLire","connexion","cmAdminCatalogue","cmAdminSauve"].forEach(function (n) { o[n] = function () { appelle(n, Array.prototype.slice.call(arguments), ok, ko); }; });
     return o;
   }
   window.google = { script: { run: make(null, null) } };
@@ -1026,6 +1026,7 @@ function cmaMajOnglets() {
     b.className = CMA.sec === d[0] ? "on" : ""; b.setAttribute("aria-selected", CMA.sec === d[0] ? "true" : "false");
     b.setAttribute("aria-label", d[1] + (n > 0 ? ", " + n + d[3] + (n > 1 ? "s" : "") : ", rien de nouveau"));
   });
+  if (CMA.tabs.env) { var be = CMA.tabs.env; be.textContent = "Envoyer"; be.className = CMA.sec === "env" ? "on" : ""; be.setAttribute("aria-selected", CMA.sec === "env" ? "true" : "false"); }
 }
 function cmaCompteur() {
   if (DEMOP || !CMA.bouton || !document.body.contains(CMA.bouton)) return;
@@ -1383,6 +1384,7 @@ function cmaMessages(pm) {
 function cmaSection(sec) {
   if (!CMA.ov) return; CMA.sec = sec;
   CMA.pann.style.display = sec === "ann" ? "block" : "none"; CMA.pmsg.style.display = sec === "prv" ? "flex" : "none";
+  if (CMA.penv) { CMA.penv.style.display = sec === "env" ? "block" : "none"; if (sec === "env" && typeof cmaEnvOuvre === "function") cmaEnvOuvre(CMA.penv); }
   cmaMajOnglets();
   if (sec === "prv" && CMA.m) CMA.m.ouvre(false);
 }
@@ -1402,8 +1404,10 @@ function cmaOuvre() {
   CMA.tabs.ann.type = CMA.tabs.prv.type = "button"; CMA.tabs.ann.setAttribute("role", "tab"); CMA.tabs.prv.setAttribute("role", "tab");
   CMA.tabs.ann.onclick = function () { cmaSection("ann"); }; CMA.tabs.prv.onclick = function () { cmaSection("prv"); };
   onglets.appendChild(CMA.tabs.ann); onglets.appendChild(CMA.tabs.prv);
+  if (typeof cmaEnvDispo === "function" && cmaEnvDispo()) { var te = document.createElement("button"); te.type = "button"; te.setAttribute("role", "tab"); te.setAttribute("data-env", "1"); te.onclick = function () { cmaSection("env"); }; CMA.tabs.env = te; onglets.appendChild(te); }
   var pann = cmaDiv("cml"), wann = cmaDiv("cmw"); pann.appendChild(wann); ov.appendChild(pann); CMA.pann = pann;
   var pmsg = cmaDiv("cmm"); ov.appendChild(pmsg); CMA.pmsg = pmsg; cmaMessages(pmsg);
+  CMA.penv = null; if (CMA.tabs.env) { var penv = cmaDiv("cml"); penv.style.display = "none"; ov.appendChild(penv); CMA.penv = penv; }
   var zone = cmaDiv(""); wann.appendChild(zone);
   zone.appendChild(cmaDiv("cmv", "Chargement…"));
   document.body.appendChild(ov); CMA.ov = ov; document.documentElement.style.overflow = "hidden";
@@ -1462,5 +1466,108 @@ function cmaAdminBouton() {
   if (cmaAdminDispo()) { b.className = "cmb"; b.textContent = "Administration des communications"; }
   else { b.textContent = "Accès administrateur"; b.setAttribute("data-adm-discret", "1"); b.style.cssText = "display:block;margin:14px auto 4px;background:none;border:0;color:#6b6a60;font-size:15px;text-decoration:underline;padding:10px 14px;cursor:pointer"; }
   b.onclick = cmaAdminOuvre; return b;
+}
+
+/* IRIS — onglet « Envoyer » dans Communications de MON ESPACE (administrateur seulement).
+   Permet d'envoyer une information (réunion, événement, consigne…) à tous les agents, à un groupe ou à des agents choisis un par un,
+   sans ouvrir l'administration. Mêmes fonctions serveur et mêmes droits que le tableau de bord (cmAdminCatalogue, cmAdminSauve) :
+   le mot de passe administrateur est demandé ici (session de 15 minutes gardée en mémoire seulement). L'onglet n'apparaît que sur un appareil administrateur. */
+var CMENV = { tok: "", cat: null, init: false };
+function cmaEnvDispo() { try { return typeof cmaAdminDispo === "function" && cmaAdminDispo(); } catch (e) { return false; } }
+function cmaEnvCss() {
+  if (document.getElementById("cmenv-css")) return;
+  var s = document.createElement("style"); s.id = "cmenv-css";
+  s.textContent = ".cmf{max-width:720px;margin:0 auto}.cmf label{display:block;font-size:17px;font-weight:700;margin:14px 0 6px;text-align:left}" +
+    ".cmf input[type=text],.cmf input[type=password],.cmf input[type=date],.cmf input[type=time],.cmf select,.cmf textarea{width:100%;box-sizing:border-box;font-size:20px;padding:12px 14px;border-radius:14px;border:2px solid #b9b49f;background:#fff;color:#04112c;font-family:inherit}" +
+    ".cmf textarea{min-height:130px;line-height:1.4;resize:vertical}.cmf .cmg{display:grid;grid-template-columns:1fr 1fr;gap:10px}.cmf .cmg>div label{margin-top:8px}" +
+    ".cmf .cmag{max-height:42vh;overflow:auto;border:2px solid #b9b49f;border-radius:14px;background:#fff;padding:6px 10px;-webkit-overflow-scrolling:touch}" +
+    ".cmf .cmag label{display:flex;align-items:center;gap:12px;font-size:19px;font-weight:600;margin:0;padding:11px 4px;border-bottom:1px solid #eee8d8}.cmf .cmag label:last-child{border-bottom:0}.cmf .cmag input{width:26px;height:26px;flex:none}" +
+    ".cmf .cmcase{display:flex;align-items:center;gap:12px;font-size:19px;font-weight:600;margin:12px 0}.cmf .cmcase input{width:26px;height:26px}" +
+    ".cmf .cmrang{display:flex;gap:8px;flex-wrap:wrap}.cmf .cmrang .cmbtn{flex:1 1 140px;margin:6px 0 0}.cmf .cmres{font-size:19px;font-weight:700;margin:14px 0;text-align:center;min-height:24px}.cmf .cmres.ko{color:#8b1d1d}.cmf .cmres.ok{color:#0a7e7a}" +
+    ".cmf .cmnb{font-size:18px;font-weight:700;margin:10px 0 4px;text-align:center}";
+  document.head.appendChild(s);
+}
+function cmaEnvOuvre(box) {
+  cmaEnvCss();
+  if (box.getAttribute("data-env") === "1") return; box.setAttribute("data-env", "1");
+  box.textContent = "";
+  var w = cmaDiv("cmf"); box.appendChild(w);
+  function lien() { try { return localStorage.getItem("iris_admin") || ""; } catch (e) { return ""; } }
+  function connexion() {
+    w.textContent = "";
+    w.appendChild(cmaDiv("cmnb", "Mot de passe administrateur"));
+    var mdp = document.createElement("input"); mdp.type = "password"; mdp.autocomplete = "current-password"; mdp.placeholder = "Mot de passe"; w.appendChild(mdp);
+    var go = cmaBtn("Ouvrir l’envoi d’informations", "pri"), res = cmaDiv("cmres"); w.appendChild(go); w.appendChild(res);
+    function entrer() {
+      if (!mdp.value) { res.className = "cmres ko"; res.textContent = "Saisissez votre mot de passe."; return; }
+      go.disabled = true; res.className = "cmres"; res.textContent = "Vérification…";
+      cmaAppel("connexion", [lien(), mdp.value], function (r) {
+        go.disabled = false;
+        if (r && r.ok && r.jeton) { CMENV.tok = r.jeton; mdp.value = ""; chargeCat(); }
+        else { res.className = "cmres ko"; res.textContent = (r && r.msg) || "Connexion refusée."; }
+      }, function () { go.disabled = false; res.className = "cmres ko"; res.textContent = "Connexion impossible, réessayez."; });
+    }
+    go.onclick = entrer; mdp.onkeydown = function (e) { if (e.key === "Enter") entrer(); };
+  }
+  function chargeCat() {
+    w.textContent = ""; w.appendChild(cmaDiv("cmv", "Chargement…"));
+    cmaAppel("cmAdminCatalogue", [CMENV.tok], function (r) {
+      if (!r || !r.ok) { CMENV.tok = ""; connexion(); var m = cmaDiv("cmres ko", (r && r.msg) || "Session expirée : saisissez de nouveau votre mot de passe."); w.appendChild(m); return; }
+      CMENV.cat = r; formulaire();
+    }, function () { w.textContent = ""; w.appendChild(cmaDiv("cmres ko", "Connexion impossible.")); w.appendChild(cmaBtn("Réessayer", "", chargeCat)); });
+  }
+  function formulaire() {
+    var cat = CMENV.cat, agents = (cat.agents || []).filter(function (a) { return a.actif !== false; });
+    w.textContent = "";
+    function champ(libelle, el) { var l = document.createElement("label"); l.textContent = libelle; w.appendChild(l); w.appendChild(el); return el; }
+    var type = document.createElement("select"); (cat.categories || []).forEach(function (c) { var o = document.createElement("option"); o.value = o.textContent = c; type.appendChild(o); });
+    champ("Type d’information", type);
+    var titre = document.createElement("input"); titre.type = "text"; titre.maxLength = 120; titre.placeholder = "Ex. : Réunion d’équipe"; champ("Titre", titre);
+    var msg = document.createElement("textarea"); msg.placeholder = "Écrivez l’information ici"; champ("Message", msg);
+    try { var v = cmaVoix(); if (v && v.barre) { var bar = v.barre(msg, {}); if (bar) w.appendChild(bar); } } catch (e) { }
+    w.appendChild(cmaDiv("cmnb", "Date, heure et lieu (pour une réunion, un événement…)"));
+    var g = cmaDiv("cmg"); w.appendChild(g);
+    function colonne(libelle, el) { var d = cmaDiv(""); var l = document.createElement("label"); l.textContent = libelle; d.appendChild(l); d.appendChild(el); g.appendChild(d); return el; }
+    var date = document.createElement("input"); date.type = "date"; colonne("Date", date);
+    var hd = document.createElement("input"); hd.type = "time"; colonne("Heure de début", hd);
+    var hf = document.createElement("input"); hf.type = "time"; colonne("Heure de fin", hf);
+    var site = document.createElement("select"); var o0 = document.createElement("option"); o0.value = ""; o0.textContent = "—"; site.appendChild(o0);
+    (cat.sites || []).forEach(function (s) { var o = document.createElement("option"); o.value = o.textContent = s; site.appendChild(o); }); colonne("Site", site);
+    var etage = document.createElement("input"); etage.type = "text"; etage.maxLength = 40; etage.placeholder = "Ex. : 3e étage"; colonne("Étage", etage);
+    var lieu = document.createElement("input"); lieu.type = "text"; lieu.maxLength = 120; lieu.placeholder = "Ex. : Salle 302"; colonne("N° de salle / lieu", lieu);
+    var prio = document.createElement("select"); (cat.priorites || ["Normale", "Importante", "Urgente"]).forEach(function (c) { var o = document.createElement("option"); o.value = o.textContent = c; prio.appendChild(o); }); champ("Priorité", prio);
+    var acc = document.createElement("input"); acc.type = "checkbox"; var la = document.createElement("label"); la.className = "cmcase"; la.appendChild(acc); la.appendChild(document.createTextNode("Demander un accusé de réception")); w.appendChild(la);
+    var par = document.createElement("input"); par.type = "checkbox"; var lp = document.createElement("label"); lp.className = "cmcase"; lp.appendChild(par); lp.appendChild(document.createTextNode("Demander si l’agent participe")); w.appendChild(lp);
+    // Destinataires : tout le monde, un groupe, ou agent par agent
+    w.appendChild(cmaDiv("cmnb", "Destinataires"));
+    var nb = cmaDiv("cmnb"), liste = cmaDiv("cmag"), cases = [];
+    agents.forEach(function (a) { var l = document.createElement("label"), c = document.createElement("input"); c.type = "checkbox"; c.value = a.cle; cases.push(c); l.appendChild(c); l.appendChild(document.createTextNode(a.nom + " " + a.prenom + (a.site ? " — " + a.site : ""))); liste.appendChild(l); c.onchange = maj; });
+    function choisis() { return cases.filter(function (c) { return c.checked; }).map(function (c) { return c.value; }); }
+    function maj() { var n = choisis().length; nb.textContent = n === 0 ? "Aucun agent choisi" : n === agents.length ? "Tous les agents (" + n + ")" : n + " agent" + (n > 1 ? "s" : "") + " choisi" + (n > 1 ? "s" : ""); }
+    function tout(oui) { cases.forEach(function (c) { c.checked = oui; }); maj(); }
+    var rang = cmaDiv("cmrang"); rang.appendChild(cmaBtn("Tout sélectionner", "pri", function () { tout(true); })); rang.appendChild(cmaBtn("Tout désélectionner", "", function () { tout(false); })); w.appendChild(rang);
+    var groupes = cat.groupes || []; if (groupes.length) { var rg = cmaDiv("cmrang"); groupes.forEach(function (gr) { rg.appendChild(cmaBtn("Groupe : " + gr.nom, "", function () { var set = {}; (gr.membres || []).forEach(function (m) { set[m] = 1; }); cases.forEach(function (c) { c.checked = !!set[c.value]; }); maj(); })); }); w.appendChild(rg); }
+    var sites = (cat.sites || []); if (sites.length) { var rs = cmaDiv("cmrang"); sites.forEach(function (s) { rs.appendChild(cmaBtn("Site : " + s, "", function () { cases.forEach(function (c, i) { c.checked = (agents[i].site || "") === s; }); maj(); })); }); w.appendChild(rs); }
+    w.appendChild(nb); w.appendChild(liste); maj();
+    var res = cmaDiv("cmres"); w.appendChild(res);
+    var env = cmaBtn("Envoyer l’information", "pri"); w.appendChild(env);
+    env.onclick = function () {
+      var ids = choisis(); res.className = "cmres";
+      if (titre.value.trim().length < 3) { res.className = "cmres ko"; res.textContent = "Écrivez le titre."; titre.focus(); return; }
+      if (msg.value.trim().length < 3) { res.className = "cmres ko"; res.textContent = "Écrivez le message."; msg.focus(); return; }
+      if (!ids.length) { res.className = "cmres ko"; res.textContent = "Choisissez au moins un agent (ou « Tout sélectionner »)."; return; }
+      var tous = ids.length === agents.length;
+      if (!window.confirm("Envoyer cette information à " + (tous ? "tous les agents (" + ids.length + ")" : ids.length + " agent" + (ids.length > 1 ? "s" : "")) + " ?")) return;
+      env.disabled = true; res.textContent = "Envoi en cours…";
+      var o = { action: "publier", categorie: type.value, titre: titre.value.trim(), message: msg.value.trim(), priorite: prio.value, dateEv: date.value, heureDeb: hd.value, heureFin: hf.value, site: site.value, etage: etage.value.trim(), lieu: lieu.value.trim(), destinataires: tous ? "tous" : ids, accuse: acc.checked, participation: par.checked };
+      cmaAppel("cmAdminSauve", [CMENV.tok, o], function (r) {
+        env.disabled = false;
+        if (r && r.ok) { res.className = "cmres ok"; res.textContent = (r.msg || "Information envoyée.") + " (" + (tous ? "tous les agents" : ids.length + " agent" + (ids.length > 1 ? "s" : "")) + ")"; titre.value = msg.value = etage.value = lieu.value = date.value = hd.value = hf.value = ""; acc.checked = par.checked = false; tout(false); if (typeof cmaCompteur === "function") cmaCompteur(); }
+        else if (r && /refus/i.test(r.msg || "")) { CMENV.tok = ""; connexion(); w.appendChild(cmaDiv("cmres ko", "Session expirée : saisissez de nouveau votre mot de passe.")); }
+        else { res.className = "cmres ko"; res.textContent = (r && r.msg) || "L’envoi a échoué."; }
+      }, function () { env.disabled = false; res.className = "cmres ko"; res.textContent = "Connexion interrompue : vérifiez dans Information si l’envoi est parti avant de recommencer."; });
+    };
+  }
+  if (CMENV.tok && CMENV.cat) formulaire(); else if (CMENV.tok) chargeCat(); else connexion();
 }
 </script><link rel="stylesheet" href="../iris.css?v=20261116"></body></html>
