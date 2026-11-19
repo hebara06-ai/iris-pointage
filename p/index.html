@@ -9,7 +9,7 @@
   }
   function make(ok, ko) {
     var o = { withSuccessHandler: function (f) { return make(f, ko); }, withFailureHandler: function (f) { return make(ok, f); } };
-    ["etat", "verifier", "pointer", "ouvrirScan", "congesEtat", "congesDemander", "congesAnnuler","congesConnexion","congesPiece","congesAjouterPiece","stampDonnees","recupDemander","recupVerifier","recupStatut","agentBilan","agentDetails","agentSignaler","agentSignalements","meteoDonnees","gaMesDossiers","gaDeposer","gaMaPiece","gaAjouterPieces","qsPoser","qsIrisRepondre","qsMesQuestions","qsDemanderHumain","qsReecrire","qsMaPiece","cmCompteur","cmMesCommunications","cmLire","cmAccuse","cmParticipation","cmMesMessages","cmLireMessages","cmEnvoyerMessage","cmReecrire","cmMaPiece","cmLireMessage","cmMaPieceMessage","cmMesPrefs","cmMesPrefsSauve"].forEach(function (n) { o[n] = function () { appelle(n, Array.prototype.slice.call(arguments), ok, ko); }; });
+    ["etat", "verifier", "pointer", "ouvrirScan", "congesEtat", "congesDemander", "congesAnnuler","congesConnexion","congesPiece","congesAjouterPiece","stampDonnees","recupDemander","recupVerifier","recupStatut","agentBilan","agentDetails","agentSignaler","agentSignalements","meteoDonnees","gaMesDossiers","gaDeposer","gaMaPiece","gaAjouterPieces","qsPoser","qsIrisRepondre","qsMesQuestions","qsDemanderHumain","qsReecrire","qsMaPiece","cmCompteur","cmMesCommunications","cmLire","cmAccuse","cmParticipation","cmMesMessages","cmLireMessages","cmEnvoyerMessage","cmReecrire","cmMaPiece","cmLireMessage","cmMaPieceMessage","cmMesPrefs","cmMesPrefsSauve","vxLire"].forEach(function (n) { o[n] = function () { appelle(n, Array.prototype.slice.call(arguments), ok, ko); }; });
     return o;
   }
   window.google = { script: { run: make(null, null) } };
@@ -209,19 +209,21 @@ var IrisVoix = (function () {
   }
   try { if (synth && synth.addEventListener) synth.addEventListener('voiceschanged', function () { voixCache = null; }); } catch (e) { }
   // Découpe le texte en phrases courtes (les longues lectures sont coupées net sur certains téléphones)
-  function morceaux(t) {
+  function morceaux(t, max) {
+    max = max || 180;
     var ph = t.match(/[^.!?;:\n]+[.!?;:]*\s*/g) || [t], out = [], cur = '';
-    ph.forEach(function (p) { if ((cur + p).length > 180 && cur) { out.push(cur.trim()); cur = ''; } cur += p; while (cur.length > 220) { var k = cur.lastIndexOf(' ', 200); if (k < 60) k = 200; out.push(cur.slice(0, k).trim()); cur = cur.slice(k); } });
+    ph.forEach(function (p) { if ((cur + p).length > max && cur) { out.push(cur.trim()); cur = ''; } cur += p; while (cur.length > max + 40) { var k = cur.lastIndexOf(' ', max + 20); if (k < 60) k = max + 20; out.push(cur.slice(0, k).trim()); cur = cur.slice(k); } });
     if (cur.trim()) out.push(cur.trim()); return out.length ? out : [t];
   }
-  function arreter() { try { if (synth) synth.cancel(); } catch (e) { } if (lecteur) { var l = lecteur; lecteur = null; if (l.fin) l.fin(); } }
-  // Lecture à voix haute ; un 2e appel avec le même bouton arrête la lecture
-  function lire(texte, onFin, cle) {
-    if (!synth || !window.SpeechSynthesisUtterance) return false;
-    var t = nettoyer(texte); if (!t) return false;
-    if (lecteur && lecteur.cle && lecteur.cle === cle) { arreter(); return true; }
-    arreter();
-    var etat = { cle: cle, fin: function () { if (onFin) { var f = onFin; onFin = null; f(); } } }; lecteur = etat;
+  // Voix naturelle (serveur IRIS -> Google) : fournie par la page ; repli automatique sur la voix du téléphone en cas de plafond, de panne ou de blocage du navigateur
+  var cloud = null, cloudHS = 0, audio = null, SILENCE = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+  function definirCloud(fn) { cloud = typeof fn === 'function' ? fn : null; }
+  function arreter() {
+    try { if (synth) synth.cancel(); } catch (e) { }
+    try { if (audio) { audio.onended = audio.onerror = null; audio.pause(); } } catch (e) { }
+    if (lecteur) { var l = lecteur; lecteur = null; l.annule = true; if (l.fin) l.fin(); }
+  }
+  function lireTel(t, etat) {
     var parts = morceaux(t), v = voixFr(), reste = parts.length;
     try {
       parts.forEach(function (p) {
@@ -229,10 +231,53 @@ var IrisVoix = (function () {
         u.onend = u.onerror = function () { reste--; if (reste <= 0) { if (lecteur === etat) lecteur = null; etat.fin(); } };
         synth.speak(u);
       });
-    } catch (e) { lecteur = null; return false; }
+    } catch (e) { if (lecteur === etat) lecteur = null; etat.fin(); return false; }
     return true;
   }
-  function dispoLecture() { return !!(synth && window.SpeechSynthesisUtterance); }
+  function jouerB64(r, ok, ko) {
+    try {
+      var bin = atob(String(r.b64)), oc = new Uint8Array(bin.length), i; for (i = 0; i < bin.length; i++) oc[i] = bin.charCodeAt(i);
+      var url = URL.createObjectURL(new Blob([oc], { type: r.mime || 'audio/mpeg' }));
+      audio.onended = function () { try { URL.revokeObjectURL(url); } catch (e) { } ok(); }; audio.onerror = function () { ko(); };
+      audio.src = url; var pr = audio.play(); if (pr && pr.catch) pr.catch(function () { ko(); });
+    } catch (e) { ko(); }
+  }
+  function lireCloud(t, etat) {
+    var paquets = morceaux(t, 900), pre = [];
+    if (paquets.length > 4 || typeof Audio !== 'function') return false;
+    if (!audio) audio = new Audio();
+    try { audio.src = SILENCE; var p0 = audio.play(); if (p0 && p0.catch) p0.catch(function () { }); } catch (e) { }   // déverrouille la lecture dans le geste de l'utilisateur (iPhone)
+    function obtenir(i, cb) {
+      var p = pre[i];
+      if (!p) { p = pre[i] = { r: null, cbs: [] }; try { cloud(paquets[i], function (r) { p.r = r || { ok: false }; p.cbs.splice(0).forEach(function (f) { f(p.r); }); }); } catch (e) { p.r = { ok: false }; } }
+      if (p.r) cb(p.r); else p.cbs.push(cb);
+    }
+    function repli(i) { cloudHS = Date.now() + 5 * 60000; if (etat.annule || lecteur !== etat) return; if (!synth || !window.SpeechSynthesisUtterance) { lecteur = null; etat.fin(); return; } lireTel(paquets.slice(i).join(' '), etat); }
+    function suite(i) {
+      if (etat.annule || lecteur !== etat) return;
+      if (i >= paquets.length) { lecteur = null; etat.fin(); return; }
+      obtenir(i, function (r) {
+        if (etat.annule || lecteur !== etat) return;
+        if (!r || !r.ok || !r.b64) { repli(i); return; }
+        jouerB64(r, function () { suite(i + 1); }, function () { repli(i); });
+        if (i + 1 < paquets.length) obtenir(i + 1, function () { });
+      });
+    }
+    suite(0); return true;
+  }
+  // Lecture à voix haute ; un 2e appel avec le même bouton arrête la lecture
+  function lire(texte, onFin, cle) {
+    var tel = !!(synth && window.SpeechSynthesisUtterance), peutCloud = !!(cloud && Date.now() > cloudHS);
+    if (!tel && !peutCloud) return false;
+    var t = nettoyer(texte); if (!t) return false;
+    if (lecteur && lecteur.cle && lecteur.cle === cle) { arreter(); return true; }
+    arreter();
+    var etat = { cle: cle, annule: false, fin: function () { if (onFin) { var f = onFin; onFin = null; f(); } } }; lecteur = etat;
+    if (peutCloud && lireCloud(t, etat)) return true;
+    if (!tel) { lecteur = null; return false; }
+    return lireTel(t, etat);
+  }
+  function dispoLecture() { return !!((synth && window.SpeechSynthesisUtterance) || cloud); }
   function dispoDictee() { return !!SR; }
   // Dictée : appelle onTexte(texteReconnu) ; onEtat('ecoute'|'arret'|'erreur', message)
   function dicter(onTexte, onEtat) {
@@ -281,7 +326,7 @@ var IrisVoix = (function () {
     document.addEventListener('selectionchange', function () { clearTimeout(maj._t); maj._t = setTimeout(maj, 250); });
     b.onmousedown = function (e) { e.preventDefault(); }; b.onclick = function () { lire(sel, null, 'sel'); fl.style.display = 'none'; };
   }
-  return { lire: lire, arreter: arreter, dicter: dicter, barre: barre, boutonLire: boutonLire, decorer: decorer, lectureSelection: lectureSelection, dispoLecture: dispoLecture, dispoDictee: dispoDictee, nettoyer: nettoyer };
+  return { lire: lire, definirCloud: definirCloud, arreter: arreter, dicter: dicter, barre: barre, boutonLire: boutonLire, decorer: decorer, lectureSelection: lectureSelection, dispoLecture: dispoLecture, dispoDictee: dispoDictee, nettoyer: nettoyer };
 })();
 
 /* IRIS — « Posez votre question » v2 : chat + voix (IrisVoix : Écouter / Dicter / Corriger / Reformuler), pièces jointes du responsable,
@@ -1377,6 +1422,8 @@ function cmaBouton() {
   if (!DEMOP) cmaDemarre();
   return b;
 }
+// Voix naturelle : la lecture « Écouter » passe d'abord par le serveur IRIS (Google) ; repli automatique sur la voix du téléphone
+(function () { try { if (typeof IrisVoix === "undefined" || !IrisVoix.definirCloud) return; IrisVoix.definirCloud(function (t, cb) { if (typeof DEMOP !== "undefined" && DEMOP) { cb(null); return; } cmaAppel("vxLire", [DEV, t], function (r) { cb(r); }, function () { cb(null); }); }); } catch (e) { } })();
 
 /* IRIS — accès administrateur aux Communications depuis MON ESPACE.
    Même code, mêmes données et mêmes droits que le tableau de bord : la page d'administration (onglet Communications) est ouverte
