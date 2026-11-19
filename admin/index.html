@@ -953,7 +953,65 @@ var IrisVoix = (function () {
     });
     return z;
   }
+
+  var MDPL = null;
+  function mdpAppel(nom, o, apres) {
+    appel(nom, o, function (r) { if (r && r.ok) { msg(r.msg || "Enregistré"); apres(r); } else { msg((r && r.msg) || "Échec.", true); if (r && r.rafraichir) apres(r); } });
+  }
+  function ligneMdp(x, rendu) {
+    var av = [x.nom, x.prenom], tete = [h("b", { t: x.nom + " " + x.prenom })];
+    tete.push(h("span", { c: "ed-tag", t: x.appareil ? "Téléphone associé" : "Aucun téléphone associé" }));
+    var tg = h("span", { c: "ed-tag", t: x.code ? "Mot de passe défini" : "Sans mot de passe (ancien contrôle)" }); if (!x.code) tg.style.cssText = "background:#fdecdc;color:#b4540a"; tete.push(tg);
+    var infos = h("p", { c: "ed-vide", t: "Téléphone : " + (x.tel || "—") + "  ·  E-mail : " + (x.email || "—") + (x.email ? (x.emailOk ? " (vérifié)" : " (non vérifié)") : "") + "  ·  Matricule : " + (x.matricule || "—") + "  ·  N° de badge : " + (x.badge || "—") + "  ·  N° d’accès : " + (x.carte || "—") });
+    var ci = h("input", { type: "text", maxlength: "6", inputmode: "numeric", autocomplete: "off", placeholder: "6 chiffres" }); ci.value = x.code || ""; ci.style.cssText = "font-size:20px;letter-spacing:.2em;width:9em;text-align:center";
+    var bv = h("button", { c: "ed-b ed-p", t: "Valider ce mot de passe", type: "button" });
+    bv.onclick = function () { var c6 = ci.value.replace(/\D/g, ""); if (c6.length !== 6) { msg("Le mot de passe doit faire exactement 6 chiffres.", true); ci.focus(); return; } mdpAppel("adminCodes", { action: "definir", l: x.l, av: av, code: c6 }, rendu); };
+    var bars = [bv, sure(x.code ? "Régénérer" : "Générer un code", false, function () { mdpAppel("adminCodes", { action: "generer", l: x.l, av: av }, rendu); })];
+    if (x.code && x.emailOk) bars.push(sure("Envoyer à l’agent par e-mail", false, function () { mdpAppel("adminCodes", { action: "envoyer", l: x.l, av: av }, rendu); }));
+    if (x.code) bars.push(sure("Retirer", true, function () { mdpAppel("adminCodes", { action: "retirer", l: x.l, av: av }, rendu); }));
+    var cs = h("input", { type: "text", maxlength: "21", inputmode: "numeric", autocomplete: "off", placeholder: "N° de sécurité sociale (15 caractères)" }); cs.style.display = "none"; cs.style.cssText = "display:none;width:17em";
+    var vue = h("span", { c: "ed-vide", t: x.ssSet ? "N° de sécurité sociale : enregistré (masqué)" : "N° de sécurité sociale : non renseigné" });
+    var bs = [], bo = h("button", { c: "ed-b", t: "Afficher", type: "button" }), bm = h("button", { c: "ed-b", t: x.ssSet ? "Modifier" : "Saisir", type: "button" }), be = h("button", { c: "ed-b ed-p", t: "Enregistrer", type: "button" });
+    be.style.display = "none"; if (!x.ssSet) bo.style.display = "none";
+    var visible = false;
+    bo.onclick = function () {
+      if (visible) { visible = false; vue.textContent = "N° de sécurité sociale : enregistré (masqué)"; bo.textContent = "Afficher"; return; }
+      appel("adminSecu", { action: "voir", l: x.l, av: av }, function (r) { if (r && r.ok) { visible = true; vue.textContent = "N° de sécurité sociale : " + r.valeur; bo.textContent = "Masquer"; } else msg((r && r.msg) || "Échec.", true); });
+    };
+    bm.onclick = function () { cs.style.display = "inline-block"; be.style.display = ""; cs.focus(); };
+    function enreg(force) {
+      appel("adminSecu", { action: "definir", l: x.l, av: av, valeur: cs.value, force: force }, function (r) {
+        if (r && r.ok) { msg(r.msg); cs.value = ""; rendu(); }
+        else if (r && r.cle && window.confirm((r.msg || "La clé de contrôle ne correspond pas.") + " Enregistrer quand même ?")) enreg(true);
+        else msg((r && r.msg) || "Échec.", true);
+      });
+    }
+    be.onclick = function () { if (!cs.value.trim()) { msg("Saisissez le numéro.", true); return; } enreg(false); };
+    var ligneSS = [vue, bo, bm, cs, be];
+    if (x.ssSet) ligneSS.push(sure("Effacer", true, function () { mdpAppel("adminSecu", { action: "effacer", l: x.l, av: av }, rendu); }));
+    return h("div", { c: "ed-l" }, tete.concat([infos, h("div", { c: "ed-row" }, [lab("Mot de passe de l’agent", ci)].concat(bars)), h("div", { c: "ed-row" }, ligneSS)]));
+  }
+  function paneMdpAgents(c) {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Mots de passe des agents" })]), corps = h("div", {}, [h("p", { c: "ed-vide", t: "Chargement…" })]);
+    carte.appendChild(h("p", { c: "ed-vide", t: "C’est vous qui choisissez le mot de passe (6 chiffres) de chaque agent. Il remplace les 4 derniers chiffres du n° d’accès pour pointer, consulter ses congés et récupérer son compte. Chaque changement vous est envoyé par e-mail avec le nom, le badge, le n° d’accès, le matricule et le nouveau mot de passe." }));
+    carte.appendChild(corps);
+    function rendu() {
+      appel("adminCodesLire", {}, function (r) {
+        corps.textContent = "";
+        if (!r || !r.ok) { corps.appendChild(h("p", { c: "ed-vide", t: (r && r.msg) || "Liste indisponible." })); return; }
+        MDPL = r.agents; var sans = r.agents.filter(function (x) { return !x.code; }).length;
+        var barre = [h("span", { c: "ed-vide", t: r.agents.length + " agent(s) · " + sans + " sans mot de passe" })];
+        if (sans) barre.push(sure("Générer les mots de passe manquants", false, function () { mdpAppel("adminCodes", { action: "generer_tous" }, rendu); }));
+        var ga = h("button", { c: "ed-b", t: "Ajouter ou supprimer un agent", type: "button" }); ga.onclick = function () { onglet = "ag"; dessiner(); }; barre.push(ga);
+        corps.appendChild(h("div", { c: "ed-row" }, barre));
+        if (!r.emailReel) corps.appendChild(h("p", { c: "ed-vide", t: "Les e-mails aux agents sont désactivés dans les réglages : seuls vos récapitulatifs partent." }));
+        r.agents.forEach(function (x) { corps.appendChild(ligneMdp(x, rendu)); });
+      });
+    }
+    rendu(); c.appendChild(carte);
+  }
   function paneParam(c) {
+    paneMdpAgents(c);
     var an = h("input", { type: "password", autocomplete: "current-password", placeholder: "Ancien mot de passe" }), nv = h("input", { type: "password", autocomplete: "new-password", placeholder: "Nouveau mot de passe (10 caractères minimum, lettre + chiffre)" }), cf = h("input", { type: "password", autocomplete: "new-password", placeholder: "Confirmer le nouveau mot de passe" }), cd = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Code de sécurité (obligatoire)" });
     var ok = h("button", { c: "ed-b ed-p", t: "Modifier mon mot de passe", type: "button" });
     ok.onclick = function () {
@@ -2438,5 +2496,54 @@ if(DERN)window.tbDraw(DERN);else maj2();
     t.appendChild(tb); kb.appendChild(t);
   }
   window.IRISKPI = function (liste) { KP.liste = liste || []; initKpi(); majKpi(); };
+})();
+</script><script>/* IRIS admin — connexion depuis un NOUVEL appareil (téléphone, autre ordinateur) sans le lien secret : mot de passe + code de sécurité.
+   Ajout isolé : la connexion avec le lien et la récupération restent inchangées. */
+(function () {
+  var vk = document.getElementById("vk"); if (!vk) return;
+  function E(t, st, tx) { var e = document.createElement(t); if (st) e.style.cssText = st; if (tx) e.textContent = tx; return e; }
+  var STI = "width:280px;max-width:80vw;font-size:17px;padding:13px 14px;border-radius:14px;border:1px solid #c9973f;background:rgba(255,255,255,.08);color:#fff;text-align:center;outline:none;box-sizing:border-box;margin-top:10px";
+  var STB = "margin-top:14px;width:280px;max-width:80vw;font-size:17px;font-weight:700;padding:14px;border:0;border-radius:14px;background:linear-gradient(180deg,#e9cd6b,#c9973f);color:#0b1a2b;cursor:pointer";
+  var STS = "margin-top:10px;width:280px;max-width:80vw;font-size:15px;padding:11px;border-radius:14px;border:1px solid #c9973f;background:transparent;color:#cdb88a;cursor:pointer";
+  var principaux = ["vkp", "vkb", "vke"].map(function (i) { return document.getElementById(i); });
+  var recup = null; Array.prototype.forEach.call(vk.querySelectorAll("a"), function (a) { if (/oublié/.test(a.textContent)) recup = a; });
+  var lien = E("a", "margin-top:10px;color:#e9cd6b;font-size:15px;cursor:pointer;text-decoration:underline", "Nouvel appareil ? Me connecter avec mon code de sécurité");
+  lien.setAttribute("role", "button"); lien.tabIndex = 0;
+  var pan = E("div", "display:none;flex-direction:column;align-items:center;text-align:center");
+  var msg = E("div", "margin-top:12px;min-height:22px;font-size:15px;color:#f0a5a5;max-width:80vw");
+  vk.appendChild(lien); vk.appendChild(pan);
+  function montrer(oui) { principaux.forEach(function (e) { if (e) e.style.display = oui ? "" : "none"; }); lien.style.display = oui ? "" : "none"; if (recup) recup.style.display = oui ? "" : "none"; pan.style.display = oui ? "none" : "flex"; }
+  function ouvrirPanneau() {
+    pan.textContent = ""; montrer(false);
+    pan.appendChild(E("div", "font-size:19px;letter-spacing:.08em;color:#cdb88a;margin-bottom:6px", "Nouvel appareil"));
+    pan.appendChild(E("div", "font-size:15px;color:#cdb88a;max-width:80vw;margin-bottom:4px", "Saisissez votre mot de passe et votre code de sécurité."));
+    var mdp = E("input", STI); mdp.type = "password"; mdp.placeholder = "Mot de passe"; mdp.autocomplete = "current-password";
+    var code = E("input", STI); code.type = "password"; code.placeholder = "Code de sécurité"; code.autocomplete = "off"; code.setAttribute("inputmode", "numeric");
+    var lb = E("label", "margin-top:12px;color:#cdb88a;font-size:15px;display:flex;align-items:center;gap:8px;max-width:80vw"), cb = E("input"); cb.type = "checkbox"; cb.checked = true; lb.appendChild(cb); lb.appendChild(document.createTextNode("Mémoriser cet appareil (sinon, à décocher sur un ordinateur partagé)"));
+    var go = E("button", STB, "Me connecter"); go.type = "button";
+    var re = E("button", STS, "Retour"); re.type = "button";
+    pan.appendChild(mdp); pan.appendChild(code); pan.appendChild(lb); pan.appendChild(go); pan.appendChild(msg); pan.appendChild(re);
+    msg.textContent = "";
+    function fermer() { pan.textContent = ""; montrer(true); }
+    re.onclick = fermer;
+    function envoyer() {
+      if (!mdp.value || !code.value) { msg.textContent = "Saisissez votre mot de passe et votre code de sécurité."; return; }
+      go.disabled = true; msg.textContent = "";
+      google.script.run.withSuccessHandler(function (r) {
+        go.disabled = false;
+        if (r && r.ok && r.jeton) {
+          if (cb.checked && r.lien) { try { localStorage.setItem("iris_admin", r.lien); } catch (e) { } }
+          CLE = r.jeton; vk.style.display = "none"; mdp.value = code.value = ""; fermer();
+          if (window.charge) charge(); if (window.maj) maj();
+        } else msg.textContent = (r && r.msg) || "Connexion impossible.";
+      }).withFailureHandler(function () { go.disabled = false; msg.textContent = "Connexion impossible, réessayez."; }).connexionNouvelAppareil(mdp.value, code.value);
+    }
+    go.onclick = envoyer;
+    mdp.onkeydown = code.onkeydown = function (e) { if (e.key === "Enter") envoyer(); };
+    setTimeout(function () { mdp.focus(); }, 50);
+  }
+  lien.onclick = ouvrirPanneau; lien.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ouvrirPanneau(); } };
+  // appareil sans lien mémorisé : le panneau « nouvel appareil » est proposé directement
+  try { if (!localStorage.getItem("iris_admin")) setTimeout(ouvrirPanneau, 400); } catch (e) { }
 })();
 </script><script>(function(){if((location.search||"").indexOf("solo=1")<0)return;var st=document.createElement("style");st.textContent="#ed .ed-top{display:none!important}";document.head.appendChild(st);var fait=false,t=setInterval(function(){var vk=document.getElementById("vk"),b=document.getElementById("btned");if(!vk||!b){return}if(vk.style.display==="none"&&!fait){fait=true;clearInterval(t);b.click()}},300)})();</script></body></html>
