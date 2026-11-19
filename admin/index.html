@@ -1010,8 +1010,28 @@ var IrisVoix = (function () {
     }
     rendu(); c.appendChild(carte);
   }
+
+  function paneRapport(c) {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Rapport semestriel (Excel + PDF)" })]), etat = h("p", { c: "ed-vide", t: "Chargement…" });
+    carte.appendChild(h("p", { c: "ed-vide", t: "Tous les 6 mois (début janvier et début juillet), IRIS vous envoie automatiquement par e-mail un fichier Excel et un PDF : nom, prénom, téléphone, e-mail, matricule, arrivées, départs, retards, heures supplémentaires, absences et congés de chaque agent. Rien n’est supprimé : les données restent dans la feuille, et les rapports sont aussi gardés dans Drive. Seul l’administrateur reçoit ce rapport ; une génération à la demande exige votre mot de passe ET votre code de sécurité." }));
+    carte.appendChild(etat);
+    appel("adminRapport", { action: "etat" }, function (r) { etat.textContent = r && r.ok ? "Dernier envoi : " + (r.dernier || "aucun pour le moment") + " · Destinataires : " + (r.destinataires || []).join(", ") + " · Prochain semestre à envoyer : " + (r.prochain || "—") : "État indisponible."; });
+    var code = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Code de sécurité" }); code.style.cssText = "width:14em";
+    carte.appendChild(h("div", { c: "ed-row" }, [lab("Code de sécurité (pour envoyer maintenant)", code)]));
+    function go(libelle, o, danger) {
+      return sure(libelle, !!danger, function () {
+        if (!code.value) { msg("Saisissez votre code de sécurité.", true); return; }
+        msg("Génération en cours… (30 à 60 secondes)");
+        var q = { action: "envoyer", semestre: o.semestre, essai: !!o.essai, code: code.value }; code.value = "";
+        appel("adminRapport", q, function (r) { if (r && r.ok) msg((r.msg || "Rapport envoyé.") + " (" + ((r.total && r.total.agents) || 0) + " agents)"); else msg((r && r.msg) || "Échec.", true); });
+      });
+    }
+    carte.appendChild(h("div", { c: "ed-row" }, [go("M’envoyer un essai (Gmail seulement)", { semestre: "courant", essai: true }), go("Envoyer le semestre précédent aux 2 adresses", { semestre: "precedent" }), go("Envoyer le semestre en cours aux 2 adresses", { semestre: "courant" })]));
+    c.appendChild(carte);
+  }
   function paneParam(c) {
     paneMdpAgents(c);
+    paneRapport(c);
     var an = h("input", { type: "password", autocomplete: "current-password", placeholder: "Ancien mot de passe" }), nv = h("input", { type: "password", autocomplete: "new-password", placeholder: "Nouveau mot de passe (10 caractères minimum, lettre + chiffre)" }), cf = h("input", { type: "password", autocomplete: "new-password", placeholder: "Confirmer le nouveau mot de passe" }), cd = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Code de sécurité (obligatoire)" });
     var ok = h("button", { c: "ed-b ed-p", t: "Modifier mon mot de passe", type: "button" });
     ok.onclick = function () {
