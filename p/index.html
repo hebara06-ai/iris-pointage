@@ -1575,13 +1575,20 @@ function cmaEnvOuvre(box) {
    Appelé par la confirmation « Pointé » (arrivée, départ ou pointage déjà enregistré), que l'agent ait scanné avec l'appareil photo du téléphone ou avec la caméra de son espace.
    Réutilise : el, c, IrisVoix (voix du téléphone, ou voix naturelle quand elle est activée). */
 // Moment de la journée (heure de Paris donnée par le serveur) : matin 4 h–12 h, après-midi 12 h–18 h, soir 18 h–24 h, nuit 0 h–4 h
-function pvMoment(h) { return h >= 4 && h < 12 ? "matin" : h >= 12 && h < 18 ? "apres" : h >= 18 ? "soir" : "nuit"; }
+// Coucher du soleil à Paris (heure légale, été/hiver pris en compte) : le « soir » commence au coucher du soleil, au plus tard à 18 h
+function pvDecalage(d) { try { var p = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Paris", hour: "2-digit", hour12: false }).format(d)) % 24, o = p - d.getUTCHours(); if (o < 0) o += 24; return o > 12 ? o - 24 : o; } catch (e) { return 1; } }
+function pvCoucher(d) {
+  d = d || new Date(); var N = Math.floor((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(d.getFullYear(), 0, 0)) / 864e5), R = Math.PI / 180, lat = 48.8566 * R, dec = 23.44 * R * Math.sin(2 * Math.PI * (284 + N) / 365), B = 2 * Math.PI * (N - 81) / 364, eot = 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B), cc = (Math.sin(-0.833 * R) - Math.sin(lat) * Math.sin(dec)) / (Math.cos(lat) * Math.cos(dec));
+  return 12 - 2.3522 / 15 - eot / 60 + Math.acos(Math.max(-1, Math.min(1, cc))) / R / 15 + pvDecalage(d);
+}
+// h = heure décimale de Paris (ex. 17,38) : matin 4 h–12 h, après-midi 12 h–coucher du soleil, soir coucher–24 h, nuit 0 h–4 h
+function pvMoment(h) { var s = Math.min(pvCoucher(), 18); return h >= 4 && h < 12 ? "matin" : h >= 12 && h < s ? "apres" : h >= s ? "soir" : "nuit"; }
 function pvMessage(r) {
-  var hh = /^\d{1,2}:/.test(String(r.heure || "")) ? Number(String(r.heure).split(":")[0]) : new Date().getHours(), m = pvMoment(hh), salut = (m === "matin" || m === "apres") ? "Bonjour" : "Bonsoir", p = String(r.prenom || "").trim(), tete = salut + (p ? " " + p : "") + ". ";
+  var hh = /^\d{1,2}:/.test(String(r.heure || "")) ? (Number(String(r.heure).split(":")[0]) + Number(String(r.heure).split(":")[1] || 0) / 60) : (new Date().getHours() + new Date().getMinutes() / 60), m = pvMoment(hh), salut = (m === "matin" || m === "apres") ? "Bonjour" : "Bonsoir", p = String(r.prenom || "").trim(), tete = salut + (p ? " " + p : "") + ". ";
   var dep = r.type === "Départ" || /^départ/i.test(String(r.libelle || ""));
   if (/déjà/i.test(String(r.libelle || ""))) return tete + (dep ? "Votre départ" : "Votre arrivée") + " est déjà enregistré" + (dep ? "" : "e") + ". Merci.";
-  if (dep) return tete + "Votre départ a bien été pris en compte. Merci et bonne route. " + { matin: "Bonne fin de matinée.", apres: "Bon après-midi.", soir: "Bonne soirée.", nuit: "Bonne nuit." }[m] + " IRIS vous remercie pour votre confiance.";
-  return tete + "Bienvenue ! Votre arrivée a bien été prise en compte. " + { matin: "Merci et bonne matinée.", apres: "Merci et bon après-midi.", soir: "Merci et bonne soirée.", nuit: "Merci et bon courage pour cette nuit." }[m];
+  if (dep) return tete + "Votre départ a bien été pris en compte. Merci et bonne route. " + { matin: "Bonne journée.", apres: "Bon après-midi.", soir: "Bonne soirée.", nuit: "Bonne nuit." }[m] + " IRIS vous remercie pour votre confiance.";
+  return tete + "Bienvenue ! Votre arrivée a bien été prise en compte. " + { matin: "Merci et bonne journée.", apres: "Merci et bon après-midi.", soir: "Merci et bonne soirée.", nuit: "Merci et bon courage pour cette nuit." }[m];
 }
 // iPhone/iPad : la voix automatique n'est autorisée qu'après un premier geste de l'utilisateur. Dès le premier toucher de la page (bouton « Pointage », « Pointer »…), on déverrouille la synthèse vocale en silence.
 var PV = { ok: false };
