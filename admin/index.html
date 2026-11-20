@@ -367,9 +367,12 @@ var IrisVoix = (function () {
   function hm(t) { var m = /([0-9]{1,2})\s*[hH:]\s*([0-9]{1,2})?/.exec(t || ""); return m ? ("0" + m[1]).slice(-2) + ":" + ("0" + (m[2] || 0)).slice(-2) : ""; }
   function msg(t, ko) { toast.textContent = t; toast.className = ko ? "ko" : ""; toast.style.display = "block"; clearTimeout(tt); tt = setTimeout(function () { toast.style.display = "none"; }, ko ? 6500 : 2800); }
   function appel(nom, arg, ok) { google.script.run.withSuccessHandler(ok).withFailureHandler(function () { msg("Connexion impossible, réessayez.", true); })[nom](CLE, arg); }
-  function charger() { appel("adminLire", jourSel ? fr(jourSel) : "", function (r) { if (!r) { msg("Accès refusé.", true); return; } DATA = r; dessiner(); }); }
+  function charger() { appel("adminLire", jourSel ? fr(jourSel) : "", function (r) { if (!r) { msg("Accès refusé.", true); return; } DATA = r; DIRTY = false; REPORT = false; dessiner(); }); }
   // Synchronisation rapide : repère de changement interrogé toutes les ~1,5 s (onglet visible) ; données rechargées seulement si le repère change
-  var STAMPA = null, SYNCA = null;
+  var STAMPA = null, SYNCA = null, DIRTY = false, REPORT = false;
+  function enEdition() { var x = document.activeElement; return ov.className === "on" && (DIRTY || (x && ov.contains(x) && /INPUT|TEXTAREA|SELECT/.test(x.tagName))); }
+  ov.addEventListener("input", function (e) { DIRTY = true; var cd = e.target && e.target.closest ? e.target.closest(".ed-card") : null; if (cd) Array.prototype.forEach.call(cd.querySelectorAll("button"), function (b) { if (b.textContent === "Enregistrer") { b.textContent = "Enregistrer les changements"; b.style.boxShadow = "0 0 0 3px #d4af37"; } }); }, true);
+  ov.addEventListener("focusout", function () { setTimeout(function () { if (REPORT && !enEdition()) { REPORT = false; charger(); } }, 400); });
   window.__sync = { n: 0, dernier: 0 };
   function syncA() {
     clearTimeout(SYNCA);
@@ -378,7 +381,7 @@ var IrisVoix = (function () {
     google.script.run.withSuccessHandler(function (r) {
       var s = r && r.s;
       if (STAMPA === null) STAMPA = s;
-      else if (s !== STAMPA) { STAMPA = s; window.__sync.n++; window.__sync.dernier = Math.round(performance.now() - t0); if (typeof maj === "function") maj(); if (DATA) charger(); }
+      else if (s !== STAMPA) { STAMPA = s; window.__sync.n++; window.__sync.dernier = Math.round(performance.now() - t0); if (typeof maj === "function") maj(); if (DATA) { if (enEdition()) REPORT = true; else charger(); } }
       SYNCA = setTimeout(syncA, 1500);
     }).withFailureHandler(function () { SYNCA = setTimeout(syncA, 6000); }).stampDonnees("adm");
   }
@@ -905,7 +908,7 @@ var IrisVoix = (function () {
     var bar = h("div", { c: "ed-row" }), av = [a.nom, a.prenom];
     if (neuf) { var ad = h("button", { c: "ed-b ed-p", t: "Ajouter l’agent", type: "button" }); ad.onclick = function () { action("adminAgent", avec({ action: "ajout" })); }; bar.appendChild(ad); }
     else {
-      var sv = h("button", { c: "ed-b ed-p", t: "Enregistrer", type: "button" }); sv.onclick = function () { action("adminAgent", avec({ action: "maj", l: a.l, av: av })); }; bar.appendChild(sv);
+      var sv = h("button", { c: "ed-b ed-p", t: "Enregistrer", type: "button" }); sv.onclick = function () { sv.disabled = true; sv.textContent = "Enregistrement…"; action("adminAgent", avec({ action: "maj", l: a.l, av: av })); setTimeout(function () { if (sv.isConnected) { sv.disabled = false; sv.textContent = "Enregistrer les changements"; } }, 8000); }; bar.appendChild(sv);
       if (a.appareil) bar.appendChild(sure("Libérer le téléphone", false, function () { action("adminAgent", { action: "liberer", l: a.l, av: av }); }));
       bar.appendChild(sure("Supprimer l’agent", true, function () { action("adminAgent", { action: "sup", l: a.l, av: av }); }));
       if (a.email) { var ev = h("button", { c: "ed-b", t: a.emailOk ? "Retirer la vérification de l’e-mail" : "Marquer l’e-mail comme vérifié", type: "button" }); ev.onclick = function () { action("adminEmailVerifie", { l: a.l, av: av, oui: !a.emailOk }); }; bar.appendChild(ev); }
