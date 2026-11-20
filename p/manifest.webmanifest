@@ -2,7 +2,7 @@
   "name": "IRIS",
   "short_name": "IRIS",
   "description": "IRIS : pointage et espace agent",
-  "start_url": "./",
+  "start_url": "./?scan=1",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
