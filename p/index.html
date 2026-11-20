@@ -1574,13 +1574,22 @@ function cmaEnvOuvre(box) {
 /* IRIS — message de bienvenue / de remerciement et voix après chaque pointage (ajout isolé : l'écran de confirmation existant n'est pas modifié).
    Appelé par la confirmation « Pointé » (arrivée, départ ou pointage déjà enregistré), que l'agent ait scanné avec l'appareil photo du téléphone ou avec la caméra de son espace.
    Réutilise : el, c, IrisVoix (voix du téléphone, ou voix naturelle quand elle est activée). */
+// Moment de la journée (heure de Paris donnée par le serveur) : matin 4 h–12 h, après-midi 12 h–18 h, soir 18 h–24 h, nuit 0 h–4 h
+function pvMoment(h) { return h >= 4 && h < 12 ? "matin" : h >= 12 && h < 18 ? "apres" : h >= 18 ? "soir" : "nuit"; }
 function pvMessage(r) {
-  var h = Number(String(r.heure || "").slice(0, 2)), salut = (h >= 18 || h < 4) ? "Bonsoir" : "Bonjour", p = String(r.prenom || "").trim(), tete = salut + (p ? " " + p : "") + ". ";
+  var hh = /^\d{1,2}:/.test(String(r.heure || "")) ? Number(String(r.heure).split(":")[0]) : new Date().getHours(), m = pvMoment(hh), salut = (m === "matin" || m === "apres") ? "Bonjour" : "Bonsoir", p = String(r.prenom || "").trim(), tete = salut + (p ? " " + p : "") + ". ";
   var dep = r.type === "Départ" || /^départ/i.test(String(r.libelle || ""));
-  if (/déjà/i.test(String(r.libelle || ""))) return tete + (dep ? "Votre départ" : "Votre arrivée") + " est déjà enregistré. Merci.";
-  if (dep) return tete + "Votre départ a bien été pris en compte. Merci et bonne route. IRIS vous remercie pour votre confiance.";
-  return tete + "Bienvenue ! Votre arrivée a bien été prise en compte. Merci et bonne journée.";
+  if (/déjà/i.test(String(r.libelle || ""))) return tete + (dep ? "Votre départ" : "Votre arrivée") + " est déjà enregistré" + (dep ? "" : "e") + ". Merci.";
+  if (dep) return tete + "Votre départ a bien été pris en compte. Merci et bonne route. " + { matin: "Bonne fin de matinée.", apres: "Bon après-midi.", soir: "Bonne soirée.", nuit: "Bonne nuit." }[m] + " IRIS vous remercie pour votre confiance.";
+  return tete + "Bienvenue ! Votre arrivée a bien été prise en compte. " + { matin: "Merci et bonne matinée.", apres: "Merci et bon après-midi.", soir: "Merci et bonne soirée.", nuit: "Merci et bon courage pour cette nuit." }[m];
 }
+// iPhone/iPad : la voix automatique n'est autorisée qu'après un premier geste de l'utilisateur. Dès le premier toucher de la page (bouton « Pointage », « Pointer »…), on déverrouille la synthèse vocale en silence.
+var PV = { ok: false };
+function pvDeverrouille() {
+  if (PV.ok) return; PV.ok = true;
+  try { if (window.speechSynthesis && window.SpeechSynthesisUtterance) { var u = new SpeechSynthesisUtterance(" "); u.volume = 0; window.speechSynthesis.speak(u); } } catch (e) { }
+}
+["touchstart", "click", "keydown"].forEach(function (n) { document.addEventListener(n, pvDeverrouille, { passive: true, capture: true }); });
 function pointageVoix(r) {
   var t = pvMessage(r), d = el("div", "pvm", t);
   d.style.cssText = "margin:14px 4px 6px;font-size:19px;line-height:1.4;font-weight:600;text-align:center";
