@@ -1045,6 +1045,40 @@ var IrisVoix = (function () {
       appel("adminChangerMotDePasse", { ancien: an.value, nouveau: nv.value, code: cd.value }, function (r) { ok.disabled = false; cd.value = ""; if (r && r.ok) { an.value = nv.value = cf.value = ""; msg(r.msg); if (r.reconnexion) setTimeout(function () { location.reload(); }, 1800); } else msg((r && r.msg) || "Échec.", true); });
     };
     c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Modifier mon mot de passe" }), h("p", { c: "ed-vide", t: "Vous pouvez le changer à tout moment. Il faut saisir l’ancien mot de passe ET votre code de sécurité. Une alerte est envoyée par e-mail et toutes les sessions sont fermées." }), lab("Ancien mot de passe", an), lab("Nouveau mot de passe", nv), lab("Confirmer", cf), lab("Code de sécurité", cd), h("div", { c: "ed-row", style: "margin-top:14px" }, [ok])]));
+    carteCodeSecu(c);
+  }
+  // Changement du code de sécurité (ajout isolé) : session administrateur + mot de passe actuel + (ancien code OU code reçu par e-mail)
+  function carteCodeSecu(c) {
+    var mdp = h("input", { type: "password", autocomplete: "current-password", placeholder: "Mot de passe actuel" }),
+      anc = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Ancien code de sécurité (laissez vide si oublié)" }),
+      otp = h("input", { type: "text", autocomplete: "one-time-code", inputmode: "numeric", placeholder: "Code à 6 chiffres reçu par e-mail" }),
+      nv = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Nouveau code de sécurité (8 chiffres)" }),
+      cf = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Confirmer le nouveau code" }),
+      tel = h("input", { type: "tel", autocomplete: "tel", placeholder: "Votre numéro de portable (sert à la récupération)" });
+    var ligneOtp = lab("Code reçu par e-mail", otp); ligneOtp.style.display = "none";
+    var mail = h("button", { c: "ed-b", t: "J’ai oublié mon code : m’envoyer un code par e-mail", type: "button" });
+    mail.onclick = function () {
+      mail.disabled = true;
+      appel("adminCodeEmail", "", function (r) { mail.disabled = false; if (r && r.ok) { ligneOtp.style.display = ""; anc.value = ""; msg(r.msg); } else msg((r && r.msg) || "Échec.", true); });
+    };
+    var ok = h("button", { c: "ed-b ed-p", t: "Modifier mon code de sécurité", type: "button" });
+    ok.onclick = function () {
+      var n = nv.value.replace(/\D/g, "");
+      if (!mdp.value || !tel.value || !nv.value) { msg("Remplissez le mot de passe, le numéro de portable et le nouveau code.", true); return; }
+      if (!anc.value && !otp.value) { msg("Saisissez l’ancien code, ou demandez un code par e-mail.", true); return; }
+      if (!/^\d{8}$/.test(n)) { msg("Le nouveau code doit contenir exactement 8 chiffres.", true); return; }
+      if (nv.value !== cf.value) { msg("La confirmation est différente du nouveau code.", true); return; }
+      ok.disabled = true;
+      appel("adminChangerCode", { mdp: mdp.value, ancien: anc.value, otp: otp.value, nouveau: nv.value, tel: tel.value }, function (r) {
+        ok.disabled = false; mdp.value = anc.value = otp.value = nv.value = cf.value = tel.value = "";
+        if (r && r.ok) { msg(r.msg); if (r.reconnexion) setTimeout(function () { location.reload(); }, 1800); } else msg((r && r.msg) || "Échec.", true);
+      });
+    };
+    c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Modifier mon code de sécurité" }),
+      h("p", { c: "ed-vide", t: "Vous pouvez le changer à tout moment : mot de passe actuel + ancien code de sécurité. Si vous l’avez oublié, demandez un code par e-mail : il est envoyé à vos deux adresses de sécurité (valable 10 minutes). Une alerte est envoyée et toutes les sessions sont fermées." }),
+      lab("Mot de passe actuel", mdp), lab("Ancien code de sécurité", anc), h("div", { c: "ed-row", style: "margin:6px 0 10px" }, [mail]), ligneOtp,
+      lab("Nouveau code de sécurité (8 chiffres)", nv), lab("Confirmer le nouveau code", cf), lab("Numéro de portable", tel),
+      h("div", { c: "ed-row", style: "margin-top:14px" }, [ok])]));
   }
   function paneAg(c) {
     c.appendChild(carteAg({ nom: "", prenom: "", tel: "", jours: "" }, true));
