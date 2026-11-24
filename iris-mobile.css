@@ -1,0 +1,59 @@
+/* IRIS — confort téléphone et tablette (administration). Aucun effet au-dessus de 1024 px : l'affichage ordinateur reste identique.
+   Chargé après iris.css. Ne lit, ne modifie et n'envoie aucune donnée. */
+
+/* ---- Listes compactes : une ligne par agent / pointage ; un toucher déplie la fiche (téléphone et tablette) ---- */
+@media (max-width:1024px){
+  .im-q{display:block;box-sizing:border-box;width:100%;margin:0 0 12px;padding:12px 16px;border:1px solid #d8d2bd;border-radius:14px;background:#fff;color:#04112c;font:inherit;font-size:16px;min-height:46px}
+  .im-q:focus{outline:2px solid #c9973f;outline-offset:1px}
+  table.rc.im-c{min-width:0!important;width:100%!important;max-width:100%!important;display:block!important;border:0!important;background:transparent!important;box-shadow:none!important}
+  table.rc.im-c thead{display:none}
+  table.rc.im-c tbody{display:grid!important;grid-template-columns:minmax(0,1fr);gap:10px}
+  table.rc.im-c tr{min-width:0;position:relative;display:flex!important;flex-wrap:wrap;align-items:center;gap:2px 12px;margin:0;padding:14px 44px 14px 16px;box-sizing:border-box;background:#fff;border:1px solid #e6dfcb;border-radius:16px;box-shadow:0 1px 3px rgba(4,17,44,.06);cursor:pointer;-webkit-tap-highlight-color:transparent}
+  table.rc.im-c tr.im-cache{display:none!important}
+  table.rc.im-c tr::after{content:"";position:absolute;right:18px;top:20px;width:9px;height:9px;border-right:2px solid #8a7c4e;border-bottom:2px solid #8a7c4e;transform:rotate(45deg);transition:transform .18s}
+  table.rc.im-c tr.im-ouvert::after{transform:rotate(-135deg);top:24px}
+  table.rc.im-c td,table.rc.im-c td:first-child{display:block!important;grid-column:auto;border:0!important;padding:0!important;margin:0;min-width:0!important;background:transparent;text-align:left!important;font-size:inherit;font-weight:inherit;white-space:normal!important}
+  table.rc.im-c td::before{content:none!important;display:none}
+  /* case à cocher (corrections) */
+  table.rc.im-c td.im-sel{order:0;flex:0 0 auto;margin-right:2px;display:block!important}
+  table.rc.im-c td.im-sel input{width:24px;height:24px;margin:0}
+  /* titre */
+  table.rc.im-c td.im-t{order:1;font-size:17px!important;font-weight:700!important;color:#04112c;line-height:1.25}
+  table.rc.im-c td.im-t + td.im-t{font-weight:500!important}
+  /* statut / contrôle */
+  table.rc.im-c td.im-s{order:2;margin-left:auto}
+  /* repères : date, arrivée, départ… */
+  table.rc.im-c td.im-m{order:3;font-size:14px!important;color:#5b5a50}
+  table.rc.im-c td.im-m::before{content:attr(data-l) " "!important;display:inline!important;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#8a8570;margin-right:4px}
+  table.rc.im-c td.im-vide{display:none!important}
+  /* détails : visibles seulement quand la carte est ouverte */
+  table.rc.im-c td.im-x{display:none!important;order:4}
+  table.rc.im-c tr.im-ouvert td.im-x{display:block!important;flex:1 1 100%;padding:8px 0 0!important;border-top:1px dashed #e6dfcb!important;margin-top:8px}
+  table.rc.im-c tr.im-ouvert td.im-x + td.im-x{border-top:0!important;margin-top:0;padding-top:6px!important}
+  table.rc.im-c tr.im-ouvert td.im-x::before{content:attr(data-l)!important;display:block!important;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8a8570;margin-bottom:2px}
+  table.rc.im-c tr.im-ouvert td.im-x[data-l=""]::before{display:none!important}
+}
+/* deux colonnes sur tablette */
+@media (min-width:701px) and (max-width:1024px){
+  table.rc.im-c tbody{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+/* ---- Téléphone : en-tête des corrections compact + barre de navigation en bas ---- */
+@media (max-width:700px){
+  #ed .ed-top{padding-top:10px;padding-bottom:10px}
+  #ed .ed-top .ed-seg{display:none}
+  #ed .ed-body{padding-bottom:96px}
+  #im-nav{position:fixed;left:0;right:0;bottom:0;z-index:1000;display:none;grid-template-columns:repeat(5,1fr);padding:6px 6px calc(6px + env(safe-area-inset-bottom));background:rgba(255,255,255,.96);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-top:1px solid #e0d9c3;box-shadow:0 -4px 18px rgba(4,17,44,.08)}
+  #im-nav.im-on{display:grid}
+  #im-nav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:54px;padding:4px 2px;border:0;border-radius:12px;background:transparent;color:#6b6958;font:inherit;font-size:11.5px;font-weight:600;line-height:1.1;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  #im-nav button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  #im-nav button.im-actif{color:#04112c;background:#f3ecd6}
+  #im-nav button.im-actif svg{stroke:#a87a2e}
+  #im-plus{position:fixed;left:10px;right:10px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:1001;display:none;flex-direction:column;gap:6px;padding:10px;background:#fff;border:1px solid #e0d9c3;border-radius:18px;box-shadow:0 10px 40px rgba(4,17,44,.22)}
+  #im-plus.im-on{display:flex}
+  #im-plus button{min-height:50px;padding:10px 16px;border:0;border-radius:12px;background:#f7f3e6;color:#04112c;font:inherit;font-size:16px;font-weight:600;text-align:left;cursor:pointer}
+  #im-plus button.im-actif{background:#04112c;color:#fff}
+  /* accueil : le QR est replié par défaut, un toucher le déplie */
+  .im-qbtn{display:block;width:100%;margin:10px 0 0;padding:12px 16px;min-height:48px;border:1px solid #c9973f;border-radius:14px;background:transparent;color:#e3bb6a;font:inherit;font-size:15px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+  .b.q.im-replie .qk,.b.q.im-replie .qc{display:none}
+}
