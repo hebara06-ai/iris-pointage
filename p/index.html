@@ -284,7 +284,7 @@ var IrisVoix = (function () {
   if (IOS) document.addEventListener('focusin', function (e) { var t = e.target; if (t && (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && /^(text|search|)$/.test(t.type)))) dernierChamp = t; });
   function dicter(onTexte, onEtat) {
     // iPhone/iPad : la dictée intégrée au navigateur est peu fiable ; on guide vers le micro du clavier, qui fonctionne partout
-    if (IOS && (SR || true)) return { demarrer: function () { if (dernierChamp) { try { dernierChamp.focus(); } catch (e) { } } onEtat('erreur', 'Sur iPhone : touchez le micro 🎤 en bas à droite du clavier pour parler.'); }, arreter: function () { onEtat('arret'); } };
+    if (IOS && !SR) return { demarrer: function () { if (dernierChamp) { try { dernierChamp.focus(); } catch (e) { } } onEtat('erreur', 'Sur iPhone : touchez le micro 🎤 en bas à droite du clavier pour parler.'); }, arreter: function () { onEtat('arret'); } };
     if (!SR) return null; var r = new SR(), actif = false; r.lang = 'fr-FR'; r.continuous = false; r.interimResults = false; r.maxAlternatives = 1;
     r.onresult = function (e) { var t = ''; for (var i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript; if (t.trim()) onTexte(t.trim()); };
     r.onerror = function (e) { actif = false; var m = e && e.error; onEtat('erreur', m === 'not-allowed' || m === 'service-not-allowed' ? 'Le micro est refusé : autorisez-le dans les réglages du navigateur.' : m === 'no-speech' ? 'Je n’ai rien entendu.' : 'La dictée a échoué.'); };
@@ -1479,9 +1479,9 @@ function cmaEnvCss() {
   var s = document.createElement("style"); s.id = "cmenv-css";
   s.textContent = ".cmf{max-width:720px;margin:0 auto}.cmf label{display:block;font-size:17px;font-weight:700;margin:14px 0 6px;text-align:left}" +
     ".cmf input[type=text],.cmf input[type=password],.cmf input[type=date],.cmf input[type=time],.cmf select,.cmf textarea{width:100%;box-sizing:border-box;font-size:20px;padding:12px 14px;border-radius:14px;border:2px solid #b9b49f;background:#fff;color:#04112c;font-family:inherit}" +
-    ".cmf textarea{min-height:130px;line-height:1.4;resize:vertical}.cmf .cmg{display:grid;grid-template-columns:1fr 1fr;gap:10px}.cmf .cmg>div label{margin-top:8px}" +
+    ".cmf textarea{min-height:130px;line-height:1.4;resize:vertical}.cmf .cmg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}.cmf .cmg>div{min-width:0}.cmf .cmg input,.cmf .cmg select{width:100%;box-sizing:border-box;max-width:100%}.cmf .cmg>div label{margin-top:8px}" +
     ".cmf .cmag{max-height:42vh;overflow:auto;border:2px solid #b9b49f;border-radius:14px;background:#fff;padding:6px 10px;-webkit-overflow-scrolling:touch}" +
-    ".cmf .cmag label{display:flex;align-items:center;gap:12px;font-size:19px;font-weight:600;margin:0;padding:11px 4px;border-bottom:1px solid #eee8d8}.cmf .cmag label:last-child{border-bottom:0}.cmf .cmag input{width:26px;height:26px;flex:none}" +
+    ".cmf .cmag label{display:flex;align-items:center;gap:12px;font-size:19px;font-weight:600;margin:0;padding:11px 4px;border-bottom:1px solid #eee8d8}.cmf .cmag label:last-child{border-bottom:0}.cmf .cmag input{width:26px;height:26px;flex:none}.cmf .cmcase{display:flex;align-items:center;gap:12px;text-align:left}.cmf .cmcase input[type=checkbox]{width:26px;height:26px;min-height:0;padding:0;margin:0;flex:none;accent-color:#c9973f}" +
     ".cmf .cmcase{display:flex;align-items:center;gap:12px;font-size:19px;font-weight:600;margin:12px 0}.cmf .cmcase input{width:26px;height:26px}" +
     ".cmf .cmrang{display:flex;gap:8px;flex-wrap:wrap}.cmf .cmrang .cmbtn{flex:1 1 140px;margin:6px 0 0}.cmf .cmres{font-size:19px;font-weight:700;margin:14px 0;text-align:center;min-height:24px}.cmf .cmres.ko{color:#8b1d1d}.cmf .cmres.ok{color:#0a7e7a}" +
     ".cmf .cmnb{font-size:18px;font-weight:700;margin:10px 0 4px;text-align:center}";
@@ -1524,17 +1524,19 @@ function cmaEnvOuvre(box) {
     champ("Type d’information", type);
     var titre = document.createElement("input"); titre.type = "text"; titre.maxLength = 120; titre.placeholder = "Ex. : Réunion d’équipe"; champ("Titre", titre);
     var msg = document.createElement("textarea"); msg.placeholder = "Écrivez l’information ici"; champ("Message", msg);
-    try { var v = cmaVoix(); if (v && v.barre) { var bar = v.barre(msg, {}); if (bar) w.appendChild(bar); } } catch (e) { }
+    /* la barre Écouter / Dicter / Corriger / Reformuler est ajoutée automatiquement sous le message */
     w.appendChild(cmaDiv("cmnb", "Date, heure et lieu (pour une réunion, un événement…)"));
     var g = cmaDiv("cmg"); w.appendChild(g);
-    function colonne(libelle, el) { var d = cmaDiv(""); var l = document.createElement("label"); l.textContent = libelle; d.appendChild(l); d.appendChild(el); g.appendChild(d); return el; }
-    var date = document.createElement("input"); date.type = "date"; colonne("Date", date);
+    function colonne(libelle, el, plein) { var d = cmaDiv(""); var l = document.createElement("label"); l.textContent = libelle; d.appendChild(l); d.appendChild(el); if (plein) d.style.gridColumn = "1 / -1"; g.appendChild(d); return el; }
+    var date = document.createElement("input"); date.type = "date"; colonne("Date", date, true);
     var hd = document.createElement("input"); hd.type = "time"; colonne("Heure de début", hd);
     var hf = document.createElement("input"); hf.type = "time"; colonne("Heure de fin", hf);
-    var site = document.createElement("select"); var o0 = document.createElement("option"); o0.value = ""; o0.textContent = "—"; site.appendChild(o0);
-    (cat.sites || []).forEach(function (s) { var o = document.createElement("option"); o.value = o.textContent = s; site.appendChild(o); }); colonne("Site", site);
+    var agence = document.createElement("input"); agence.type = "text"; agence.maxLength = 60; agence.value = "Samsic, Champéret 3"; agence.setAttribute("data-iv-no", "1"); colonne("Agence", agence, true);
+    var site = document.createElement("input"); site.type = "text"; site.maxLength = 40; site.value = "Neptune"; site.placeholder = "Choisir ou écrire un site"; site.setAttribute("list", "cma-sites"); site.setAttribute("autocomplete", "off"); site.setAttribute("data-iv-no", "1"); colonne("Site", site, true);
+    var sdl = document.createElement("datalist"); sdl.id = "cma-sites"; var vus = {}; var connus = ["Neptune"]; try { connus = connus.concat(JSON.parse(localStorage.getItem("iris-sites-v1") || "[]")); } catch (e) { } connus = connus.concat(cat.sites || []);
+    connus.forEach(function (s) { if (s && !vus[s]) { vus[s] = 1; var o = document.createElement("option"); o.value = s; sdl.appendChild(o); } }); site.parentNode.appendChild(sdl);
     var etage = document.createElement("input"); etage.type = "text"; etage.maxLength = 40; etage.placeholder = "Ex. : 3e étage"; colonne("Étage", etage);
-    var lieu = document.createElement("input"); lieu.type = "text"; lieu.maxLength = 120; lieu.placeholder = "Ex. : Salle 302"; colonne("N° de salle / lieu", lieu);
+    var lieu = document.createElement("input"); lieu.type = "text"; lieu.maxLength = 120; lieu.placeholder = "Ex. : Salle 302"; lieu.setAttribute("data-iv-no", "1"); colonne("N° de salle / lieu", lieu);
     var prio = document.createElement("select"); (cat.priorites || ["Normale", "Importante", "Urgente"]).forEach(function (c) { var o = document.createElement("option"); o.value = o.textContent = c; prio.appendChild(o); }); champ("Priorité", prio);
     var acc = document.createElement("input"); acc.type = "checkbox"; var la = document.createElement("label"); la.className = "cmcase"; la.appendChild(acc); la.appendChild(document.createTextNode("Demander un accusé de réception")); w.appendChild(la);
     var par = document.createElement("input"); par.type = "checkbox"; var lp = document.createElement("label"); lp.className = "cmcase"; lp.appendChild(par); lp.appendChild(document.createTextNode("Demander si l’agent participe")); w.appendChild(lp);
@@ -1557,9 +1559,11 @@ function cmaEnvOuvre(box) {
       if (msg.value.trim().length < 3) { res.className = "cmres ko"; res.textContent = "Écrivez le message."; msg.focus(); return; }
       if (!ids.length) { res.className = "cmres ko"; res.textContent = "Choisissez au moins un agent (ou « Tout sélectionner »)."; return; }
       var tous = ids.length === agents.length;
+      function lieuFinal() { var ag = agence.value.trim(), l = lieu.value.trim(); return (date.value || l) && ag ? (l ? ag + " — " + l : ag).slice(0, 120) : l; }
+      (function () { var v = site.value.trim(); if (v && v !== "Neptune") { try { var L = JSON.parse(localStorage.getItem("iris-sites-v1") || "[]"); if (L.indexOf(v) < 0) { L.push(v); localStorage.setItem("iris-sites-v1", JSON.stringify(L.slice(-30))); } } catch (e) { } } })();
       if (!window.confirm("Envoyer cette information à " + (tous ? "tous les agents (" + ids.length + ")" : ids.length + " agent" + (ids.length > 1 ? "s" : "")) + " ?")) return;
       env.disabled = true; res.textContent = "Envoi en cours…";
-      var o = { action: "publier", categorie: type.value, titre: titre.value.trim(), message: msg.value.trim(), priorite: prio.value, dateEv: date.value, heureDeb: hd.value, heureFin: hf.value, site: site.value, etage: etage.value.trim(), lieu: lieu.value.trim(), destinataires: tous ? "tous" : ids, accuse: acc.checked, participation: par.checked };
+      var o = { action: "publier", categorie: type.value, titre: titre.value.trim(), message: msg.value.trim(), priorite: prio.value, dateEv: date.value, heureDeb: hd.value, heureFin: hf.value, site: site.value.trim(), etage: etage.value.trim(), lieu: lieuFinal(), destinataires: tous ? "tous" : ids, accuse: acc.checked, participation: par.checked };
       cmaAppel("cmAdminSauve", [CMENV.tok, o], function (r) {
         env.disabled = false;
         if (r && r.ok) { res.className = "cmres ok"; res.textContent = (r.msg || "Information envoyée.") + " (" + (tous ? "tous les agents" : ids.length + " agent" + (ids.length > 1 ? "s" : "")) + ")"; titre.value = msg.value = etage.value = lieu.value = date.value = hd.value = hf.value = ""; acc.checked = par.checked = false; tout(false); if (typeof cmaCompteur === "function") cmaCompteur(); }
