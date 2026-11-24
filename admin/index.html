@@ -446,6 +446,24 @@ var IrisVoix = (function () {
     return h("div", { c: "ed-l" }, tete.concat([lab("Jour", dd), lab("Arrivée", ia), lab("Départ", id), h("div", { c: "ed-row" }, bar)]));
   }
   function visibles() { return (DATA.pointages || []).filter(function (p) { return !agFiltre || (p.nom === agFiltre.nom && p.prenom === agFiltre.prenom); }); }
+  // Nombre « À régulariser » pour la pastille de l'onglet Pointages : mêmes règles que la carte, sans le filtre par agent
+  function nbRegul() {
+    try {
+      if (!DATA) return 0;
+      var n = (DATA.pointages || []).filter(function (p) { return !p.depart; }).length;
+      if (jourSel) {
+        var nj = NJ[(new Date(jourSel + "T12:00:00").getDay() + 6) % 7].toLowerCase(), pris = {}, auj = jourSel === iso();
+        (DATA.pointages || []).forEach(function (p) { pris[p.nom + "|" + p.prenom] = 1; });
+        (DATA.agents || []).forEach(function (x) {
+          var prevu = x.jours ? String(x.jours).toLowerCase().indexOf(nj) >= 0 : ["lun", "mar", "mer", "jeu", "ven"].indexOf(nj) >= 0;
+          if (!prevu || pris[x.nom + "|" + x.prenom]) return;
+          var deb = minutesDe(hm(x.debut)); if (auj && deb !== null && maintenantMin() < deb) return;
+          n++;
+        });
+      }
+      return n;
+    } catch (e) { return 0; }
+  }
   function carteRegul(c) {
     var aRegul = visibles().filter(function (p) { return !p.depart; }), manques = [];
     if (jourSel && !agFiltre) {
@@ -2201,7 +2219,7 @@ var IrisVoix = (function () {
     var y = ov.scrollTop; ov.textContent = "";
     var np = ((DATA && DATA.conges) || []).filter(function (x) { return x.statut === "En attente"; }).length;
     var nsg = SG ? SG.signalements.filter(function (x) { return ["Correction acceptée", "Correction refusée", "Clôturée"].indexOf(x.statut) < 0; }).length : 0;
-    var seg = h("div", { c: "ed-seg" }, [["pt", "Pointages", 0], ["ab", "Absences et retards", 0], ["cg", "Congés", np], ["sg", "Signalements", nsg], ["qs", "Questions IRIS" + qsBadge(), Number(QS.aTraiter) || 0], ["cm", "Communications" + cmBadge(), 0], ["ag", "Agents", 0], ["ga", "Gestion administrative", gaNonLus()], ["pa", "Paramètres", 0]].map(function (o) { var b = h("button", { t: o[1], type: "button" }); if (o[2] > 0) b.appendChild(pastilleOnglet(o[2])); if (o[0] === onglet) b.className = "on"; b.onclick = function () { onglet = o[0]; dessiner(); }; return b; }));
+    var seg = h("div", { c: "ed-seg" }, [["pt", "Pointages", nbRegul()], ["ab", "Absences et retards", 0], ["cg", "Congés", np], ["sg", "Signalements", nsg], ["qs", "Questions IRIS" + qsBadge(), Number(QS.aTraiter) || 0], ["cm", "Communications" + cmBadge(), 0], ["ag", "Agents", 0], ["ga", "Gestion administrative", gaNonLus()], ["pa", "Paramètres", 0]].map(function (o) { var b = h("button", { t: o[1], type: "button" }); if (o[2] > 0) b.appendChild(pastilleOnglet(o[2])); if (o[0] === onglet) b.className = "on"; b.onclick = function () { onglet = o[0]; dessiner(); }; return b; }));
     var x = h("button", { c: "ed-x", t: "Fermer", type: "button" }); x.onclick = fermer;
     ov.appendChild(h("div", { c: "ed-top" }, [h("h2", { t: "Corrections" }), seg, x]));
     var corps = h("div", { c: "ed-body" }); ov.appendChild(corps);
