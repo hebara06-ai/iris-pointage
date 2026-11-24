@@ -57,6 +57,10 @@
   #im-nav.im-on{display:grid}
   #im-nav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:54px;padding:4px 2px;border:0;border-radius:12px;background:transparent;color:#6b6958;font:inherit;font-size:11.5px;font-weight:600;line-height:1.1;cursor:pointer;-webkit-tap-highlight-color:transparent}
   #im-nav button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  #im-nav button{position:relative}
+  #im-nav .im-pastille,#im-plus .im-pastille{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;box-sizing:border-box;border-radius:10px;background:#16a34a;color:#fff;font-style:normal;font-weight:700;font-size:12px;line-height:1;font-variant-numeric:tabular-nums}
+  #im-nav .im-pastille{position:absolute;top:2px;right:calc(50% - 22px)}
+  #im-plus button{display:flex;align-items:center;justify-content:space-between;gap:12px}
   #im-nav button.im-actif{color:#04112c;background:#f3ecd6}
   #im-nav button.im-actif svg{stroke:#a87a2e}
   #im-plus{position:fixed;left:10px;right:10px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:1001;display:none;flex-direction:column;gap:6px;padding:10px;background:#fff;border:1px solid #e0d9c3;border-radius:18px;box-shadow:0 10px 40px rgba(4,17,44,.22)}

@@ -103,6 +103,10 @@
     var seg = ed && ed.querySelector(".ed-top .ed-seg");
     return seg ? Array.prototype.slice.call(seg.querySelectorAll("button")) : [];
   }
+  // Nombre non lu affiché par la pastille verte de l'onglet de bureau (0 si aucune)
+  function nbNonLu(o) { var p = o.querySelector(".iris-pastille"); var n = p ? parseInt(p.textContent, 10) : 0; return n > 0 ? n : 0; }
+  function libelle(o) { var f = o.firstChild; return ((f && f.nodeType === 3 ? f.data : o.textContent) || "").trim(); }
+  function pastille(n) { return n > 0 ? '<i class="im-pastille" aria-label="' + n + ' non lu(s)">' + n + "</i>" : ""; }
   function cle(b) { var t = (b.textContent || "").trim(); for (var i = 0; i < PRINCIPAUX.length; i++) if (t.indexOf(PRINCIPAUX[i]) === 0) return PRINCIPAUX[i]; return ""; }
   function construireNav() {
     if (nav) return;
@@ -118,14 +122,14 @@
     var tabs = onglets();
     if (!tabs.length) return;
     construireNav();
-    var actifCle = "", actifAutre = false, autres = [];
+    var actifCle = "", actifAutre = false, autres = [], totalAutres = 0;
     nav.textContent = ""; plus.textContent = "";
     PRINCIPAUX.forEach(function (nom) {
       var o = tabs.filter(function (b) { return cle(b) === nom; })[0];
       if (!o) return;
       var b = document.createElement("button"); b.type = "button";
       var on = o.className.indexOf("on") >= 0; if (on) { b.className = "im-actif"; actifCle = nom; }
-      b.innerHTML = ICONES[nom] + "<span>" + nom.replace("Absences", "Absences") + (/\((\d+)\)/.test(o.textContent) ? " (" + /\((\d+)\)/.exec(o.textContent)[1] + ")" : "") + "</span>";
+      b.innerHTML = ICONES[nom] + pastille(nbNonLu(o)) + "<span>" + nom + "</span>";
       b.addEventListener("click", function () { plus.classList.remove("im-on"); o.click(); });
       nav.appendChild(b);
     });
@@ -133,11 +137,11 @@
       if (cle(o)) return;
       autres.push(o);
       var on = o.className.indexOf("on") >= 0; if (on) actifAutre = true;
-      var b = document.createElement("button"); b.type = "button"; b.setAttribute("role", "menuitem"); b.textContent = (o.textContent || "").trim(); if (on) b.className = "im-actif";
+      var b = document.createElement("button"); b.type = "button"; b.setAttribute("role", "menuitem"); b.innerHTML = "<span></span>" + pastille(nbNonLu(o)); b.firstChild.textContent = libelle(o); totalAutres += nbNonLu(o); if (on) b.className = "im-actif";
       b.addEventListener("click", function () { plus.classList.remove("im-on"); o.click(); });
       plus.appendChild(b);
     });
-    var bp = document.createElement("button"); bp.type = "button"; bp.innerHTML = ICONES.Plus + "<span>Plus</span>"; if (actifAutre) bp.className = "im-actif";
+    var bp = document.createElement("button"); bp.type = "button"; bp.innerHTML = ICONES.Plus + pastille(totalAutres) + "<span>Plus</span>"; if (actifAutre) bp.className = "im-actif";
     bp.setAttribute("aria-haspopup", "true");
     bp.addEventListener("click", function (e) { e.stopPropagation(); plus.classList.toggle("im-on"); });
     nav.appendChild(bp);
