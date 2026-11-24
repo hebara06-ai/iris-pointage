@@ -1442,7 +1442,7 @@ function cmaAdminFerme() { if (CMA_ADM.ov && CMA_ADM.ov.parentNode) CMA_ADM.ov.p
 function cmaAdminOuvre() {
   if (CMA_ADM.ov) return;
   var ov = document.createElement("div"); ov.className = "cmov"; ov.setAttribute("role", "dialog"); ov.setAttribute("aria-label", "Administration des communications");
-  var h = document.createElement("div"); h.className = "cmh"; var h2 = document.createElement("h2"); h2.textContent = "Communications — administrateur"; h.appendChild(h2);
+  var h = document.createElement("div"); h.className = "cmh"; var h2 = document.createElement("h2"); h2.textContent = "Communications — administrateur"; h.appendChild(h2);
   var f = document.createElement("button"); f.type = "button"; f.textContent = "Fermer"; f.onclick = function () { cmaAdminFerme(); if (typeof cmaCompteur === "function") cmaCompteur(); }; h.appendChild(f); ov.appendChild(h);
   var URL_ADM = "../admin/?cm=1&solo=1", corps = document.createElement("div"); corps.style.cssText = "flex:1;position:relative;display:flex;min-height:0;background:#f4f1ea"; ov.appendChild(corps);
   var fr = document.createElement("iframe"); fr.src = URL_ADM; fr.title = "Administration IRIS — Communications"; fr.style.cssText = "flex:1;width:100%;border:0;background:#f4f1ea"; corps.appendChild(fr);

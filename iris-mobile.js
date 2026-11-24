@@ -113,7 +113,7 @@
   }
   function majNav() {
     var ed = document.getElementById("ed");
-    var visible = MQ_TEL.matches && ed && ed.className.indexOf("on") >= 0;
+    var visible = MQ_TEL.matches && ed && ed.className.indexOf("on") >= 0 && (location.search || "").indexOf("solo=1") < 0;
     if (!visible) { if (nav) { nav.classList.remove("im-on"); plus.classList.remove("im-on"); } return; }
     var tabs = onglets();
     if (!tabs.length) return;
@@ -153,10 +153,20 @@
   });
 
   var obs = null, OPTS = { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] };
+  /* ---- Champs date / heure vides : un repère lisible (sur iPhone ils s'affichent comme des cases blanches) ---- */
+  function marquer(i) { var v = !i.value; if (i.classList.contains("im-empty") !== v) i.classList.toggle("im-empty", v); }
+  function champsDate() {
+    var L = document.querySelectorAll("input[type=date],input[type=time]");
+    for (var k = 0; k < L.length; k++) {
+      var i = L[k];
+      if (!i.__im) { i.__im = 1; (function (x) { ["input", "change", "blur"].forEach(function (ev) { x.addEventListener(ev, function () { marquer(x); }); }); })(i); }
+      marquer(i);
+    }
+  }
   function tout() {
     planifie = false;
     if (obs) obs.disconnect();           /* nos propres changements ne relancent pas le traitement */
-    try { tables(); qr(); majNav(); } catch (e) { }
+    try { tables(); qr(); majNav(); if (MQ_TAB.matches) champsDate(); } catch (e) { }
     if (obs) obs.observe(document.body, OPTS);
   }
   function planifier() { if (planifie) return; planifie = true; (window.requestAnimationFrame || setTimeout)(tout); }

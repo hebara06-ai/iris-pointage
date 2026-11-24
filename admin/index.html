@@ -1453,7 +1453,7 @@ var IrisVoix = (function () {
   }
     // ===== Communications (Phases 1 à 4 : annonces, accusés, participation, rappels, e-mails, messages privés) — inséré dans la portée de l'administration : réutilise h, lab, appel, msg, sure, dessiner =====
   var CM = { liste: null, cat: null, err: null, charge: false, vue: "liste", id: null, detail: null, form: null, filtre: "tous", sel: {}, rech: "", site: "",
-    flt: { categorie: "", site: "", agent: "", du: "", au: "", heureDu: "", heureAu: "" }, sitesListe: null, grp: null, rechGrp: "", rechAg: "", sauv: null, restaurer: null, vx: null, nonLus: 0, pollId: 0, pollEnCours: false, emb: false, cible: null,
+    flt: { categorie: "", site: "Neptune", agent: "", du: "", au: "", heureDu: "", heureAu: "" }, sitesListe: null, grp: null, rechGrp: "", rechAg: "", sauv: null, restaurer: null, vx: null, nonLus: 0, pollId: 0, pollEnCours: false, emb: false, cible: null,
     fils: null, fil: null, cle: "", rep: { texte: "", orig: "", commId: "" }, suivi: null, sv: { du: "", au: "" }, emails: null, emStatut: "", ajout: {}, rechAjout: "" };
   // Compteur affiché dans le libellé de l'onglet (texte seul) : « (3) », « (99+) »
   // Le libellé de l'onglet principal reste « Communications » : la pastille ronde y est insérée par cmMajPastilleOnglet()

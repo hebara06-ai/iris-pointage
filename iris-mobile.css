@@ -38,6 +38,16 @@
   table.rc.im-c tbody{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 
+/* ---- Champs date / heure vides lisibles ; champ Site pleine largeur (téléphone et tablette) ---- */
+@media (max-width:1024px){
+  input[type=date],input[type=time]{position:relative;min-height:48px;-webkit-appearance:none;appearance:none}
+  input.im-empty[type=date]::-webkit-datetime-edit,input.im-empty[type=time]::-webkit-datetime-edit{opacity:0}
+  input.im-empty[type=date]::before,input.im-empty[type=time]::before{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#9a9786;pointer-events:none}
+  input.im-empty[type=date]::before{content:"jj/mm/aaaa"}
+  input.im-empty[type=time]::before{content:"hh:mm"}
+  .ed-card input[list]{display:block;width:100%;box-sizing:border-box}
+}
+
 /* ---- Téléphone : en-tête des corrections compact + barre de navigation en bas ---- */
 @media (max-width:700px){
   #ed .ed-top{padding-top:10px;padding-bottom:10px}
