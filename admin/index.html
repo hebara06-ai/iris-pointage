@@ -633,7 +633,7 @@ var IrisVoix = (function () {
     var corps = h("div", {}), card = h("div", { c: "ed-card" }, [h("h3", { t: "Retards signalés par les agents" }), corps]);
     function ligneRetard(x) {
       var st = String(x.statut || ""), coul = st === "Justifié" ? ["#e3f5ea", "#13813e"] : (st === "Non justifié" ? ["#fdecec", "#b91c1c"] : ["#f3ecd6", "#8a6d1d"]);
-      var libelle = st === "Signalé" ? "En attente de décision" : ("Retard " + st.charAt(0).toLowerCase() + st.slice(1) + (x.auto ? " automatiquement" : ""));
+      var libelle = st === "Signalé" ? "En attente de décision" : (x.auto ? "Clôturé automatiquement (sans décision)" : ("Retard " + st.charAt(0).toLowerCase() + st.slice(1)));
       var pastille = h("span", { t: libelle, style: "background:" + coul[0] + ";color:" + coul[1] + ";font-weight:700;font-size:13px;padding:6px 12px;border-radius:999px;white-space:nowrap" });
       var tete = h("div", { style: "display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap" }, [h("b", { t: String(x.nom || "") + " " + String(x.prenom || ""), style: "font-size:17px;overflow-wrap:anywhere" }), pastille]);
       var ligne = h("div", { style: "padding:16px 0;border-top:1px solid #eee7d6;display:flex;flex-direction:column;gap:6px" }, [
@@ -641,8 +641,8 @@ var IrisVoix = (function () {
         h("div", { t: String(x.jour || "") + " · prévu " + String(x.prevue || "") + " → arrivée " + String(x.arrivee || "") + " · " + (Number(x.min) || 0) + " min", style: "font-weight:600" }),
         h("div", { t: String(x.motif || "") + (x.precision ? " — " + x.precision : ""), style: "white-space:pre-wrap;overflow-wrap:anywhere" }),
         h("div", { t: (x.site ? x.site + " · " : "") + "signalé le " + String(x.depot || "") + (x.decide && st !== "Signalé" ? " · décision le " + x.decide : ""), c: "ed-vide" })]);
-      if (st === "Signalé") ligne.appendChild(h("div", { t: "Sans décision de votre part sous 24 heures, ce retard sera justifié automatiquement.", c: "ed-vide" }));
-      else if (x.auto) ligne.appendChild(h("div", { t: "Aucune décision sous 24 heures : justifié automatiquement.", c: "ed-vide" }));
+      if (st === "Signalé") ligne.appendChild(h("div", { t: "Sans décision de votre part sous 24 heures, ce retard sera clôturé automatiquement (excusé, sans décision de votre part).", c: "ed-vide" }));
+      else if (x.auto) ligne.appendChild(h("div", { t: "Aucune décision sous 24 heures : clôturé automatiquement (retard excusé, sans décision du responsable).", c: "ed-vide" }));
       else if (x.commentaire) ligne.appendChild(h("div", { t: "Commentaire : " + x.commentaire, c: "ed-vide" }));
       if (st === "Signalé") {
         var com = h("input", { type: "text", placeholder: "Commentaire (facultatif)", maxlength: "200", autocomplete: "off" }), bj = h("button", { c: "ed-b ed-p", t: "Justifier", type: "button" }), bn = h("button", { c: "ed-b", t: "Non justifié", type: "button" });
