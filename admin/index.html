@@ -1837,7 +1837,41 @@ var IrisVoix = (function () {
     var ext = (f.name.split(".").pop() || "").toLowerCase(); if (!/^(pdf|jpe?g|png|heic|heif)$/.test(ext)) { er("Format non accepté : PDF, JPG, PNG."); return; } if (f.size > 8000000) { er("Fichier trop lourd (8 Mo maximum)."); return; }
     var fr2 = new FileReader(); fr2.onload = function () { cb({ nom: f.name, b64: String(fr2.result).split(",")[1] }); }; fr2.onerror = function () { er("Fichier illisible."); }; fr2.readAsDataURL(f);
   }
+  // Bulletins de paie : dépôt d'un PDF par agent et par mois (rangé dans un dossier Drive privé) et suivi de qui en a un
+  function carteBulletins() {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Bulletins de paie" })]), sel = agentSelect(), mois = h("input", { type: "month" }), fic = h("input", { type: "file", accept: "application/pdf,.pdf" }), suivi = h("div", {});
+    var d0 = new Date(); d0.setMonth(d0.getMonth() - 1); mois.value = d0.getFullYear() + "-" + ("0" + (d0.getMonth() + 1)).slice(-2);
+    carte.appendChild(h("p", { c: "ed-vide", t: "Déposez le bulletin PDF d’un agent pour un mois : seul cet agent le verra, dans son espace (onglet Gestion administrative). Le fichier est rangé dans un dossier Drive privé. Un bulletin déjà déposé ne peut pas être remplacé ni supprimé ici. 5 Mo au plus, PDF uniquement." }));
+    carte.appendChild(h("div", { c: "ed-row" }, [lab("Agent", sel), lab("Mois du bulletin", mois)])); carte.appendChild(h("div", { c: "ed-row" }, [lab("Fichier PDF", fic)]));
+    var go = h("button", { c: "ed-b ed-p", t: "Déposer le bulletin", type: "button" });
+    function majSuivi() {
+      suivi.textContent = ""; suivi.appendChild(h("p", { c: "ed-vide", t: "Chargement…" }));
+      appel("adminBulletins", { periode: mois.value }, function (r) {
+        suivi.textContent = "";
+        if (!(r && r.ok)) { suivi.appendChild(h("p", { c: "ed-vide", t: (r && r.msg) || "Suivi indisponible." })); return; }
+        suivi.appendChild(h("p", { c: "ed-vide", t: r.deposes + " bulletin(s) déposé(s) sur " + r.agents.length + " agent(s) pour " + r.periode + " :" }));
+        r.agents.forEach(function (a) { suivi.appendChild(h("div", { c: "sg-m", t: (a.depose ? "✔ " : "✖ ") + a.nom + " " + a.prenom + (a.depose ? (a.lu ? " — consulté le " + a.lu : " — pas encore consulté") : " — pas de bulletin") })); });
+      });
+    }
+    mois.onchange = majSuivi;
+    go.onclick = function () {
+      var a = DATA.agents[sel.selectedIndex], f = fic.files && fic.files[0];
+      if (!a) { msg("Choisissez un agent.", true); return; } if (!mois.value) { msg("Choisissez le mois.", true); return; } if (!f) { msg("Choisissez le fichier PDF.", true); return; }
+      if (f.size > 5 * 1024 * 1024) { msg("Le fichier dépasse 5 Mo.", true); return; }
+      go.disabled = true; msg("Envoi du bulletin…");
+      var lec = new FileReader();
+      lec.onerror = function () { go.disabled = false; msg("Fichier illisible.", true); };
+      lec.onload = function () {
+        var u = new Uint8Array(lec.result), s = ""; for (var i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+        appel("adminBulletinDeposer", { nom: a.nom, prenom: a.prenom, periode: mois.value, fichier: { nom: f.name, b64: btoa(s) } }, function (r) { go.disabled = false; msg((r && r.msg) || "Échec.", !(r && r.ok)); if (r && r.ok) { fic.value = ""; majSuivi(); } });
+      };
+      lec.readAsArrayBuffer(f);
+    };
+    carte.appendChild(h("div", { c: "ed-row" }, [go])); carte.appendChild(suivi); majSuivi();
+    return carte;
+  }
   function paneGa(c) {
+    c.appendChild(carteBulletins());
     if (GA.err && !GA.chargement) { var re = h("button", { c: "ed-b", t: "Réessayer", type: "button" }); re.onclick = function () { GA.err = null; GA.st = GA.ls = null; dessiner(); }; c.appendChild(h("div", { c: "ed-card" }, [h("p", { c: "ed-vide", t: GA.err }), re])); return; }
     if (GA.st === null && GA.ls === null && !GA.chargement) { c.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); gaCharge(true); return; }
     if (!GA.st || !GA.ls) { c.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); return; }
