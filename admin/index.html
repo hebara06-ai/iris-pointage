@@ -697,8 +697,39 @@ var IrisVoix = (function () {
     }
     return card;
   }
-  function paneAb(c) {
-    c.appendChild(carteRetardsSignales());
+  // Statistiques de retards signalés : par motif, par site et par mois (descriptives : aucun nom, aucune note individuelle)
+  function carteStatsRetards() {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Statistiques des retards signalés" })]), corps = h("div", {}), per = h("select");
+    [["1", "Dernier mois"], ["3", "3 derniers mois"], ["6", "6 derniers mois"], ["12", "12 derniers mois"]].forEach(function (o) { var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; per.appendChild(op); }); per.value = "6";
+    carte.appendChild(h("p", { c: "ed-vide", t: "Pour repérer des causes (transport, planning, site) plutôt que des personnes : aucun nom n’apparaît et aucune note individuelle n’est calculée. Les signalements annulés ne sont pas comptés." }));
+    carte.appendChild(h("div", { c: "ed-row" }, [lab("Période", per)])); carte.appendChild(corps);
+    function bloc(titre, liste) {
+      var b = h("div", {}), max = Math.max.apply(null, liste.map(function (x) { return x.n; }).concat([1]));
+      b.appendChild(h("h4", { t: titre })); b.lastChild.style.cssText = "margin:18px 0 6px;font-size:15px";
+      if (!liste.length) { b.appendChild(h("p", { c: "ed-vide", t: "Aucun retard." })); return b; }
+      liste.forEach(function (x) {
+        var barre = h("div", {}); barre.style.cssText = "height:8px;border-radius:99px;background:#cdb88a;width:" + Math.max(4, Math.round(x.n / max * 100)) + "%;margin-top:5px";
+        var l = h("div", { c: "sg-l" }, [h("b", { t: x.nom }), h("div", { c: "sg-m", t: x.n + " retard" + (x.n > 1 ? "s" : "") + " · " + x.min + " min au total · moyenne " + x.moyenne + " min · " + x.justifies + " justifié" + (x.justifies > 1 ? "s" : "") }), barre]);
+        b.appendChild(l);
+      });
+      return b;
+    }
+    function charge() {
+      corps.textContent = ""; corps.appendChild(h("p", { c: "ed-vide", t: "Chargement…" }));
+      appel("adminRetardsStats", { mois: Number(per.value) }, function (r) {
+        corps.textContent = "";
+        if (!(r && r.ok)) { corps.appendChild(h("p", { c: "ed-vide", t: (r && r.msg) || "Statistiques indisponibles." })); return; }
+        var t0 = r.total || {};
+        corps.appendChild(h("p", { c: "ed-vide", t: (t0.n || 0) + " retard(s) sur la période : " + (t0.justifies || 0) + " justifié(s), " + (t0.nonJustifies || 0) + " non justifié(s), " + (t0.attente || 0) + " en attente · " + (t0.min || 0) + " minutes au total." }));
+        corps.appendChild(bloc("Par motif", r.parMotif || [])); corps.appendChild(bloc("Par site", r.parSite || [])); corps.appendChild(bloc("Par mois", r.parMois || []));
+      });
+    }
+    per.onchange = charge; charge();
+    return carte;
+  }
+  function paneAb(c) {
+    c.appendChild(carteRetardsSignales());
+    c.appendChild(carteStatsRetards());
     var sel = agentSelect(), da = h("input", { type: "date" }), ty = h("select"), mo = h("textarea", { placeholder: "Motif (obligatoire) : écrivez ici, le texte passe à la ligne et vous pouvez remonter pour relire", rows: "4", maxlength: "1000", spellcheck: "true", lang: "fr", autocapitalize: "sentences" });
     da.value = iso(); mo.style.width = "100%"; mo.style.minHeight = "120px"; mo.style.resize = "vertical";
     [["Absence", "Absence justifiée"], ["Retard", "Retard excusé"], ["Absence non justifiée", "Absence non justifiée"], ["Retard non excusé", "Retard non excusé"]].forEach(function (o) { ty.appendChild(h("option", { value: o[0], t: o[1] })); });
