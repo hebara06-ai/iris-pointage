@@ -1486,6 +1486,32 @@ var IrisVoix = (function () {
     carte.appendChild(h("div", { c: "ed-row" }, [go]));
     c.appendChild(carte);
   }
+  // QR : âge des QR utilisés pour les scans réels (indice, pas une preuve : un QR photographié et envoyé arrive plus tard qu'un scan devant l'écran)
+  function paneQrAge(c) {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "QR : âge des scans (indice anti-partage)" })]), corps = h("div", {}), per = h("select");
+    [["7", "7 derniers jours"], ["30", "30 derniers jours"], ["90", "90 derniers jours"]].forEach(function (o) { var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; per.appendChild(op); }); per.value = "30";
+    carte.appendChild(h("p", { c: "ed-vide", t: "Chaque scan accepté est noté avec l’âge du QR utilisé (un QR change toutes les 5 secondes). Un scan fait devant l’écran utilise un QR récent ; un QR photographié puis envoyé à un collègue arrive plus tard. C’est un indice, jamais une preuve : un téléphone lent ou un réseau faible produit aussi des QR âgés. Aucun score n’est calculé, à vous d’interpréter." }));
+    carte.appendChild(h("div", { c: "ed-row" }, [lab("Période", per)])); carte.appendChild(corps);
+    function charge() {
+      corps.textContent = ""; corps.appendChild(h("p", { c: "ed-vide", t: "Chargement…" }));
+      appel("adminQrStats", { jours: Number(per.value), seuil: 3 }, function (r) {
+        corps.textContent = "";
+        if (!(r && r.ok)) { corps.appendChild(h("p", { c: "ed-vide", t: (r && r.msg) || "Indisponible." })); return; }
+        if (!r.total) { corps.appendChild(h("p", { c: "ed-vide", t: "Aucun scan enregistré sur cette période." })); return; }
+        corps.appendChild(h("p", { c: "ed-vide", t: r.total + " scan(s) accepté(s). Répartition par âge du QR (chaque palier = " + r.duree + " s) :" }));
+        var max = Math.max.apply(null, r.hist.map(function (x) { return x.n; }).concat([1]));
+        r.hist.forEach(function (x) {
+          var barre = h("div", {}); barre.style.cssText = "height:8px;border-radius:99px;background:" + (x.age >= r.seuil ? "#e08a00" : "#2e9e5b") + ";width:" + Math.max(2, Math.round(x.n / max * 100)) + "%;margin-top:5px";
+          corps.appendChild(h("div", { c: "sg-l" }, [h("b", { t: (x.age === 0 ? "QR affiché à cet instant" : "QR de " + (x.age * r.duree) + " à " + ((x.age + 1) * r.duree) + " s") + " : " + x.n + " scan(s) (" + Math.round(x.n / r.total * 100) + " %)" }), barre]));
+        });
+        corps.appendChild(h("h4", { t: "Agents ayant scanné avec un QR de " + (r.seuil * r.duree) + " s ou plus" })); corps.lastChild.style.cssText = "margin:16px 0 6px;font-size:15px";
+        if (!r.agents.length) { corps.appendChild(h("p", { c: "ed-vide", t: "Aucun agent concerné sur la période." })); return; }
+        r.agents.forEach(function (a) { corps.appendChild(h("div", { c: "sg-l" }, [h("b", { t: a.nom + " " + a.prenom }), h("div", { c: "sg-m", t: a.vieux + " scan(s) avec un QR âgé sur " + a.scans + " scan(s)" })])); });
+      });
+    }
+    per.onchange = charge; charge();
+    c.appendChild(carte);
+  }
   function paneParam(c) {
     paneMdpAgents(c);
     paneRapport(c);
@@ -1496,6 +1522,7 @@ var IrisVoix = (function () {
     paneScelles(c);
     paneSauvegardes(c);
     paneSauvegardeExterne(c);
+    paneQrAge(c);
     paneDeuxFacteurs(c);
     paneJournal(c);
     var an = h("input", { type: "password", autocomplete: "current-password", placeholder: "Ancien mot de passe" }), nv = h("input", { type: "password", autocomplete: "new-password", placeholder: "Nouveau mot de passe (10 caractères minimum, lettre + chiffre)" }), cf = h("input", { type: "password", autocomplete: "new-password", placeholder: "Confirmer le nouveau mot de passe" }), cd = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Code de sécurité (obligatoire)" });
