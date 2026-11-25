@@ -52,7 +52,7 @@
   setInterval(vider, 45000); setTimeout(vider, 3000); bandeau();
   function make(ok, ko) {
     var o = { withSuccessHandler: function (f) { return make(f, ko); }, withFailureHandler: function (f) { return make(ok, f); } };
-    ["etat", "verifier", "pointer", "ouvrirScan", "congesEtat", "congesDemander", "congesAnnuler","congesConnexion","congesPiece","congesAjouterPiece","stampDonnees","recupDemander","recupVerifier","recupStatut","agentBilan","agentDetails","agentSignaler","agentSignalements","retardSignaler","retardsMes","retardAnnuler","meteoDonnees","gaMesDossiers","gaDeposer","gaMaPiece","gaAjouterPieces","qsPoser","qsIrisRepondre","qsMesQuestions","qsDemanderHumain","qsReecrire","qsMaPiece","cmCompteur","cmMesCommunications","cmLire","cmAccuse","cmParticipation","cmMesMessages","cmLireMessages","cmEnvoyerMessage","cmReecrire","cmMaPiece","cmLireMessage","cmMaPieceMessage","cmMesPrefs","cmMesPrefsSauve","vxLire","connexion","cmAdminCatalogue","cmAdminSauve","corrigerTexte","reformulerTexte"].forEach(function (n) { o[n] = function () { appelle(n, Array.prototype.slice.call(arguments), ok, ko); }; });
+    ["etat", "verifier", "pointer", "ouvrirScan", "congesEtat", "congesDemander", "congesAnnuler","congesConnexion","congesPiece","congesAjouterPiece","stampDonnees","recupDemander","recupVerifier","recupStatut","agentBilan","agentDetails","agentSignaler","agentSignalements","retardSignaler","retardsMes","retardAnnuler","traduireTexte","meteoDonnees","gaMesDossiers","gaDeposer","gaMaPiece","gaAjouterPieces","qsPoser","qsIrisRepondre","qsMesQuestions","qsDemanderHumain","qsReecrire","qsMaPiece","cmCompteur","cmMesCommunications","cmLire","cmAccuse","cmParticipation","cmMesMessages","cmLireMessages","cmEnvoyerMessage","cmReecrire","cmMaPiece","cmLireMessage","cmMaPieceMessage","cmMesPrefs","cmMesPrefsSauve","vxLire","connexion","cmAdminCatalogue","cmAdminSauve","corrigerTexte","reformulerTexte"].forEach(function (n) { o[n] = function () { appelle(n, Array.prototype.slice.call(arguments), ok, ko); }; });
     return o;
   }
   window.google = { script: { run: make(null, null) } };
@@ -363,14 +363,14 @@ var IrisVoix = (function () {
   // Dictée : appelle onTexte(texteReconnu) ; onEtat('ecoute'|'arret'|'erreur', message)
   var IOS = /iP(hone|ad|od)/.test(navigator.userAgent || '') || (/Macintosh/.test(navigator.userAgent || '') && navigator.maxTouchPoints > 1), dernierChamp = null;
   if (IOS) document.addEventListener('focusin', function (e) { var t = e.target; if (t && (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && /^(text|search|)$/.test(t.type)))) dernierChamp = t; });
-  function dicter(onTexte, onEtat) {
+  function dicter(onTexte, onEtat, getLang) {
     // iPhone/iPad : la dictée intégrée au navigateur est peu fiable ; on guide vers le micro du clavier, qui fonctionne partout
     if (IOS && !SR) return { demarrer: function () { if (dernierChamp) { try { dernierChamp.focus(); } catch (e) { } } onEtat('erreur', 'Sur iPhone : touchez le micro 🎤 en bas à droite du clavier pour parler.'); }, arreter: function () { onEtat('arret'); } };
     if (!SR) return null; var r = new SR(), actif = false; r.lang = 'fr-FR'; r.continuous = false; r.interimResults = false; r.maxAlternatives = 1;
     r.onresult = function (e) { var t = ''; for (var i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript; if (t.trim()) onTexte(t.trim()); };
     r.onerror = function (e) { actif = false; var m = e && e.error; onEtat('erreur', m === 'not-allowed' || m === 'service-not-allowed' ? 'Le micro est refusé : autorisez-le dans les réglages du navigateur.' : m === 'no-speech' ? 'Je n’ai rien entendu.' : 'La dictée a échoué.'); };
     r.onend = function () { if (actif) { actif = false; onEtat('arret'); } };
-    return { demarrer: function () { try { arreter(); r.start(); actif = true; onEtat('ecoute'); } catch (e) { actif = false; onEtat('erreur', 'La dictée n’a pas pu démarrer.'); } }, arreter: function () { try { r.stop(); } catch (e) { } actif = false; onEtat('arret'); } };
+    return { demarrer: function () { try { arreter(); r.lang = (getLang && getLang()) || 'fr-FR'; r.start(); actif = true; onEtat('ecoute'); } catch (e) { actif = false; onEtat('erreur', 'La dictée n’a pas pu démarrer.'); } }, arreter: function () { try { r.stop(); } catch (e) { } actif = false; onEtat('arret'); } };
   }
   function valeur(c) { return c.value || ''; }
   function inserer(c, t) { var v = valeur(c), sep = v && !/\s$/.test(v) ? ' ' : ''; c.value = v + sep + t; try { c.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) { } c.focus(); }
@@ -378,14 +378,39 @@ var IrisVoix = (function () {
   function barre(champ, opts) {
     opts = opts || {}; var bar = document.createElement('div'); bar.className = 'iv-bar'; bar.setAttribute('data-iv', '1'); var note = document.createElement('div'); note.className = 'iv-note'; note.setAttribute('role', 'status');
     function msg(t) { note.textContent = t || ''; }
+    var LANGUES = [['fr', 'Français', 'fr-FR'], ['ar', 'العربية · Arabe', 'ar-SA'], ['pt', 'Português', 'pt-PT'], ['es', 'Español', 'es-ES'], ['en', 'English', 'en-GB'], ['ro', 'Română', 'ro-RO'], ['it', 'Italiano', 'it-IT'], ['tr', 'Türkçe', 'tr-TR']], code = 'fr', btrad = null;
+    function langueRec() { for (var i = 0; i < LANGUES.length; i++) if (LANGUES[i][0] === code) return LANGUES[i][2]; return 'fr-FR'; }
+    function langueNom() { for (var i = 0; i < LANGUES.length; i++) if (LANGUES[i][0] === code) return LANGUES[i][1].split(' · ').pop(); return ''; }
     if (opts.lire !== false && dispoLecture()) { var bl = bouton(SVG_HP, 'Écouter'); bl.onclick = function () { var t = valeur(champ); if (!t.trim()) { msg('Rien à lire pour le moment.'); return; } msg(''); bl.classList.add('on'); if (!lire(t, function () { bl.classList.remove('on'); }, champ)) bl.classList.remove('on'); }; bar.appendChild(bl); }
     if (opts.dicter !== false && dispoDictee()) {
-      var bd = bouton(SVG_MIC, 'Dicter'), d = dicter(function (t) { inserer(champ, t); if (opts.corrigerApresDictee && opts.corriger) { avec(opts.corriger, 'Correction…'); } }, function (e, m) { if (e === 'ecoute') { bd.classList.add('ec', 'on'); bd.lastChild.textContent = 'J’écoute…'; msg(''); } else { bd.classList.remove('ec', 'on'); bd.lastChild.textContent = 'Dicter'; if (e === 'erreur') msg(m); } }), ecoute = false;
+      var bd = bouton(SVG_MIC, 'Dicter'), d = dicter(function (t) { inserer(champ, t); if (code !== 'fr' && opts.traduire) { traduireChamp(); } else if (opts.corrigerApresDictee && opts.corriger) { avec(opts.corriger, 'Correction…'); } }, function (e, m) { if (e === 'ecoute') { bd.classList.add('ec', 'on'); bd.lastChild.textContent = 'J’écoute…'; msg(''); } else { bd.classList.remove('ec', 'on'); bd.lastChild.textContent = 'Dicter'; if (e === 'erreur') msg(m); } }, langueRec), ecoute = false;
       bd.onclick = function () { if (ecoute) { ecoute = false; d.arreter(); } else { ecoute = true; d.demarrer(); } }; bar.appendChild(bd);
     }
     function avec(f, texteAttente) { var t = valeur(champ); if (t.trim().length < 3) { msg('Écrivez d’abord quelques mots.'); return; } msg(texteAttente); Array.prototype.forEach.call(bar.querySelectorAll('button'), function (b) { b.disabled = true; }); f(t, function (err, nv) { Array.prototype.forEach.call(bar.querySelectorAll('button'), function (b) { b.disabled = false; }); if (err || !nv) { msg(err || 'Aucune proposition.'); return; } champ.value = nv; try { champ.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) { } msg('Texte mis à jour.'); }); }
     if (opts.corriger) { var bc = bouton(SVG_PLUME, 'Corriger'); bc.onclick = function () { avec(opts.corriger, 'Correction en cours…'); }; bar.appendChild(bc); }
     if (opts.reformuler) { var br = bouton(SVG_ETOILE, 'Reformuler'); br.onclick = function () { avec(opts.reformuler, 'Reformulation en cours…'); }; bar.appendChild(br); }
+    // Traduction vers le français : le texte d'origine reste dans le champ, sous la traduction, avec sa propre mention
+    function traduireChamp() {
+      var tx = valeur(champ); if (tx.trim().length < 2) { msg('Écrivez ou dictez d’abord quelques mots.'); return; }
+      if (/— Texte d’origine/.test(tx)) { msg('Ce texte est déjà traduit.'); return; }
+      msg('Traduction en cours…'); Array.prototype.forEach.call(bar.querySelectorAll('button,select'), function (b) { b.disabled = true; });
+      opts.traduire(tx, code, function (err, fr) {
+        Array.prototype.forEach.call(bar.querySelectorAll('button,select'), function (b) { b.disabled = false; });
+        if (err || !fr) { msg(err || 'Traduction impossible.'); return; }
+        var plein = fr + '\n— Texte d’origine (' + langueNom() + ') : ' + tx.trim();
+        if (champ.maxLength > 0 && plein.length > champ.maxLength) { plein = fr; msg('Traduit en français. Le texte d’origine n’a pas pu être conservé (champ trop court). Relisez avant d’envoyer.'); }
+        else msg('Traduit en français. Relisez avant d’envoyer.');
+        champ.value = plein; try { champ.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) { }
+      });
+    }
+    if (opts.traduire) {
+      var sl = document.createElement('select'); sl.setAttribute('aria-label', 'Langue dans laquelle vous parlez'); sl.setAttribute('dir', 'auto');
+      sl.style.cssText = 'padding:9px 12px;font-size:15px;font-weight:600;border-radius:12px;border:1px solid #d9b15f;background:#fff;color:#07152e;max-width:100%;width:auto;margin:0';
+      LANGUES.forEach(function (l) { var o = document.createElement('option'); o.value = l[0]; o.textContent = l[1]; sl.appendChild(o); });
+      btrad = bouton(SVG_ETOILE, 'Traduire en français'); btrad.style.display = 'none'; btrad.onclick = traduireChamp;
+      sl.onchange = function () { code = sl.value; btrad.style.display = code === 'fr' ? 'none' : ''; msg(code === 'fr' ? '' : 'Dictez dans votre langue : IRIS traduit en français.'); };
+      bar.appendChild(sl); bar.appendChild(btrad);
+    }
     bar.appendChild(note); return bar;
   }
   // Bouton « Écouter » pour un texte affiché (non modifiable) ; fournisseur = chaîne ou fonction
@@ -601,7 +626,12 @@ function qsReecrireIA(texte, mode, cb) {
   runK(function (res) { if (res && res.ok && res.texte) cb(null, qsNet(res.texte)); else cb((res && res.msg) || "Le service est occupé, réessayez dans un instant."); },
     function () { cb("Connexion interrompue : réessayez."); }).qsReecrire(DEV, texte, mode);
 }
-var QS_OPTS = { corrigerApresDictee: true, corriger: function (t, cb) { qsReecrireIA(t, "corriger", cb); }, reformuler: function (t, cb) { qsReecrireIA(t, "reformuler", cb); } };
+function traduireIA(texte, langue, cb) {
+  if (DEMOP) { cb("Mode démonstration : rien n’est enregistré."); return; }
+  runK(function (res) { if (res && res.ok && res.texte) cb(null, qsNet(res.texte)); else cb((res && res.msg) || "La traduction est indisponible, réessayez dans un instant."); },
+    function () { cb("Connexion interrompue : réessayez."); }).traduireTexte(DEV, texte, langue);
+}
+var QS_OPTS = { traduire: function (t, code, cb) { traduireIA(t, code, cb); }, corrigerApresDictee: true, corriger: function (t, cb) { qsReecrireIA(t, "corriger", cb); }, reformuler: function (t, cb) { qsReecrireIA(t, "reformuler", cb); } };
 // Au démarrage : bouton flottant « Écouter la sélection » + barre sous toutes les zones d'écriture de l'espace agent (sauf les champs marqués data-iv-no et le chat, déjà équipé)
 function qsChampOk(ch) {
   if (ch.closest(".qs") || ch.getAttribute("data-iv-no") || ch.disabled || ch.readOnly) return false;
