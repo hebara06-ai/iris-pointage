@@ -1347,6 +1347,61 @@ var IrisVoix = (function () {
     carte.appendChild(h("div", { c: "ed-row" }, [bv, bm])); carte.appendChild(res);
     c.appendChild(carte);
   }
+  // Sauvegarde externe chiffrée sur l'ordinateur : le classeur est récupéré puis chiffré DANS LE NAVIGATEUR (AES-256, phrase secrète de l'administrateur) ;
+  // le serveur ne connaît jamais la phrase. Le fichier produit se déchiffre sur la page « restaurer » (aucune donnée n'y est envoyée).
+  function irisOctets(b64) { var s = atob(b64), o = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) o[i] = s.charCodeAt(i); return o; }
+  function irisCle(phrase, sel, usages) {
+    var enc = new TextEncoder();
+    return crypto.subtle.importKey("raw", enc.encode(phrase), "PBKDF2", false, ["deriveKey"]).then(function (base) {
+      return crypto.subtle.deriveKey({ name: "PBKDF2", salt: sel, iterations: 250000, hash: "SHA-256" }, base, { name: "AES-GCM", length: 256 }, false, usages);
+    });
+  }
+  function irisChiffrer(octets, phrase) {
+    var sel = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+    return irisCle(phrase, sel, ["encrypt"]).then(function (cle) { return crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, cle, octets); }).then(function (ct) {
+      var c = new Uint8Array(ct), out = new Uint8Array(36 + c.length); out.set(new TextEncoder().encode("IRISBAK1"), 0); out.set(sel, 8); out.set(iv, 24); out.set(c, 36); return out;
+    });
+  }
+  function irisDechiffrer(octets, phrase) {
+    if (octets.length < 37 || new TextDecoder().decode(octets.slice(0, 8)) !== "IRISBAK1") return Promise.reject(new Error("format"));
+    var sel = octets.slice(8, 24), iv = octets.slice(24, 36), ct = octets.slice(36);
+    return irisCle(phrase, sel, ["decrypt"]).then(function (cle) { return crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, cle, ct); }).then(function (c) { return new Uint8Array(c); });
+  }
+  window.irisChiffrer = irisChiffrer; window.irisDechiffrer = irisDechiffrer;
+  function paneSauvegardeExterne(c) {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Sauvegarde externe chiffrée (sur votre ordinateur)" })]);
+    carte.appendChild(h("p", { c: "ed-vide", t: "IRIS récupère le classeur, puis le chiffre dans votre navigateur avec une phrase secrète que vous choisissez (AES-256) : le serveur ne connaît jamais cette phrase. Vous obtenez un fichier .irisbak à ranger hors de Google (ordinateur, disque externe). Pour le rouvrir : page « Restaurer une sauvegarde », avec la phrase secrète. ATTENTION : si vous perdez la phrase secrète, la sauvegarde est définitivement illisible. Seules les feuilles du classeur sont sauvegardées, pas les justificatifs et photos stockés dans Drive." }));
+    var code = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Votre code de sécurité" }), p1 = h("input", { type: "password", autocomplete: "new-password", placeholder: "Phrase secrète (12 caractères minimum)" }), p2 = h("input", { type: "password", autocomplete: "new-password", placeholder: "Répétez la phrase secrète" });
+    carte.appendChild(h("div", { c: "ed-row" }, [lab("Votre code de sécurité", code)]));
+    carte.appendChild(h("div", { c: "ed-row" }, [lab("Phrase secrète", p1), lab("Répétez-la", p2)]));
+    var go = h("button", { c: "ed-b ed-p", t: "Télécharger la sauvegarde chiffrée", type: "button" });
+    go.onclick = function () {
+      if (!window.crypto || !crypto.subtle) { msg("Ce navigateur ne permet pas le chiffrement.", true); return; }
+      if (!code.value) { msg("Saisissez votre code de sécurité.", true); return; }
+      if (p1.value.length < 12) { msg("La phrase secrète doit faire au moins 12 caractères.", true); return; }
+      if (p1.value !== p2.value) { msg("Les deux phrases secrètes ne sont pas identiques.", true); return; }
+      go.disabled = true; msg("Récupération du classeur… (quelques secondes)");
+      var phrase = p1.value, q = { code: code.value }; code.value = "";
+      appel("adminSauvegardeExport", q, function (r) {
+        if (!(r && r.ok)) { go.disabled = false; msg((r && r.msg) || "Échec de l’export.", true); return; }
+        var clair = irisOctets(r.b64);
+        msg("Chiffrement dans votre navigateur…");
+        irisChiffrer(clair, phrase).then(function (chiffre) {
+          msg("Vérification du déchiffrement…");
+          return irisDechiffrer(chiffre, phrase).then(function (retour) {
+            var egal = retour.length === clair.length; for (var i = 0; egal && i < clair.length; i++) if (retour[i] !== clair[i]) egal = false;
+            if (!egal) throw new Error("verification");
+            var blob = new Blob([chiffre], { type: "application/octet-stream" }), a = document.createElement("a");
+            a.href = URL.createObjectURL(blob); a.download = r.nom + ".irisbak"; document.body.appendChild(a); a.click();
+            setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+            msg("Sauvegarde chiffrée téléchargée (" + Math.round(chiffre.length / 1024) + " Ko) et déchiffrement vérifié. Rangez-la hors de Google et gardez la phrase secrète.");
+          });
+        }).catch(function () { msg("Chiffrement impossible : rien n’a été téléchargé.", true); }).then(function () { go.disabled = false; p1.value = ""; p2.value = ""; });
+      });
+    };
+    carte.appendChild(h("div", { c: "ed-row" }, [go]));
+    c.appendChild(carte);
+  }
   function paneParam(c) {
     paneMdpAgents(c);
     paneRapport(c);
@@ -1356,6 +1411,7 @@ var IrisVoix = (function () {
     paneConservation(c);
     paneScelles(c);
     paneSauvegardes(c);
+    paneSauvegardeExterne(c);
     paneDeuxFacteurs(c);
     paneJournal(c);
     var an = h("input", { type: "password", autocomplete: "current-password", placeholder: "Ancien mot de passe" }), nv = h("input", { type: "password", autocomplete: "new-password", placeholder: "Nouveau mot de passe (10 caractères minimum, lettre + chiffre)" }), cf = h("input", { type: "password", autocomplete: "new-password", placeholder: "Confirmer le nouveau mot de passe" }), cd = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Code de sécurité (obligatoire)" });
