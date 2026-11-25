@@ -64,11 +64,20 @@ if (!CLE) { document.getElementById("msg").style.display = "block"; document.get
 
 /* Même interface que dans Apps Script, mais par requête réseau. */
 var google = { script: { run: { withSuccessHandler: function (ok) { var o = { withFailureHandler: function (ko) { o.ko = ko; return o; }, jetons: function (k) {
+  /* La clé part dans le corps d'une requête POST (jamais dans l'adresse) ; l'ancienne méthode ne sert que de secours. */
+  function secours() {
+    var y = new XMLHttpRequest();
+    y.open("GET", URL_APP + "?api=jetons&cle=" + encodeURIComponent(k));
+    y.onload = function () { try { ok(JSON.parse(y.responseText)); } catch (e) { if (o.ko) o.ko(); } };
+    y.onerror = y.ontimeout = function () { if (o.ko) o.ko(); };
+    y.timeout = 20000; y.send();
+  }
   var x = new XMLHttpRequest();
-  x.open("GET", URL_APP + "?api=jetons&cle=" + encodeURIComponent(k));
-  x.onload = function () { try { ok(JSON.parse(x.responseText)); } catch (e) { if (o.ko) o.ko(); } };
-  x.onerror = x.ontimeout = function () { if (o.ko) o.ko(); };
-  x.timeout = 20000; x.send();
+  x.open("POST", URL_APP);
+  x.setRequestHeader("Content-Type", "text/plain;charset=utf-8");
+  x.onload = function () { try { var j = JSON.parse(x.responseText); if (j && j.e === undefined && "r" in j) ok(j.r); else secours(); } catch (e) { secours(); } };
+  x.onerror = x.ontimeout = secours;
+  x.timeout = 20000; x.send(JSON.stringify({ f: "jetons", a: [k] }));
 }, meteoDonnees: function () {
   var x = new XMLHttpRequest();
   x.open("GET", URL_APP + "?api=meteo");
