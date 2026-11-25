@@ -1595,6 +1595,21 @@ var IrisVoix = (function () {
     per.onchange = charge; charge();
     c.appendChild(carte);
   }
+  // Résumé quotidien par e-mail : uniquement des nombres, jamais de nom ni de lien d'accès (gratuit : quota d'e-mails de Google)
+  function paneResume(c) {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Résumé quotidien par e-mail" })]), etat = h("p", { c: "ed-vide", t: "Chargement…" });
+    carte.appendChild(h("p", { c: "ed-vide", t: "Chaque matin vers 6 h, IRIS vous envoie un e-mail avec des nombres seulement : demandes de congé en attente, retards à décider, contestations, signalements ouverts, alertes de durée légale. Aucun nom, aucun lien d’accès. Gratuit. Il part à la première adresse de votre liste d’alertes de sécurité." }));
+    carte.appendChild(etat);
+    function majEtat() { appel("adminResume", { action: "etat" }, function (r) { etat.textContent = r && r.ok ? (r.actif ? "Résumé quotidien ACTIF (adresse : " + r.dest + ")." : "Résumé quotidien désactivé. Adresse : " + (r.dest || "aucune") + ".") : "État indisponible."; }); }
+    majEtat();
+    var cd = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Votre code de sécurité" });
+    carte.appendChild(h("div", { c: "ed-row" }, [lab("Votre code de sécurité (pour activer ou désactiver)", cd)]));
+    function envoi(action) { if (action !== "essai" && !cd.value) { msg("Saisissez votre code de sécurité.", true); return; } var q = { action: action, code: cd.value }; cd.value = ""; appel("adminResume", q, function (r) { msg((r && r.msg) || "Échec.", !(r && r.ok)); majEtat(); }); }
+    var bo = h("button", { c: "ed-b ed-p", t: "Activer le résumé quotidien", type: "button" }), be = h("button", { c: "ed-b", t: "M’envoyer un résumé d’essai maintenant", type: "button" });
+    bo.onclick = function () { envoi("activer"); }; be.onclick = function () { envoi("essai"); };
+    var bf = sure("Désactiver le résumé", true, function () { envoi("desactiver"); });
+    carte.appendChild(h("div", { c: "ed-row" }, [bo, be, bf])); c.appendChild(carte);
+  }
   function paneParam(c) {
     paneMdpAgents(c);
     paneRapport(c);
@@ -1606,6 +1621,7 @@ var IrisVoix = (function () {
     paneSauvegardes(c);
     paneSauvegardeExterne(c);
     paneQrAge(c);
+    paneResume(c);
     paneDeuxFacteurs(c);
     paneJournal(c);
     var an = h("input", { type: "password", autocomplete: "current-password", placeholder: "Ancien mot de passe" }), nv = h("input", { type: "password", autocomplete: "new-password", placeholder: "Nouveau mot de passe (10 caractères minimum, lettre + chiffre)" }), cf = h("input", { type: "password", autocomplete: "new-password", placeholder: "Confirmer le nouveau mot de passe" }), cd = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Code de sécurité (obligatoire)" });
