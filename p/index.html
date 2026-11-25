@@ -1,15 +1,58 @@
 <!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; frame-src 'self' blob:; connect-src https://script.google.com https://script.googleusercontent.com https://api.open-meteo.com https://api-bdc.io; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin><link rel="prefetch" href="jsQR.min.js"><title>IRIS</title><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#0b1a2b"><link rel="icon" href="../icon-192.png"><link rel="apple-touch-icon" href="../icon-192.png"><meta name="apple-mobile-web-app-title" content="IRIS"><script>(function shim(){
   var URL_APP = "https://script.google.com/macros/s/AKfycbzAc5Ge9XGmOE5bBbOxkN528oSBNvgw3MZEGRZVH15HxMZnVB_MwputipQMebgHXAxO/exec";
-  function appelle(nom, args, ok, ko) {
+  function brut(nom, args, ok, ko) {
     var x = new XMLHttpRequest();
     x.open("POST", URL_APP); x.setRequestHeader("Content-Type", "text/plain;charset=utf-8"); x.timeout = 30000;
     x.onload = function () { try { var r = JSON.parse(x.responseText); if (r && r.e !== undefined) { if (ko) ko(r.e); } else if (ok) ok(r ? r.r : null); } catch (e) { if (ko) ko(e); } };
     x.onerror = x.ontimeout = function () { if (ko) ko(); };
     x.send(JSON.stringify({ f: nom, a: args }));
   }
+  /* Hors connexion : une demande de congé (sans pièce jointe) ou un retard signalé est gardé sur le téléphone
+     puis renvoyé tout seul au retour du réseau. Aucun doublon : jeton d'envoi, et le serveur refuse les chevauchements. */
+  var FILE = "iris_file_v1", ENL = { congesDemander: 1, retardSignaler: 1 }, note = "", tNote = 0, enCours = false;
+  function lireFile() { try { return JSON.parse(localStorage.getItem(FILE) || "[]"); } catch (e) { return []; } }
+  function ecrireFile(l) { try { localStorage.setItem(FILE, JSON.stringify(l.slice(-20))); } catch (e) { } bandeau(); }
+  function hex() { var s = ""; for (var i = 0; i < 16; i++) s += Math.floor(Math.random() * 16).toString(16); return s; }
+  function bandeau() {
+    if (!document.body) { document.addEventListener("DOMContentLoaded", bandeau); return; }
+    var b = document.getElementById("iris-file");
+    if (!b) {
+      b = document.createElement("div"); b.id = "iris-file"; b.setAttribute("role", "status"); b.setAttribute("aria-live", "polite");
+      b.style.cssText = "position:fixed;left:50%;bottom:18px;transform:translateX(-50%);max-width:min(92vw,460px);box-sizing:border-box;padding:12px 18px;border-radius:14px;background:#0b1a2b;color:#f6f4ef;font:500 14px/1.4 -apple-system,system-ui,sans-serif;text-align:center;z-index:99999;display:none;box-shadow:0 6px 24px rgba(11,26,43,.28);pointer-events:none";
+      document.body.appendChild(b);
+    }
+    var n = lireFile().length, tx = note || (n ? (n === 1 ? "1 envoi en attente : il partira dès que le réseau revient." : n + " envois en attente : ils partiront dès que le réseau revient.") : "");
+    b.textContent = tx; b.style.display = tx ? "block" : "none";
+  }
+  function noter(tx, ms) { note = tx; bandeau(); clearTimeout(tNote); tNote = setTimeout(function () { note = ""; bandeau(); }, ms); }
+  function minutesRetard(o) { var p = /^(\d\d):(\d\d)/.exec((o && o.prevue) || ""), a = /^(\d\d):(\d\d)/.exec((o && o.arrivee) || ""); if (!p || !a) return 0; var m = (+a[1] * 60 + +a[2]) - (+p[1] * 60 + +p[2]); return m > 0 ? m : 0; }
+  function enfilable(nom, args) { return ENL[nom] && (nom === "retardSignaler" ? !!(args[1] && typeof args[1] === "object") : !args[6]); }
+  function appelle(nom, args, ok, ko) {
+    if (nom === "congesDemander" && !args[6] && !args[7]) args[7] = hex();
+    brut(nom, args, ok, function (e) {
+      if (e === undefined && enfilable(nom, args)) {
+        var l = lireFile(); l.push({ n: nom, a: args, t: Date.now() }); ecrireFile(l);
+        if (ok) ok(nom === "retardSignaler" ? { ok: true, minutes: minutesRetard(args[1]), horsLigne: true } : { ok: true, horsLigne: true });
+      } else if (ko) ko(e);
+    });
+  }
+  function vider() {
+    if (enCours || navigator.onLine === false) return;
+    var l = lireFile(); if (!l.length) return;
+    enCours = true; var it = l[0];
+    function suite(msg) {
+      var r = lireFile().filter(function (z) { return !(z.t === it.t && z.n === it.n); }); ecrireFile(r); enCours = false;
+      if (msg && !/chevauche|déjà/.test(msg)) noter("Une demande envoyée hors connexion n’a pas pu être acceptée : " + msg + " Merci de la refaire.", 12000);
+      else if (!msg && !r.length) noter("Vos envois en attente ont été transmis.", 6000);
+      if (r.length) vider();
+    }
+    brut(it.n, it.a, function (r) { suite(r && r.ok === false ? (r.msg || "refusée.") : ""); }, function (e) { if (e === undefined || e instanceof Error) { enCours = false; return; } suite(String(e && e.message ? e.message : e || "refusée.")); });
+  }
+  window.addEventListener("online", vider);
+  setInterval(vider, 45000); setTimeout(vider, 3000); bandeau();
   function make(ok, ko) {
     var o = { withSuccessHandler: function (f) { return make(f, ko); }, withFailureHandler: function (f) { return make(ok, f); } };
-    ["etat", "verifier", "pointer", "ouvrirScan", "congesEtat", "congesDemander", "congesAnnuler","congesConnexion","congesPiece","congesAjouterPiece","stampDonnees","recupDemander","recupVerifier","recupStatut","agentBilan","agentDetails","agentSignaler","agentSignalements","meteoDonnees","gaMesDossiers","gaDeposer","gaMaPiece","gaAjouterPieces","qsPoser","qsIrisRepondre","qsMesQuestions","qsDemanderHumain","qsReecrire","qsMaPiece","cmCompteur","cmMesCommunications","cmLire","cmAccuse","cmParticipation","cmMesMessages","cmLireMessages","cmEnvoyerMessage","cmReecrire","cmMaPiece","cmLireMessage","cmMaPieceMessage","cmMesPrefs","cmMesPrefsSauve","vxLire","connexion","cmAdminCatalogue","cmAdminSauve","corrigerTexte","reformulerTexte"].forEach(function (n) { o[n] = function () { appelle(n, Array.prototype.slice.call(arguments), ok, ko); }; });
+    ["etat", "verifier", "pointer", "ouvrirScan", "congesEtat", "congesDemander", "congesAnnuler","congesConnexion","congesPiece","congesAjouterPiece","stampDonnees","recupDemander","recupVerifier","recupStatut","agentBilan","agentDetails","agentSignaler","agentSignalements","retardSignaler","retardsMes","retardAnnuler","meteoDonnees","gaMesDossiers","gaDeposer","gaMaPiece","gaAjouterPieces","qsPoser","qsIrisRepondre","qsMesQuestions","qsDemanderHumain","qsReecrire","qsMaPiece","cmCompteur","cmMesCommunications","cmLire","cmAccuse","cmParticipation","cmMesMessages","cmLireMessages","cmEnvoyerMessage","cmReecrire","cmMaPiece","cmLireMessage","cmMaPieceMessage","cmMesPrefs","cmMesPrefsSauve","vxLire","connexion","cmAdminCatalogue","cmAdminSauve","corrigerTexte","reformulerTexte"].forEach(function (n) { o[n] = function () { appelle(n, Array.prototype.slice.call(arguments), ok, ko); }; });
     return o;
   }
   window.google = { script: { run: make(null, null) } };
