@@ -1181,10 +1181,37 @@ var IrisVoix = (function () {
     q.onkeydown = function (e) { if (e.key === "Enter") charge(); };
     carte.appendChild(h("div", { c: "ed-row" }, [q, bt])); carte.appendChild(liste); c.appendChild(carte); charge();
   }
+  // Certificat de présence mensuel : document à remettre au client, protégé par le code de sécurité, noms masqués par défaut
+  function paneCertificat(c) {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Certificat de présence du mois" })]);
+    carte.appendChild(h("p", { c: "ed-vide", t: "Un document soigné qui résume la présence du mois sur le site : jours prévus et présents, retards, absences, heures. Ouvrez-le puis imprimez-le en PDF. Il porte une empreinte de vérification : si un chiffre est modifié après coup, elle ne correspond plus. Les noms des agents sont masqués, sauf si vous les affichez." }));
+    var jour = h("input", { type: "date" }), noms = h("input", { type: "checkbox" }), code = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Code de sécurité" });
+    jour.value = iso(); code.style.cssText = "width:14em";
+    carte.appendChild(h("div", { c: "ed-row" }, [lab("Un jour du mois voulu", jour), lab("Code de sécurité", code)]));
+    carte.appendChild(h("div", { c: "ed-row" }, [lab("Afficher les noms des agents", noms)]));
+    var go = h("button", { c: "ed-b ed-p", t: "Créer le certificat", type: "button" });
+    go.onclick = function () {
+      if (!code.value) { msg("Saisissez votre code de sécurité.", true); return; }
+      if (!jour.value) { msg("Choisissez un jour du mois.", true); return; }
+      go.disabled = true; msg("Préparation du certificat…");
+      var q = { ref: fr(jour.value), avecNoms: !!noms.checked, code: code.value }; code.value = "";
+      appel("adminCertificat", q, function (r) {
+        go.disabled = false;
+        if (!(r && r.ok)) { msg((r && r.msg) || "Échec du certificat.", true); return; }
+        var blob = new Blob([r.html], { type: "text/html;charset=utf-8" }), a = document.createElement("a");
+        a.href = URL.createObjectURL(blob); a.download = r.nom; document.body.appendChild(a); a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+        msg("Certificat prêt : " + r.periode + ". Ouvrez le fichier puis imprimez-le en PDF.");
+      });
+    };
+    carte.appendChild(h("div", { c: "ed-row" }, [go]));
+    c.appendChild(carte);
+  }
   function paneParam(c) {
     paneMdpAgents(c);
     paneRapport(c);
     paneExport(c);
+    paneCertificat(c);
     paneJournal(c);
     var an = h("input", { type: "password", autocomplete: "current-password", placeholder: "Ancien mot de passe" }), nv = h("input", { type: "password", autocomplete: "new-password", placeholder: "Nouveau mot de passe (10 caractères minimum, lettre + chiffre)" }), cf = h("input", { type: "password", autocomplete: "new-password", placeholder: "Confirmer le nouveau mot de passe" }), cd = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Code de sécurité (obligatoire)" });
     var ok = h("button", { c: "ed-b ed-p", t: "Modifier mon mot de passe", type: "button" });
