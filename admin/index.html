@@ -661,6 +661,23 @@ var IrisVoix = (function () {
         }
       }
       else if (x.commentaire) ligne.appendChild(h("div", { t: "Commentaire : " + x.commentaire, c: "ed-vide" }));
+      if (x.contest) {
+        ligne.appendChild(h("div", { t: "Contestation de l’agent : " + x.contest, style: "font-weight:600;white-space:pre-wrap;overflow-wrap:anywhere" }));
+        if (x.reponse) ligne.appendChild(h("div", { t: "Votre réponse : " + x.reponse, c: "ed-vide" }));
+        else if (st === "Non justifié") {
+          var comE = h("input", { type: "text", placeholder: "Commentaire (facultatif)", maxlength: "200", autocomplete: "off" }); comE.style.cssText = "flex:1 1 220px;min-width:0";
+          var reex = function (issue, b1, b2) {
+            if (b1.disabled) return; b1.disabled = b2.disabled = true;
+            var garde = setTimeout(function () { b1.disabled = b2.disabled = false; msg("Pas de réponse du serveur : réessayez.", true); }, 30000);
+            try {
+              google.script.run.withSuccessHandler(function (r) { clearTimeout(garde); b1.disabled = b2.disabled = false; if (r && r.ok) { msg(r.msg); RSG.liste = null; RSG.t = 0; charger(); } else msg((r && r.msg) || "Échec.", true); })
+                .withFailureHandler(function () { clearTimeout(garde); b1.disabled = b2.disabled = false; msg("Connexion impossible, réessayez.", true); }).adminRetardReexaminer(CLE, { id: x.id, issue: issue, commentaire: comE.value });
+            } catch (e) { clearTimeout(garde); b1.disabled = b2.disabled = false; msg("Connexion impossible, réessayez.", true); }
+          };
+          var bAcc = sure("Accepter la contestation (justifier le retard)", false, function () { reex("Accepté", bAcc, bMain); }), bMain = sure("Maintenir la décision", true, function () { reex("Maintenu", bAcc, bMain); });
+          ligne.appendChild(h("div", { style: "display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px" }, [comE, bAcc, bMain]));
+        }
+      }
       if (st === "Signalé") {
         var com = h("input", { type: "text", placeholder: "Commentaire (facultatif)", maxlength: "200", autocomplete: "off" }), bj = h("button", { c: "ed-b ed-p", t: "Justifier", type: "button" }), bn = h("button", { c: "ed-b", t: "Non justifié", type: "button" });
         var decider = function (d) {
@@ -696,7 +713,7 @@ var IrisVoix = (function () {
       RSG.t = Date.now();
       var echec = function () { RSG.err = "Connexion impossible : rouvrez l’onglet pour réessayer."; RSG.t = 0; rend(); };
       try {
-        google.script.run.withSuccessHandler(function (r) { if (r && r.ok) { RSG.liste = r.retards || []; RTN.n = RSG.liste.filter(function (x) { return x.statut === "Signalé"; }).length; RSG.err = ""; } else RSG.err = (r && r.msg) || "Retards signalés indisponibles pour le moment."; rend(); })
+        google.script.run.withSuccessHandler(function (r) { if (r && r.ok) { RSG.liste = r.retards || []; RTN.n = RSG.liste.filter(function (x) { return x.statut === "Signalé" || (x.statut === "Non justifié" && x.contest && !x.reponse); }).length; RSG.err = ""; } else RSG.err = (r && r.msg) || "Retards signalés indisponibles pour le moment."; rend(); })
           .withFailureHandler(echec).adminRetardsSignales(CLE, "");
       } catch (e) { echec(); }
     }
@@ -1537,7 +1554,7 @@ var IrisVoix = (function () {
       google.script.run.withSuccessHandler(function (r) {
         RTN.enCours = false;
         if (!(r && r.ok)) return;
-        var n = (r.retards || []).filter(function (x) { return x.statut === "Signalé"; }).length;
+        var n = (r.retards || []).filter(function (x) { return x.statut === "Signalé" || (x.statut === "Non justifié" && x.contest && !x.reponse); }).length;
         if (n !== RTN.n) { RTN.n = n; if (ov.className === "on" && !enEdition()) dessiner(); }
       }).withFailureHandler(function () { RTN.enCours = false; }).adminRetardsSignales(CLE, "");
     } catch (e) { RTN.enCours = false; }
