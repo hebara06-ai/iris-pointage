@@ -366,7 +366,7 @@ var IrisVoix = (function () {
   function en(f) { var m = /^([0-9]{2})\/([0-9]{2})\/([0-9]{4})$/.exec(f || ""); return m ? m[3] + "-" + m[2] + "-" + m[1] : ""; }
   function hm(t) { var m = /([0-9]{1,2})\s*[hH:]\s*([0-9]{1,2})?/.exec(t || ""); return m ? ("0" + m[1]).slice(-2) + ":" + ("0" + (m[2] || 0)).slice(-2) : ""; }
   function msg(t, ko) { toast.textContent = t; toast.className = ko ? "ko" : ""; toast.style.display = "block"; clearTimeout(tt); tt = setTimeout(function () { toast.style.display = "none"; }, ko ? 6500 : 2800); }
-  function appel(nom, arg, ok) { google.script.run.withSuccessHandler(ok).withFailureHandler(function () { msg("Connexion impossible, réessayez.", true); })[nom](CLE, arg); }
+  function appel(nom, arg, ok) { if (window.__paie && nom !== "adminExport") return; google.script.run.withSuccessHandler(ok).withFailureHandler(function () { msg("Connexion impossible, réessayez.", true); })[nom](CLE, arg); }
   function charger() { appel("adminLire", jourSel ? fr(jourSel) : "", function (r) { if (!r) { msg("Accès refusé.", true); return; } DATA = r; DIRTY = false; REPORT = false; dessiner(); }); }
   // Synchronisation rapide : repère de changement interrogé toutes les ~1,5 s (onglet visible) ; données rechargées seulement si le repère change
   var STAMPA = null, SYNCA = null, DIRTY = false, REPORT = false;
@@ -1133,18 +1133,18 @@ var IrisVoix = (function () {
   function selectOptions(liste) {
     var s = h("select"); liste.forEach(function (o) { var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; s.appendChild(op); }); return s;
   }
-  function paneExport(c) {
+  function paneExport(c, sansCode) {
     var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Exporter pour la paie ou un contrôle (Excel)" })]);
-    carte.appendChild(h("p", { c: "ed-vide", t: "Choisissez la période et le contenu : IRIS prépare un fichier que vous ouvrez dans Excel. L’export exige votre code de sécurité et reste noté dans le journal d’activité. Aucune donnée n’est modifiée." }));
+    carte.appendChild(h("p", { c: "ed-vide", t: sansCode ? "Choisissez la période et le contenu : IRIS prépare un fichier que vous ouvrez dans Excel. Chaque export est noté dans le journal d’activité. Aucune donnée n’est modifiée." : "Choisissez la période et le contenu : IRIS prépare un fichier que vous ouvrez dans Excel. L’export exige votre code de sécurité et reste noté dans le journal d’activité. Aucune donnée n’est modifiée." }));
     var per = selectOptions([["mois", "Un mois"], ["semaine", "Une semaine"], ["trimestre", "Un trimestre"], ["semestre", "Un semestre"], ["annee", "Une année"]]),
       jour = h("input", { type: "date" }), cont = selectOptions([["recap", "Récapitulatif par agent : heures, retards, absences (paie)"], ["points", "Pointages détaillés"], ["abs", "Absences et retards excusés"], ["conges", "Congés"]]),
       code = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Code de sécurité" });
     jour.value = iso(); code.style.cssText = "width:14em";
     carte.appendChild(h("div", { c: "ed-row" }, [lab("Période", per), lab("Un jour de cette période", jour)]));
-    carte.appendChild(h("div", { c: "ed-row" }, [lab("Contenu", cont), lab("Code de sécurité", code)]));
+    carte.appendChild(h("div", { c: "ed-row" }, sansCode ? [lab("Contenu", cont)] : [lab("Contenu", cont), lab("Code de sécurité", code)]));
     var go = h("button", { c: "ed-b ed-p", t: "Télécharger le fichier", type: "button" });
     go.onclick = function () {
-      if (!code.value) { msg("Saisissez votre code de sécurité.", true); return; }
+      if (!sansCode && !code.value) { msg("Saisissez votre code de sécurité.", true); return; }
       if (!jour.value) { msg("Choisissez un jour de la période.", true); return; }
       go.disabled = true; msg("Préparation du fichier…");
       var q = { type: per.value, ref: fr(jour.value), partie: cont.value, code: code.value }; code.value = "";
@@ -1181,6 +1181,35 @@ var IrisVoix = (function () {
     q.onkeydown = function (e) { if (e.key === "Enter") charge(); };
     carte.appendChild(h("div", { c: "ed-row" }, [q, bt])); carte.appendChild(liste); c.appendChild(carte); charge();
   }
+  // Profil Paie : vue réduite (export seul) pour la personne qui prépare les paies
+  window.ouvrirPaie = function () {
+    window.__paie = true; ov.className = "on"; document.body.style.overflow = "hidden"; ov.textContent = "";
+    var w = h("div", {}); w.style.cssText = "max-width:720px;margin:0 auto;padding:28px 16px 40px;text-align:center";
+    w.appendChild(h("h2", { t: "Espace Paie" }));
+    w.appendChild(h("p", { c: "ed-vide", t: "Vous pouvez exporter les chiffres (heures, retards, pointages, absences, congés) pour préparer les paies. Rien d’autre n’est accessible avec ce profil." }));
+    var corps = h("div", {}); corps.style.textAlign = "left"; w.appendChild(corps); paneExport(corps, true);
+    var q = h("button", { c: "ed-b", t: "Se déconnecter", type: "button" }); q.onclick = function () { location.reload(); };
+    var rq = h("div", { c: "ed-row" }, [q]); rq.style.justifyContent = "center"; w.appendChild(rq); ov.appendChild(w);
+  };
+  // Gestion du profil Paie (administrateur) : un second mot de passe qui n'ouvre que l'export
+  function paneProfilPaie(c) {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Profil Paie" })]), etat = h("p", { c: "ed-vide", t: "Chargement…" });
+    carte.appendChild(h("p", { c: "ed-vide", t: "Pour la personne qui prépare les paies : un second mot de passe qui n’ouvre que l’export des chiffres. Elle ne voit ni les agents, ni les mots de passe, ni les paramètres. Elle se connecte sur la même page, avec le même lien d’accès que vous. Changer ou supprimer ce mot de passe ferme ses sessions." }));
+    carte.appendChild(etat);
+    function majEtat() { appel("adminPaie", { action: "etat" }, function (r) { etat.textContent = r && r.ok ? (r.actif ? "Profil Paie actif." : "Aucun profil Paie pour le moment.") : "État indisponible."; }); }
+    majEtat();
+    var nv = h("input", { type: "password", autocomplete: "new-password", placeholder: "Mot de passe Paie (10 caractères minimum, lettre + chiffre)" }), cd = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Votre code de sécurité" });
+    carte.appendChild(h("div", { c: "ed-row" }, [lab("Mot de passe Paie", nv), lab("Votre code de sécurité", cd)]));
+    function envoi(action) {
+      if (!cd.value || (action === "definir" && !nv.value)) { msg(action === "definir" ? "Saisissez le mot de passe Paie et votre code de sécurité." : "Saisissez votre code de sécurité.", true); return; }
+      var q = { action: action, nouveau: nv.value, code: cd.value }; cd.value = ""; nv.value = "";
+      appel("adminPaie", q, function (r) { msg((r && r.msg) || "Échec.", !(r && r.ok)); majEtat(); });
+    }
+    var bd = h("button", { c: "ed-b ed-p", t: "Définir ou changer le mot de passe Paie", type: "button" }); bd.onclick = function () { envoi("definir"); };
+    var bs = sure("Supprimer le profil Paie", true, function () { envoi("supprimer"); });
+    carte.appendChild(h("div", { c: "ed-row" }, [bd, bs]));
+    c.appendChild(carte);
+  }
   // Certificat de présence mensuel : document à remettre au client, protégé par le code de sécurité, noms masqués par défaut
   function paneCertificat(c) {
     var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Certificat de présence du mois" })]);
@@ -1212,6 +1241,7 @@ var IrisVoix = (function () {
     paneRapport(c);
     paneExport(c);
     paneCertificat(c);
+    paneProfilPaie(c);
     paneJournal(c);
     var an = h("input", { type: "password", autocomplete: "current-password", placeholder: "Ancien mot de passe" }), nv = h("input", { type: "password", autocomplete: "new-password", placeholder: "Nouveau mot de passe (10 caractères minimum, lettre + chiffre)" }), cf = h("input", { type: "password", autocomplete: "new-password", placeholder: "Confirmer le nouveau mot de passe" }), cd = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Code de sécurité (obligatoire)" });
     var ok = h("button", { c: "ed-b ed-p", t: "Modifier mon mot de passe", type: "button" });
@@ -2448,7 +2478,7 @@ hmaj();setInterval(hmaj,120000);</script><div id="vk" style="position:fixed;top:
     var m = pw.value; if (!m) return; bt.disabled = true; er.textContent = "";
     google.script.run.withSuccessHandler(function (r) {
       bt.disabled = false;
-      if (r && r.ok) { CLE = r.jeton; derAct = derRen = Date.now(); vk.style.display = "none"; pw.value = ""; if (window.charge) charge(); if (window.maj) maj(); }
+      if (r && r.ok) { CLE = r.jeton; derAct = derRen = Date.now(); vk.style.display = "none"; pw.value = ""; if (r.role === "paie" && window.ouvrirPaie) { ouvrirPaie(); return; } if (window.charge) charge(); if (window.maj) maj(); }
       else er.textContent = (r && r.msg) || "Connexion impossible.";
     }).withFailureHandler(function () { bt.disabled = false; er.textContent = "Connexion impossible, réessayez."; }).connexion(LIEN, m);
   }
