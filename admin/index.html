@@ -495,8 +495,10 @@ var IrisVoix = (function () {
     dessiner(); charger();
   };
   function panePt(c) {
+    c.appendChild(carteBriefing());
     var cat = carteATraiter(); if (cat) c.appendChild(cat);
     c.appendChild(carteAlertesLegales());
+    c.appendChild(carteCouverture());
     var di = h("input", { type: "date" }); di.value = jourSel; di.onchange = function () { jourSel = di.value; charger(); };
     var tous = h("button", { c: "ed-b", t: "150 derniers pointages", type: "button" }); tous.onclick = function () { jourSel = ""; charger(); };
     var auj = h("button", { c: "ed-b", t: "Aujourd’hui", type: "button" }); auj.onclick = function () { jourSel = iso(); charger(); };
@@ -891,6 +893,86 @@ var IrisVoix = (function () {
     ann.onclick = function () { ta.value = avant; ann.style.display = "none"; };
     return [cor, ref, mic, ann];
   }
+  // Couverture du jour : attendus, présents, pas encore pointés, absents prévus, disponibles (faits du planning et des pointages ; IRIS ne contacte personne)
+  var RAD = { resume: null };
+  function carteCouverture() {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Couverture du jour" })]), corps = h("div", {});
+    carte.appendChild(h("p", { c: "ed-vide", t: "Qui est attendu aujourd’hui, qui a déjà pointé, qui n’est pas encore arrivé, qui est absent ou en congé, et qui est disponible (jour de repos, sans congé). Ce sont des faits du planning et des pointages : la disponibilité n’est pas vérifiée auprès de l’agent et IRIS ne contacte personne." }));
+    carte.appendChild(corps); corps.appendChild(h("p", { c: "ed-vide", t: "Chargement…" }));
+    var auj = iso();
+    appel("adminPlanning", { debut: fr(auj) }, function (r) {
+      corps.textContent = "";
+      if (!(r && r.ok)) { corps.appendChild(h("p", { c: "ed-vide", t: (r && r.msg) || "Planning indisponible." })); return; }
+      var idx = (new Date().getDay() + 6) % 7, now = new Date(), minNow = now.getHours() * 60 + now.getMinutes(), vu = {};
+      (DATA && jourSel === auj ? DATA.pointages || [] : []).forEach(function (p) { vu[(p.nom || "") + "|" + (p.prenom || "")] = 1; });
+      var peutPresence = !!(DATA && jourSel === auj), att = [], pres = [], non = [], abs = [], dispo = [];
+      r.agents.forEach(function (a) {
+        var j = a.jours[idx]; if (!j) return; var cle = a.nom + "|" + a.prenom, nomC = a.nom + " " + a.prenom;
+        if (j.etat === "travail") {
+          att.push(nomC);
+          if (vu[cle]) pres.push(nomC);
+          else { var m = /(\d{1,2})\s*[hH:]\s*(\d{0,2})/.exec(a.horaire || ""), debut = m ? Number(m[1]) * 60 + Number(m[2] || 0) : -1; if (peutPresence && debut >= 0 && minNow >= debut + 15) non.push(nomC + " (prévu à " + (a.horaire || "").split("–")[0].trim() + ")"); }
+        } else if (j.etat === "conge" || j.etat === "absence") abs.push(nomC + " — " + j.libelle);
+        else if (j.etat === "repos") dispo.push(nomC);
+      });
+      RAD.resume = { attendus: att.length, presents: pres.length, non: non.length, absents: abs.length, peutPresence: peutPresence }; if (RAD.maj) RAD.maj();
+      function bloc(titre, liste, vide) {
+        corps.appendChild(h("h4", { t: titre + " (" + liste.length + ")" })); corps.lastChild.style.cssText = "margin:14px 0 4px;font-size:15px";
+        if (!liste.length) { corps.appendChild(h("p", { c: "ed-vide", t: vide })); return; }
+        liste.slice(0, 15).forEach(function (x) { corps.appendChild(h("div", { c: "sg-m", t: "• " + x })); });
+        if (liste.length > 15) corps.appendChild(h("div", { c: "sg-m", t: "… et " + (liste.length - 15) + " autre(s)." }));
+      }
+      corps.appendChild(h("p", { c: "ed-vide", t: att.length + " agent(s) attendu(s) aujourd’hui" + (peutPresence ? " · " + pres.length + " ont déjà pointé." : " (affichez le jour d’aujourd’hui dans Pointages pour voir les présences).") }));
+      if (peutPresence) bloc("Attendus et pas encore pointés (heure dépassée de 15 min)", non, "Personne : tous les agents attendus ont pointé ou ne sont pas encore en retard.");
+      bloc("Absents ou en congé aujourd’hui", abs, "Aucun.");
+      bloc("Disponibles aujourd’hui (jour de repos, sans congé)", dispo, "Aucun agent en repos aujourd’hui.");
+    });
+    return carte;
+  }
+  // Briefing du matin : les décisions du jour en quelques phrases, lisible à voix haute
+  function carteBriefing() {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Briefing du matin" })]), para = h("p", {});
+    function texteBriefing() {
+      var np = ((DATA && DATA.conges) || []).filter(function (x) { return x.statut === "En attente"; }).length, nsg = nbSgOuverts();
+      var pts = [[retardsAttente(), "retard à décider ou à réexaminer", "retards à décider ou à réexaminer"], [np, "demande de congé en attente", "demandes de congé en attente"], [nsg, "signalement ouvert", "signalements ouverts"], [Number(QS.aTraiter) || 0, "question IRIS à traiter", "questions IRIS à traiter"], [gaNonLus(), "dossier administratif à traiter", "dossiers administratifs à traiter"], [LEG.n, "alerte de durée légale", "alertes de durée légale"], [nbRegul(), "pointage à régulariser", "pointages à régulariser"]].filter(function (x) { return x[0] > 0; });
+      var phrases = ["Bonjour. Voici votre briefing."];
+      if (RAD.resume) phrases.push(RAD.resume.attendus + " agent" + (RAD.resume.attendus > 1 ? "s" : "") + " attendu" + (RAD.resume.attendus > 1 ? "s" : "") + " aujourd’hui" + (RAD.resume.peutPresence ? ", " + RAD.resume.presents + (RAD.resume.presents > 1 ? " ont" : " a") + " déjà pointé" + (RAD.resume.non ? ", " + RAD.resume.non + " pas encore arrivé" + (RAD.resume.non > 1 ? "s" : "") : "") : "") + (RAD.resume.absents ? ", " + RAD.resume.absents + " absent" + (RAD.resume.absents > 1 ? "s" : "") + " ou en congé" : "") + ".");
+      if (!pts.length) phrases.push("Rien d’urgent à traiter pour le moment.");
+      else pts.forEach(function (x) { phrases.push(x[0] + " " + (x[0] > 1 ? x[2] : x[1]) + "."); });
+      return phrases.join(" ");
+    }
+    para.textContent = texteBriefing(); para.style.cssText = "line-height:1.6;margin:6px 0 12px"; RAD.maj = function () { para.textContent = texteBriefing(); };
+    carte.appendChild(para);
+    var bl = h("button", { c: "ed-b ed-p", t: "Écouter le briefing", type: "button" });
+    bl.onclick = function () { if (typeof IrisVoix === "undefined" || !IrisVoix.dispoLecture()) { msg("La lecture à voix haute n’est pas disponible sur cet appareil.", true); return; } IrisVoix.lire(para.textContent, null, "briefing"); };
+    carte.appendChild(h("div", { c: "ed-row" }, [bl]));
+    return carte;
+  }
+  // Simulateur « et si » : effet d'un congé ou d'une absence avant de répondre (n'enregistre rien)
+  function carteSimulation() {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Simuler une demande (et si ?)" })]), sel = agentSelect(), ty = h("select"), d1 = h("input", { type: "date" }), d2 = h("input", { type: "date" }), corps = h("div", {});
+    [["Congés payés", "Congés payés"], ["Sans solde", "Congé sans solde"], ["Absence exceptionnelle", "Absence autorisée"]].forEach(function (o) { var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; ty.appendChild(op); });
+    d1.value = iso(); d2.value = iso();
+    carte.appendChild(h("p", { c: "ed-vide", t: "Avant de répondre à une demande, voyez ce qu’elle changerait : jours comptés, solde de congés, demandes qui se chevauchent et couverture de l’équipe jour par jour. Rien n’est enregistré." }));
+    carte.appendChild(h("div", { c: "ed-row" }, [lab("Agent", sel), lab("Type", ty)])); carte.appendChild(h("div", { c: "ed-row" }, [lab("Du", d1), lab("Au", d2)]));
+    var go = h("button", { c: "ed-b ed-p", t: "Simuler", type: "button" });
+    go.onclick = function () {
+      var a = DATA.agents[sel.selectedIndex]; if (!a) { msg("Choisissez un agent.", true); return; }
+      go.disabled = true; corps.textContent = ""; corps.appendChild(h("p", { c: "ed-vide", t: "Calcul…" }));
+      appel("adminSimulerConge", { nom: a.nom, prenom: a.prenom, debut: d1.value, fin: d2.value || d1.value, type: ty.value }, function (r) {
+        go.disabled = false; corps.textContent = "";
+        if (!(r && r.ok)) { corps.appendChild(h("p", { c: "ed-vide", t: (r && r.msg) || "Simulation impossible." })); return; }
+        corps.appendChild(h("p", { t: r.agent + " — " + r.jours + " jour(s) compté(s) jusqu’au " + r.fin + "." })); corps.lastChild.style.fontWeight = "700";
+        if (r.solde) corps.appendChild(h("p", { c: "ed-vide", t: "Solde de congés payés utilisable : " + (r.solde.avant === null ? "inconnu" : r.solde.avant + " j") + " → " + (r.solde.apres === null ? "inconnu" : r.solde.apres + " j") + (r.solde.fiable ? "" : " (solde non fiable)") + "." }));
+        if (r.alertes.length) { r.alertes.forEach(function (x) { corps.appendChild(h("div", { c: "sg-l" }, [h("b", { t: "⚠ " + x })])); }); } else corps.appendChild(h("p", { c: "ed-vide", t: "Aucun point d’attention détecté." }));
+        if (r.chevauchements.length) { corps.appendChild(h("h4", { t: "Autres demandes sur ces dates" })); corps.lastChild.style.cssText = "margin:12px 0 4px;font-size:15px"; r.chevauchements.forEach(function (x) { corps.appendChild(h("div", { c: "sg-m", t: "• " + x.nom + " " + x.prenom + " — " + x.debut + " → " + x.fin + " (" + x.statut + ")" })); }); }
+        corps.appendChild(h("h4", { t: "Couverture de l’équipe, hors cet agent" })); corps.lastChild.style.cssText = "margin:12px 0 4px;font-size:15px";
+        r.couverture.forEach(function (x) { corps.appendChild(h("div", { c: "sg-m", t: x.jour.slice(0, 3) + " " + x.date.slice(0, 5) + " : " + x.autresPresents + " présent(s) sur " + x.autresPrevus + " prévu(s)" + (x.concerne ? "" : " (jour de repos de l’agent)") })); });
+      });
+    };
+    carte.appendChild(h("div", { c: "ed-row" }, [go])); carte.appendChild(corps);
+    return carte;
+  }
   function paneCg(c) {
     var L = DATA.conges || [], att = L.filter(function (x) { return x.statut === "En attente"; });
     function ligne(x) {
@@ -922,6 +1004,7 @@ var IrisVoix = (function () {
     if (lotC) c1.appendChild(lotC.barre);
     att.forEach(function (x) { var e = ligne(x); if (lotC) e.insertBefore(lotC.ajouter(x), e.firstChild); c1.appendChild(e); });
     c.appendChild(c1);
+    c.appendChild(carteSimulation());
     var sel = agentSelect(), ty = h("select"), d1 = h("input", { type: "date" }), d2 = h("input", { type: "date" }), age = h("input", { type: "text", maxlength: "80" }), info = h("p", { c: "ed-vide" }), site = champSiteCg("iris-sites-cg"), pr = champPrecisionCg();
     var mo = h("textarea", { placeholder: "Motif (obligatoire pour une absence) : écrivez ici, le texte passe à la ligne et vous pouvez remonter pour relire", rows: "4", maxlength: "1000", spellcheck: "true", lang: "fr", autocapitalize: "sentences" });
     d1.value = iso(); age.value = "Samsic, Champéret 3"; mo.style.width = "100%"; mo.style.minHeight = "120px"; mo.style.resize = "vertical";
