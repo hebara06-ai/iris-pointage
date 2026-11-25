@@ -630,39 +630,54 @@ var IrisVoix = (function () {
   var RSG = { t: 0, liste: null, err: "" };
   function carteRetardsSignales() {
     var corps = h("div", {}), card = h("div", { c: "ed-card" }, [h("h3", { t: "Retards signalés par les agents" }), corps]);
+    function ligneRetard(x) {
+      var st = String(x.statut || ""), coul = st === "Justifié" ? ["#e3f5ea", "#13813e"] : (st === "Non justifié" ? ["#fdecec", "#b91c1c"] : ["#f3ecd6", "#8a6d1d"]);
+      var libelle = st === "Signalé" ? "En attente de décision" : ("Retard " + st.charAt(0).toLowerCase() + st.slice(1) + (x.auto ? " automatiquement" : ""));
+      var pastille = h("span", { t: libelle, style: "background:" + coul[0] + ";color:" + coul[1] + ";font-weight:700;font-size:13px;padding:6px 12px;border-radius:999px;white-space:nowrap" });
+      var tete = h("div", { style: "display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap" }, [h("b", { t: String(x.nom || "") + " " + String(x.prenom || ""), style: "font-size:17px;overflow-wrap:anywhere" }), pastille]);
+      var ligne = h("div", { style: "padding:16px 0;border-top:1px solid #eee7d6;display:flex;flex-direction:column;gap:6px" }, [
+        tete,
+        h("div", { t: String(x.jour || "") + " · prévu " + String(x.prevue || "") + " → arrivée " + String(x.arrivee || "") + " · " + (Number(x.min) || 0) + " min", style: "font-weight:600" }),
+        h("div", { t: String(x.motif || "") + (x.precision ? " — " + x.precision : ""), style: "white-space:pre-wrap;overflow-wrap:anywhere" }),
+        h("div", { t: (x.site ? x.site + " · " : "") + "signalé le " + String(x.depot || "") + (x.decide && st !== "Signalé" ? " · décision le " + x.decide : ""), c: "ed-vide" })]);
+      if (st === "Signalé") ligne.appendChild(h("div", { t: "Sans décision de votre part sous 24 heures, ce retard sera justifié automatiquement.", c: "ed-vide" }));
+      else if (x.auto) ligne.appendChild(h("div", { t: "Aucune décision sous 24 heures : justifié automatiquement.", c: "ed-vide" }));
+      else if (x.commentaire) ligne.appendChild(h("div", { t: "Commentaire : " + x.commentaire, c: "ed-vide" }));
+      if (st === "Signalé") {
+        var com = h("input", { type: "text", placeholder: "Commentaire (facultatif)", maxlength: "200", autocomplete: "off" }), bj = h("button", { c: "ed-b ed-p", t: "Justifier", type: "button" }), bn = h("button", { c: "ed-b", t: "Non justifié", type: "button" });
+        var decider = function (d) {
+          if (bj.disabled) return; bj.disabled = bn.disabled = true;
+          var fini = false, reactiver = function (m) { if (fini) return; fini = true; bj.disabled = bn.disabled = false; msg(m, true); };
+          var garde = setTimeout(function () { reactiver("Pas de réponse du serveur : réessayez."); }, 30000);
+          try {
+            google.script.run.withSuccessHandler(function (r) { clearTimeout(garde); if (r && r.ok) { fini = true; msg(r.msg); RSG.liste = null; RSG.t = 0; charger(); } else if (!fini) { fini = true; bj.disabled = bn.disabled = false; msg((r && r.msg) || "Échec.", true); } })
+              .withFailureHandler(function () { clearTimeout(garde); reactiver("Connexion impossible, réessayez."); }).adminRetardDecider(CLE, { id: x.id, decision: d, commentaire: com.value });
+          } catch (e) { clearTimeout(garde); reactiver("Connexion impossible, réessayez."); }
+        };
+        bj.onclick = function () { decider("Justifié"); }; bn.onclick = function () { decider("Non justifié"); };
+        com.style.cssText = "flex:1 1 220px;min-width:0";
+        ligne.appendChild(h("div", { style: "display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px" }, [com, bj, bn]));
+      }
+      return ligne;
+    }
     function rend() {
       corps.textContent = "";
       if (RSG.err) { corps.appendChild(h("p", { c: "ed-vide", t: RSG.err })); return; }
       if (!RSG.liste) { corps.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); return; }
-      if (!RSG.liste.length) { corps.appendChild(h("p", { c: "ed-vide", t: "Aucun retard signalé." })); return; }
-      RSG.liste.slice(0, 30).forEach(function (x) {
-        var coul = x.statut === "Justifié" ? ["#e3f5ea", "#13813e"] : (x.statut === "Non justifié" ? ["#fdecec", "#b91c1c"] : ["#f3ecd6", "#8a6d1d"]);
-        var libelle = x.statut === "Signalé" ? "En attente de décision" : ("Retard " + x.statut.charAt(0).toLowerCase() + x.statut.slice(1) + (x.auto ? " automatiquement" : ""));
-        var pastille = h("span", { t: libelle, style: "background:" + coul[0] + ";color:" + coul[1] + ";font-weight:700;font-size:13px;padding:6px 12px;border-radius:999px;white-space:nowrap" });
-        var tete = h("div", { style: "display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap" }, [h("b", { t: x.nom + " " + x.prenom, style: "font-size:17px" }), pastille]);
-        var ligne = h("div", { style: "padding:16px 0;border-top:1px solid #eee7d6;display:flex;flex-direction:column;gap:6px" }, [
-          tete,
-          h("div", { t: x.jour + " · prévu " + x.prevue + " → arrivée " + x.arrivee + " · " + x.min + " min", style: "font-weight:600" }),
-          h("div", { t: x.motif + (x.precision ? " — " + x.precision : ""), style: "white-space:pre-wrap" }),
-          h("div", { t: (x.site ? x.site + " · " : "") + "signalé le " + x.depot + (x.decide && x.statut !== "Signalé" ? " · décision le " + x.decide : ""), c: "ed-vide" })]);
-        if (x.statut === "Signalé") ligne.appendChild(h("div", { t: "Sans décision de votre part sous 24 heures, ce retard sera justifié automatiquement.", c: "ed-vide" }));
-        else if (x.auto) ligne.appendChild(h("div", { t: "Aucune décision sous 24 heures : justifié automatiquement.", c: "ed-vide" }));
-        else if (x.commentaire) ligne.appendChild(h("div", { t: "Commentaire : " + x.commentaire, c: "ed-vide" }));
-        if (x.statut === "Signalé") {
-          var com = h("input", { type: "text", placeholder: "Commentaire (facultatif)", maxlength: "200", autocomplete: "off" }), bj = h("button", { c: "ed-b ed-p", t: "Justifier", type: "button" }), bn = h("button", { c: "ed-b", t: "Non justifié", type: "button" });
-          var decider = function (d) { bj.disabled = bn.disabled = true; appel("adminRetardDecider", { id: x.id, decision: d, commentaire: com.value }, function (r) { if (r && r.ok) { msg(r.msg); RSG.liste = null; RSG.t = 0; charger(); } else { bj.disabled = bn.disabled = false; msg((r && r.msg) || "Échec.", true); } }); };
-          bj.onclick = function () { decider("Justifié"); }; bn.onclick = function () { decider("Non justifié"); };
-          com.style.cssText = "flex:1 1 220px;min-width:0";
-          ligne.appendChild(h("div", { style: "display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px" }, [com, bj, bn]));
-        }
-        corps.appendChild(ligne);
-      });
-      if (RSG.liste.length > 30) corps.appendChild(h("p", { c: "ed-vide", t: "Les 30 retards les plus récents sont affichés (" + RSG.liste.length + " au total)." }));
+      var L = RSG.liste.filter(function (x) { return x && x.id; });
+      if (!L.length) { corps.appendChild(h("p", { c: "ed-vide", t: "Aucun retard signalé." })); return; }
+      try { L.slice(0, 30).forEach(function (x) { corps.appendChild(ligneRetard(x)); }); }
+      catch (e) { RSG.liste = null; RSG.t = 0; corps.textContent = ""; corps.appendChild(h("p", { c: "ed-vide", t: "Retards signalés illisibles pour le moment. Rouvrez l’onglet." })); return; }
+      if (L.length > 30) corps.appendChild(h("p", { c: "ed-vide", t: "Les 30 retards les plus récents sont affichés (" + L.length + " au total)." }));
     }
     rend();
     if (!RSG.liste || Date.now() - RSG.t > 30000) {
       RSG.t = Date.now();
-      appel("adminRetardsSignales", "", function (r) { if (r && r.ok) { RSG.liste = r.retards || []; RSG.err = ""; } else RSG.err = (r && r.msg) || "Retards signalés indisponibles pour le moment."; rend(); });
+      var echec = function () { RSG.err = "Connexion impossible : rouvrez l’onglet pour réessayer."; RSG.t = 0; rend(); };
+      try {
+        google.script.run.withSuccessHandler(function (r) { if (r && r.ok) { RSG.liste = r.retards || []; RSG.err = ""; } else RSG.err = (r && r.msg) || "Retards signalés indisponibles pour le moment."; rend(); })
+          .withFailureHandler(echec).adminRetardsSignales(CLE, "");
+      } catch (e) { echec(); }
     }
     return card;
   }
@@ -1413,7 +1428,7 @@ var IrisVoix = (function () {
   function qsCharge() {
     if (QS.chargement) { QS.encore = true; return; }
     QS.chargement = true; QS.err = null; QS.encore = false;
-    function fin() { QS.chargement = false; if (QS.encore && !QS.err) { QS.encore = false; qsCharge(); return; } dessiner(); }
+    function fin() { QS.chargement = false; if (QS.encore && !QS.err) { QS.encore = false; qsCharge(); return; } if (onglet === "qs" || !enEdition()) dessiner(); }
     qsAppel("qsAdminListe", { statut: "" }, function (r) {
       if (r && r.ok && Array.isArray(r.questions)) { QS.liste = r.questions; QS.aTraiter = Number(r.aTraiter) || 0; }
       else { QS.err = (r && r.msg) || "Questions indisponibles."; QS.liste = null; QS.aTraiter = null; }
@@ -1422,8 +1437,11 @@ var IrisVoix = (function () {
   }
   // Compteur du badge : chargé à l'ouverture de la fenêtre « Corrections » (hook additif sur le bouton) puis rafraîchi discrètement hors de l'onglet Questions
   function qsCompteur() { QS.err = null; qsCharge(); }
+  // Pastille « Signalements » : compte chargé dès l'ouverture de la fenêtre (et non à la première visite de l'onglet), redessin seulement si le compte change
+  function nbSgOuverts() { return SG && SG.signalements ? SG.signalements.filter(function (x) { return ["Correction acceptée", "Correction refusée", "Clôturée"].indexOf(x.statut) < 0; }).length : 0; }
+  function sgCompteur() { var avant = nbSgOuverts(); chargerSg(function () { if (nbSgOuverts() !== avant && !enEdition()) dessiner(); }); }
   setInterval(function () { if (ov.className === "on" && !document.hidden && onglet !== "qs" && !QS.err && !QS.chargement) qsCharge(); }, 60000);
-  setInterval(function () { if (ov.className === "on" && !document.hidden) gaCompteur(); }, 60000);
+  setInterval(function () { if (ov.className === "on" && !document.hidden) { gaCompteur(); if (onglet !== "sg" && !enEdition()) sgCompteur(); } }, 60000);
   // Correction / reformulation par IA (fonctions du serveur d'administration) au format attendu par IrisVoix : f(texte, cb(erreur, texte))
   function qsReecrire(nom) { return function (t, cb) { qsAppel(nom, t, function (r) { cb(r && r.ok ? null : (r && r.msg) || "Indisponible pour le moment.", r && r.texte); }, function () { cb("Connexion impossible, réessayez."); }); }; }
   var QS_OUTILS = { corriger: qsReecrire("corrigerTexte"), reformuler: qsReecrire("reformulerTexte") };
@@ -1542,7 +1560,7 @@ var IrisVoix = (function () {
     var bs = document.querySelectorAll("button"), n = Number(CM.nonLus) || 0, i, b = null;
     for (i = 0; i < bs.length; i++) { var f = bs[i].firstChild; if (f && f.nodeType === 3 && /^Communications/.test(f.data)) { b = bs[i]; break; } }
     if (!b) return;
-    var anc = b.querySelector(".cm-pastille-onglet, .iris-pastille"); if (anc) b.removeChild(anc);
+    var anc = b.querySelector(".cm-pastille-onglet, .iris-pastille"); if (anc && n > 0 && anc.textContent === String(n)) return; if (anc) b.removeChild(anc);
     if (n <= 0) return;
     var p = pastilleOnglet(n); p.className = "iris-pastille cm-pastille-onglet";
     b.appendChild(p);
@@ -2260,7 +2278,7 @@ var IrisVoix = (function () {
     var y = ov.scrollTop; ov.textContent = "";
     var np = ((DATA && DATA.conges) || []).filter(function (x) { return x.statut === "En attente"; }).length;
     var nsg = SG ? SG.signalements.filter(function (x) { return ["Correction acceptée", "Correction refusée", "Clôturée"].indexOf(x.statut) < 0; }).length : 0;
-    var seg = h("div", { c: "ed-seg" }, [["pt", "Pointages", nbRegul()], ["ab", "Absences et retards", 0], ["cg", "Congés", np], ["sg", "Signalements", nsg], ["qs", "Questions IRIS" + qsBadge(), Number(QS.aTraiter) || 0], ["cm", "Communications" + cmBadge(), 0], ["ag", "Agents", 0], ["ga", "Gestion administrative", gaNonLus()], ["pa", "Paramètres", 0]].map(function (o) { var b = h("button", { t: o[1], type: "button" }); if (o[2] > 0) b.appendChild(pastilleOnglet(o[2])); if (o[0] === onglet) b.className = "on"; b.onclick = function () { onglet = o[0]; dessiner(); }; return b; }));
+    var seg = h("div", { c: "ed-seg" }, [["pt", "Pointages", nbRegul()], ["ab", "Absences et retards", 0], ["cg", "Congés", np], ["sg", "Signalements", nsg], ["qs", "Questions IRIS" + qsBadge(), Number(QS.aTraiter) || 0], ["cm", "Communications" + cmBadge(), (typeof CM !== "undefined" && CM && Number(CM.nonLus)) || 0], ["ag", "Agents", 0], ["ga", "Gestion administrative", gaNonLus()], ["pa", "Paramètres", 0]].map(function (o) { var b = h("button", { t: o[1], type: "button" }); if (o[2] > 0) b.appendChild(pastilleOnglet(o[2])); if (o[0] === onglet) b.className = "on"; b.onclick = function () { onglet = o[0]; dessiner(); }; return b; }));
     var x = h("button", { c: "ed-x", t: "Fermer", type: "button" }); x.onclick = fermer;
     ov.appendChild(h("div", { c: "ed-top" }, [h("h2", { t: "Corrections" }), seg, x]));
     var corps = h("div", { c: "ed-body" }); ov.appendChild(corps);
@@ -2269,7 +2287,7 @@ var IrisVoix = (function () {
   }
   function fermer() { ov.className = ""; document.body.style.overflow = ""; }
   btn.onclick = function () { agFiltre = null; ov.className = "on"; document.body.style.overflow = "hidden"; if (!jourSel) jourSel = iso(); DATA = null; SG = null; dessiner(); charger(); };
-  (function () { var ouvrir = btn.onclick; btn.onclick = function () { ouvrir.apply(this, arguments); qsCompteur(); gaCompteur(); try { cmCompteurMaj(); } catch (e) { } }; })();
+  (function () { var ouvrir = btn.onclick; btn.onclick = function () { ouvrir.apply(this, arguments); qsCompteur(); gaCompteur(); sgCompteur(); try { cmCompteurMaj(); } catch (e) { } }; })();
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") fermer(); });
 })();</script><script>var MOIS="",minuterie=null,CL={"Présent":"s-pr","Parti":"s-pa","Absent":"s-ab","Attendu":"s-at","Repos":"s-re","En retard":"s-rt","Justifiée":"s-ju"};function g(i){return document.getElementById(i)}function td(tr,t,c){var x=document.createElement("td");if(c)x.className=c;x.textContent=t;tr.appendChild(x);return x}function pl(t,c,titre){var s=document.createElement("span");s.className="pl "+c;s.textContent=t;if(titre)s.title=titre;return s}var ADM=null,DERN=null,ADMT=null,FICHE=null,PER={type:"mois",ref:""},PERD=null,PERN=0,REF=null,POSTF=[];function fj(n){return String(Math.round(Number(n||0)*100)/100).replace(".",",")}var ET={vt:"#16a34a",ja:"#facc15",or:"#f97316",ro:"#dc2626",vi:"#7c3aed",gr:"#9ca3af"},ETX={vt:"#15803d",ja:"#a16207",or:"#c2410c",ro:"#b91c1c",vi:"#6d28d9",gr:"#4b5563"};function etatSolde(so){var T=so?(so.total!==undefined&&so.total!==null?Number(so.total):Number(so.reliquat||0)+Number(so.acquis||0)):NaN,r=so&&so.reste!==null&&so.reste!==undefined&&so.reste!==""?Math.round(Number(so.reste)*100)/100:NaN;if(!so||!isFinite(r)||!isFinite(T))return{k:"gr",col:ET.gr,lib:"Solde non vérifié",pill:"N/A",pct:0,r:NaN,T:T};var pct=T>0?Math.max(0,Math.min(1,r/T)):0;if(r<0)return{k:"vi",col:ET.vi,lib:"Dépassement à vérifier",pill:"−"+fj(-r)+" j",pct:0,r:r,T:T};if(r===0)return{k:"ro",col:ET.ro,lib:"CONGÉS ÉPUISÉS",pill:"Congés épuisés",pct:0,r:r,T:T};var k=r<=5?"or":r<=10?"ja":"vt",lib=r<=5?"Solde faible":r<=10?"Solde à surveiller":"Solde confortable";return{k:k,col:ET[k],lib:lib,pill:Math.round(100*pct)+" %",pct:pct,r:r,T:T}}function jaugeEl(et,c){var w=document.createElement("div");w.className="jq";var t=document.createElement("div");t.className="jt "+et.k;var i=document.createElement("i");i.style.width=(100*et.pct)+"%";i.style.background=et.col;t.appendChild(i);w.appendChild(t);var p=document.createElement("span");p.className="jp "+et.k;p.textContent=c&&et.k==="ro"?"Épuisés":et.pill;w.appendChild(p);w.title=et.lib+(isFinite(et.r)?" : "+fj(et.r)+" j disponible"+(et.r>1?"s":"")+" sur "+fj(et.T):"");w.setAttribute("role","img");w.setAttribute("aria-label",w.title);return w}function mixW(h,a){var n=parseInt(h.slice(1),16),r=n>>16,g1=(n>>8)&255,b=n&255;function m(c){return Math.round(c*a+255*(1-a))}return"#"+[m(r),m(g1),m(b)].map(function(c){return("0"+c.toString(16)).slice(-2)}).join("")}
 function legSolde(){var w=document.createElement("div");w.className="lgs";[["vt","Solde confortable","plus de 10 jours"],["ja","Solde à surveiller","6 à 10 jours"],["or","Solde faible","1 à 5 jours"],["ro","CONGÉS ÉPUISÉS","exactement 0 jour"],["vi","Dépassement à vérifier","solde négatif ou congés anticipés"],["gr","Solde non vérifié","données indisponibles"]].forEach(function(z){var d=document.createElement("span"),i=document.createElement("i");i.style.background=ET[z[0]];d.appendChild(i);d.appendChild(document.createTextNode(z[1]+" ("+z[2]+")"));w.appendChild(d)});return w}
