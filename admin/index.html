@@ -1319,6 +1319,34 @@ var IrisVoix = (function () {
     carte.appendChild(h("div", { c: "ed-row" }, [bs, bv])); carte.appendChild(res);
     c.appendChild(carte);
   }
+  // Sauvegardes : état, test de lecture de la copie la plus récente, copie manuelle (la copie reste dans le même compte Google, non chiffrée)
+  function paneSauvegardes(c) {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Sauvegardes du classeur" })]), etat = h("p", { c: "ed-vide", t: "Chargement…" }), liste = h("div", {}), res = h("div", {});
+    carte.appendChild(h("p", { c: "ed-vide", t: "IRIS copie chaque lundi vers 3 h le classeur dans le dossier Drive « IRIS - Sauvegardes » (12 copies gardées). Le test ouvre la copie la plus récente et la compare à aujourd’hui. Attention : ces copies restent dans le même compte Google et ne sont pas chiffrées ; elles ne remplacent pas une sauvegarde externe." }));
+    carte.appendChild(etat); carte.appendChild(liste);
+    function majEtat() {
+      appel("adminSauvegardes", { action: "etat" }, function (r) {
+        liste.textContent = "";
+        if (!(r && r.ok)) { etat.textContent = (r && r.msg) || "État indisponible."; return; }
+        etat.textContent = (r.programmee ? "Sauvegarde hebdomadaire programmée. " : "ATTENTION : aucune sauvegarde hebdomadaire programmée. ") + r.total + " copie(s) dans le dossier.";
+        (r.copies || []).slice(0, 6).forEach(function (x) { liste.appendChild(h("div", { c: "sg-m", t: x.nom + " — " + x.date + " (il y a " + x.ageJours + " j)" })); });
+      });
+    }
+    majEtat();
+    var bv = h("button", { c: "ed-b ed-p", t: "Tester la dernière copie", type: "button" }), bm = h("button", { c: "ed-b", t: "Faire une copie maintenant", type: "button" });
+    bv.onclick = function () {
+      bv.disabled = true; res.textContent = ""; res.appendChild(h("p", { c: "ed-vide", t: "Test en cours (quelques secondes)…" }));
+      appel("adminSauvegardes", { action: "verifier" }, function (r) {
+        bv.disabled = false; res.textContent = "";
+        if (!(r && r.ok)) { res.appendChild(h("p", { c: "ed-vide", t: (r && r.msg) || "Test impossible." })); return; }
+        res.appendChild(h("p", { c: "ed-vide", t: "Copie « " + r.copie + " » du " + r.date + " (il y a " + r.ageJours + " j) : lisible. " + (r.tropAncienne ? "ATTENTION : elle a plus de 8 jours, la sauvegarde hebdomadaire ne semble pas tourner. " : "") + (r.coherente ? "Feuilles cohérentes avec aujourd’hui." : "À voir : des écarts sont signalés ci-dessous.") }));
+        (r.lignes || []).forEach(function (x) { res.appendChild(h("div", { c: "sg-m", t: x.feuille + " : " + x.copie + " ligne(s) dans la copie, " + x.vivant + " aujourd’hui — " + x.etat })); });
+      });
+    };
+    bm.onclick = function () { bm.disabled = true; appel("adminSauvegardes", { action: "maintenant" }, function (r) { bm.disabled = false; msg((r && r.msg) || "Échec.", !(r && r.ok)); majEtat(); }); };
+    carte.appendChild(h("div", { c: "ed-row" }, [bv, bm])); carte.appendChild(res);
+    c.appendChild(carte);
+  }
   function paneParam(c) {
     paneMdpAgents(c);
     paneRapport(c);
@@ -1327,6 +1355,7 @@ var IrisVoix = (function () {
     paneProfilPaie(c);
     paneConservation(c);
     paneScelles(c);
+    paneSauvegardes(c);
     paneDeuxFacteurs(c);
     paneJournal(c);
     var an = h("input", { type: "password", autocomplete: "current-password", placeholder: "Ancien mot de passe" }), nv = h("input", { type: "password", autocomplete: "new-password", placeholder: "Nouveau mot de passe (10 caractères minimum, lettre + chiffre)" }), cf = h("input", { type: "password", autocomplete: "new-password", placeholder: "Confirmer le nouveau mot de passe" }), cd = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Code de sécurité (obligatoire)" });
