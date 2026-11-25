@@ -1236,12 +1236,29 @@ var IrisVoix = (function () {
     carte.appendChild(h("div", { c: "ed-row" }, [go]));
     c.appendChild(carte);
   }
+  // Durée de conservation (5 ans) : tableau en lecture seule, IRIS ne supprime rien tout seul
+  function paneConservation(c) {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Durée de conservation des données" })]), corps = h("div", {});
+    carte.appendChild(h("p", { c: "ed-vide", t: "Durée retenue : 5 ans pour les pointages, les absences et les congés. IRIS ne supprime rien automatiquement : ce tableau compte seulement les lignes plus anciennes que cette durée. Quand il y en aura, vous déciderez de ce qu’on en fait." }));
+    carte.appendChild(corps); corps.appendChild(h("p", { c: "ed-vide", t: "Chargement…" }));
+    appel("adminConservation", "", function (r) {
+      corps.textContent = "";
+      if (!(r && r.ok)) { corps.appendChild(h("p", { c: "ed-vide", t: (r && r.msg) || "Indisponible." })); return; }
+      corps.appendChild(h("p", { c: "ed-vide", t: "Lignes datées d’avant le " + r.coupure + " :" }));
+      r.feuilles.forEach(function (f) {
+        var i = f.info, tx = i.total ? f.nom + " : " + i.anciennes + " à examiner sur " + i.total + " (la plus ancienne : " + i.plusAncienne + ")" : f.nom + " : aucune ligne";
+        var l = h("div", { c: "sg-l" }, [h("b", { t: tx })]); corps.appendChild(l);
+      });
+    });
+    c.appendChild(carte);
+  }
   function paneParam(c) {
     paneMdpAgents(c);
     paneRapport(c);
     paneExport(c);
     paneCertificat(c);
     paneProfilPaie(c);
+    paneConservation(c);
     paneJournal(c);
     var an = h("input", { type: "password", autocomplete: "current-password", placeholder: "Ancien mot de passe" }), nv = h("input", { type: "password", autocomplete: "new-password", placeholder: "Nouveau mot de passe (10 caractères minimum, lettre + chiffre)" }), cf = h("input", { type: "password", autocomplete: "new-password", placeholder: "Confirmer le nouveau mot de passe" }), cd = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Code de sécurité (obligatoire)" });
     var ok = h("button", { c: "ed-b ed-p", t: "Modifier mon mot de passe", type: "button" });
