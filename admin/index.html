@@ -697,38 +697,67 @@ var IrisVoix = (function () {
     }
     return card;
   }
-  // Statistiques de retards signalés : par motif, par site et par mois (descriptives : aucun nom, aucune note individuelle)
-  function carteStatsRetards() {
-    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Statistiques des retards signalés" })]), corps = h("div", {}), per = h("select");
-    [["1", "Dernier mois"], ["3", "3 derniers mois"], ["6", "6 derniers mois"], ["12", "12 derniers mois"]].forEach(function (o) { var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; per.appendChild(op); }); per.value = "6";
-    carte.appendChild(h("p", { c: "ed-vide", t: "Pour repérer des causes (transport, planning, site) plutôt que des personnes : aucun nom n’apparaît et aucune note individuelle n’est calculée. Les signalements annulés ne sont pas comptés." }));
-    carte.appendChild(h("div", { c: "ed-row" }, [lab("Période", per)])); carte.appendChild(corps);
-    function bloc(titre, liste) {
-      var b = h("div", {}), max = Math.max.apply(null, liste.map(function (x) { return x.n; }).concat([1]));
-      b.appendChild(h("h4", { t: titre })); b.lastChild.style.cssText = "margin:18px 0 6px;font-size:15px";
-      if (!liste.length) { b.appendChild(h("p", { c: "ed-vide", t: "Aucun retard." })); return b; }
-      liste.forEach(function (x) {
-        var barre = h("div", {}); barre.style.cssText = "height:8px;border-radius:99px;background:#cdb88a;width:" + Math.max(4, Math.round(x.n / max * 100)) + "%;margin-top:5px";
-        var l = h("div", { c: "sg-l" }, [h("b", { t: x.nom }), h("div", { c: "sg-m", t: x.n + " retard" + (x.n > 1 ? "s" : "") + " · " + x.min + " min au total · moyenne " + x.moyenne + " min · " + x.justifies + " justifié" + (x.justifies > 1 ? "s" : "") }), barre]);
-        b.appendChild(l);
-      });
-      return b;
-    }
-    function charge() {
-      corps.textContent = ""; corps.appendChild(h("p", { c: "ed-vide", t: "Chargement…" }));
-      appel("adminRetardsStats", { mois: Number(per.value) }, function (r) {
-        corps.textContent = "";
-        if (!(r && r.ok)) { corps.appendChild(h("p", { c: "ed-vide", t: (r && r.msg) || "Statistiques indisponibles." })); return; }
-        var t0 = r.total || {};
-        corps.appendChild(h("p", { c: "ed-vide", t: (t0.n || 0) + " retard(s) sur la période : " + (t0.justifies || 0) + " justifié(s), " + (t0.nonJustifies || 0) + " non justifié(s), " + (t0.attente || 0) + " en attente · " + (t0.min || 0) + " minutes au total." }));
-        corps.appendChild(bloc("Par motif", r.parMotif || [])); corps.appendChild(bloc("Par site", r.parSite || [])); corps.appendChild(bloc("Par mois", r.parMois || []));
-      });
-    }
-    per.onchange = charge; charge();
-    return carte;
-  }
-  function paneAb(c) {
-    c.appendChild(carteRetardsSignales());
+  // Statistiques de retards signalés : par motif, par site et par mois (descriptives : aucun nom, aucune note individuelle)
+  function carteStatsRetards() {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Statistiques des retards signalés" })]), corps = h("div", {}), per = h("select");
+    [["1", "Dernier mois"], ["3", "3 derniers mois"], ["6", "6 derniers mois"], ["12", "12 derniers mois"]].forEach(function (o) { var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; per.appendChild(op); }); per.value = "6";
+    carte.appendChild(h("p", { c: "ed-vide", t: "Pour repérer des causes (transport, planning, site) plutôt que des personnes : aucun nom n’apparaît et aucune note individuelle n’est calculée. Les signalements annulés ne sont pas comptés." }));
+    carte.appendChild(h("div", { c: "ed-row" }, [lab("Période", per)])); carte.appendChild(corps);
+    function bloc(titre, liste) {
+      var b = h("div", {}), max = Math.max.apply(null, liste.map(function (x) { return x.n; }).concat([1]));
+      b.appendChild(h("h4", { t: titre })); b.lastChild.style.cssText = "margin:18px 0 6px;font-size:15px";
+      if (!liste.length) { b.appendChild(h("p", { c: "ed-vide", t: "Aucun retard." })); return b; }
+      liste.forEach(function (x) {
+        var barre = h("div", {}); barre.style.cssText = "height:8px;border-radius:99px;background:#cdb88a;width:" + Math.max(4, Math.round(x.n / max * 100)) + "%;margin-top:5px";
+        var l = h("div", { c: "sg-l" }, [h("b", { t: x.nom }), h("div", { c: "sg-m", t: x.n + " retard" + (x.n > 1 ? "s" : "") + " · " + x.min + " min au total · moyenne " + x.moyenne + " min · " + x.justifies + " justifié" + (x.justifies > 1 ? "s" : "") }), barre]);
+        b.appendChild(l);
+      });
+      return b;
+    }
+    function charge() {
+      corps.textContent = ""; corps.appendChild(h("p", { c: "ed-vide", t: "Chargement…" }));
+      appel("adminRetardsStats", { mois: Number(per.value) }, function (r) {
+        corps.textContent = "";
+        if (!(r && r.ok)) { corps.appendChild(h("p", { c: "ed-vide", t: (r && r.msg) || "Statistiques indisponibles." })); return; }
+        var t0 = r.total || {};
+        corps.appendChild(h("p", { c: "ed-vide", t: (t0.n || 0) + " retard(s) sur la période : " + (t0.justifies || 0) + " justifié(s), " + (t0.nonJustifies || 0) + " non justifié(s), " + (t0.attente || 0) + " en attente · " + (t0.min || 0) + " minutes au total." }));
+        corps.appendChild(bloc("Par motif", r.parMotif || [])); corps.appendChild(bloc("Par site", r.parSite || [])); corps.appendChild(bloc("Par mois", r.parMois || []));
+      });
+    }
+    per.onchange = charge; charge();
+    return carte;
+  }
+  // Tableau d'absentéisme : taux mensuel et tendance (statistiques d'ensemble, aucun nom)
+  function carteAbsenteisme() {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Absentéisme : tendances mensuelles" })]), corps = h("div", {}), per = h("select");
+    [["3", "3 derniers mois"], ["6", "6 derniers mois"], ["12", "12 derniers mois"]].forEach(function (o) { var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; per.appendChild(op); }); per.value = "6";
+    carte.appendChild(h("p", { c: "ed-vide", t: "Taux d’absentéisme = absences (justifiées ou non) ÷ jours de travail théoriques. Les congés autorisés ne comptent pas comme de l’absentéisme. Le comptage commence à la date réglée dans « Réglages » : avant, il n’y a pas de données. Statistiques d’ensemble, aucun nom." }));
+    carte.appendChild(h("div", { c: "ed-row" }, [lab("Période", per)])); carte.appendChild(corps);
+    function charge() {
+      corps.textContent = ""; corps.appendChild(h("p", { c: "ed-vide", t: "Calcul en cours (jusqu’à 30 secondes la première fois)…" }));
+      appel("adminAbsenteisme", { mois: Number(per.value) }, function (r) {
+        corps.textContent = "";
+        if (!(r && r.ok)) { corps.appendChild(h("p", { c: "ed-vide", t: (r && r.msg) || "Calcul impossible." })); return; }
+        var L = r.lignes || [], avecDonnees = L.filter(function (x) { return x.theoriques > 0; });
+        if (!avecDonnees.length) { corps.appendChild(h("p", { c: "ed-vide", t: "Aucune donnée sur cette période : le comptage des absences n’a pas encore commencé (voir « Réglages »)." })); return; }
+        var max = Math.max.apply(null, avecDonnees.map(function (x) { return x.taux || 0; }).concat([1])), prec = null;
+        L.forEach(function (x) {
+          var cle = x.libelle + (x.enCours ? " (en cours)" : "");
+          if (!(x.theoriques > 0)) { corps.appendChild(h("div", { c: "sg-l" }, [h("b", { t: cle }), h("div", { c: "sg-m", t: "Pas de comptage sur ce mois." })])); return; }
+          var tend = prec === null ? "" : (x.taux > prec ? " ▲ +" + (Math.round((x.taux - prec) * 10) / 10) + " pt" : (x.taux < prec ? " ▼ " + (Math.round((x.taux - prec) * 10) / 10) + " pt" : " = stable")); prec = x.taux;
+          var barre = h("div", {}); barre.style.cssText = "height:8px;border-radius:99px;background:" + (x.taux >= 8 ? "#c62828" : x.taux >= 4 ? "#e08a00" : "#2e9e5b") + ";width:" + Math.max(3, Math.round(x.taux / max * 100)) + "%;margin-top:5px";
+          corps.appendChild(h("div", { c: "sg-l" }, [h("b", { t: cle + " — " + x.taux + " %" + tend }),
+            h("div", { c: "sg-m", t: x.theoriques + " jours théoriques · " + x.presents + " présences · " + x.absJust + " absence(s) justifiée(s) · " + x.absNon + " non justifiée(s) · " + x.retards + " retard(s)" }), barre]));
+        });
+        corps.appendChild(h("p", { c: "ed-vide", t: "Calculé le " + (r.calculeLe || "") + (r.cache ? " (résultat gardé quelques minutes)." : ".") }));
+      });
+    }
+    per.onchange = charge; charge();
+    return carte;
+  }
+  function paneAb(c) {
+    c.appendChild(carteRetardsSignales());
+    c.appendChild(carteAbsenteisme());
     c.appendChild(carteStatsRetards());
     var sel = agentSelect(), da = h("input", { type: "date" }), ty = h("select"), mo = h("textarea", { placeholder: "Motif (obligatoire) : écrivez ici, le texte passe à la ligne et vous pouvez remonter pour relire", rows: "4", maxlength: "1000", spellcheck: "true", lang: "fr", autocapitalize: "sentences" });
     da.value = iso(); mo.style.width = "100%"; mo.style.minHeight = "120px"; mo.style.resize = "vertical";
@@ -1298,36 +1327,36 @@ var IrisVoix = (function () {
     });
     c.appendChild(carte);
   }
-  // Second facteur de connexion : code à 6 chiffres par e-mail (activation prouvée par un code de test réellement reçu)
-  function paneDeuxFacteurs(c) {
-    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Second facteur de connexion (code par e-mail)" })]), etat = h("p", { c: "ed-vide", t: "Chargement…" });
-    carte.appendChild(h("p", { c: "ed-vide", t: "Après votre mot de passe, IRIS envoie un code à 6 chiffres à votre adresse de sécurité, valable 10 minutes : un mot de passe volé ne suffit plus. Pour l’activer, IRIS vous envoie d’abord un code de test : l’activation n’a lieu que si vous le saisissez, ce qui prouve que l’e-mail arrive. Si l’e-mail devenait indisponible, un secours existe dans l’éditeur Apps Script (fonction a2fDesactiver)." }));
-    carte.appendChild(etat);
-    var cd = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Votre code de sécurité" }), rc = h("input", { type: "text", autocomplete: "one-time-code", inputmode: "numeric", placeholder: "Code reçu par e-mail" }), defi = "";
-    var zoneRc = h("div", { c: "ed-row" }, [lab("Code de test reçu par e-mail", rc)]); zoneRc.style.display = "none";
-    function majEtat() { appel("adminDeuxFacteurs", { action: "etat" }, function (r) { etat.textContent = r && r.ok ? (r.actif ? "Second facteur ACTIF (adresse : " + r.dest + ")." : "Second facteur désactivé. Adresse de sécurité : " + (r.dest || "aucune") + ".") : "État indisponible."; }); }
-    majEtat();
-    carte.appendChild(h("div", { c: "ed-row" }, [lab("Votre code de sécurité", cd)])); carte.appendChild(zoneRc);
-    var bAct = h("button", { c: "ed-b ed-p", t: "Activer : m’envoyer un code de test", type: "button" }), bConf = h("button", { c: "ed-b ed-p", t: "Confirmer l’activation", type: "button" });
-    bAct.onclick = function () {
-      if (!cd.value) { msg("Saisissez votre code de sécurité.", true); return; }
-      var q = { action: "envoyer", code: cd.value }; cd.value = "";
-      appel("adminDeuxFacteurs", q, function (r) { if (r && r.ok) { defi = r.defi; zoneRc.style.display = ""; msg(r.msg); } else msg((r && r.msg) || "Échec.", true); });
-    };
-    bConf.onclick = function () {
-      if (!rc.value || !defi) { msg("Demandez d’abord un code de test, puis saisissez-le.", true); return; }
-      var q = { action: "confirmer", defi: defi, codeRecu: rc.value }; rc.value = "";
-      appel("adminDeuxFacteurs", q, function (r) { if (r && r.ok) { defi = ""; zoneRc.style.display = "none"; msg(r.msg); } else msg((r && r.msg) || "Échec.", true); majEtat(); });
-    };
-    var bOff = sure("Désactiver le second facteur", true, function () {
-      if (!cd.value) { msg("Saisissez votre code de sécurité.", true); return; }
-      var q = { action: "desactiver", code: cd.value }; cd.value = "";
-      appel("adminDeuxFacteurs", q, function (r) { msg((r && r.msg) || "Échec.", !(r && r.ok)); majEtat(); });
-    });
-    zoneRc.appendChild(bConf);
-    carte.appendChild(h("div", { c: "ed-row" }, [bAct, bOff]));
-    c.appendChild(carte);
-  }
+  // Second facteur de connexion : code à 6 chiffres par e-mail (activation prouvée par un code de test réellement reçu)
+  function paneDeuxFacteurs(c) {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Second facteur de connexion (code par e-mail)" })]), etat = h("p", { c: "ed-vide", t: "Chargement…" });
+    carte.appendChild(h("p", { c: "ed-vide", t: "Après votre mot de passe, IRIS envoie un code à 6 chiffres à votre adresse de sécurité, valable 10 minutes : un mot de passe volé ne suffit plus. Pour l’activer, IRIS vous envoie d’abord un code de test : l’activation n’a lieu que si vous le saisissez, ce qui prouve que l’e-mail arrive. Si l’e-mail devenait indisponible, un secours existe dans l’éditeur Apps Script (fonction a2fDesactiver)." }));
+    carte.appendChild(etat);
+    var cd = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Votre code de sécurité" }), rc = h("input", { type: "text", autocomplete: "one-time-code", inputmode: "numeric", placeholder: "Code reçu par e-mail" }), defi = "";
+    var zoneRc = h("div", { c: "ed-row" }, [lab("Code de test reçu par e-mail", rc)]); zoneRc.style.display = "none";
+    function majEtat() { appel("adminDeuxFacteurs", { action: "etat" }, function (r) { etat.textContent = r && r.ok ? (r.actif ? "Second facteur ACTIF (adresse : " + r.dest + ")." : "Second facteur désactivé. Adresse de sécurité : " + (r.dest || "aucune") + ".") : "État indisponible."; }); }
+    majEtat();
+    carte.appendChild(h("div", { c: "ed-row" }, [lab("Votre code de sécurité", cd)])); carte.appendChild(zoneRc);
+    var bAct = h("button", { c: "ed-b ed-p", t: "Activer : m’envoyer un code de test", type: "button" }), bConf = h("button", { c: "ed-b ed-p", t: "Confirmer l’activation", type: "button" });
+    bAct.onclick = function () {
+      if (!cd.value) { msg("Saisissez votre code de sécurité.", true); return; }
+      var q = { action: "envoyer", code: cd.value }; cd.value = "";
+      appel("adminDeuxFacteurs", q, function (r) { if (r && r.ok) { defi = r.defi; zoneRc.style.display = ""; msg(r.msg); } else msg((r && r.msg) || "Échec.", true); });
+    };
+    bConf.onclick = function () {
+      if (!rc.value || !defi) { msg("Demandez d’abord un code de test, puis saisissez-le.", true); return; }
+      var q = { action: "confirmer", defi: defi, codeRecu: rc.value }; rc.value = "";
+      appel("adminDeuxFacteurs", q, function (r) { if (r && r.ok) { defi = ""; zoneRc.style.display = "none"; msg(r.msg); } else msg((r && r.msg) || "Échec.", true); majEtat(); });
+    };
+    var bOff = sure("Désactiver le second facteur", true, function () {
+      if (!cd.value) { msg("Saisissez votre code de sécurité.", true); return; }
+      var q = { action: "desactiver", code: cd.value }; cd.value = "";
+      appel("adminDeuxFacteurs", q, function (r) { msg((r && r.msg) || "Échec.", !(r && r.ok)); majEtat(); });
+    });
+    zoneRc.appendChild(bConf);
+    carte.appendChild(h("div", { c: "ed-row" }, [bAct, bOff]));
+    c.appendChild(carte);
+  }
   // Scellés des pointages : empreinte quotidienne chaînée, vérifiable à tout moment (preuve que les pointages n'ont pas été retouchés en silence)
   function paneScelles(c) {
     var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Scellés des pointages (preuve d’intégrité)" })]), etat = h("p", { c: "ed-vide", t: "Chargement…" }), res = h("div", {});
@@ -1350,89 +1379,89 @@ var IrisVoix = (function () {
     carte.appendChild(h("div", { c: "ed-row" }, [bs, bv])); carte.appendChild(res);
     c.appendChild(carte);
   }
-  // Sauvegardes : état, test de lecture de la copie la plus récente, copie manuelle (la copie reste dans le même compte Google, non chiffrée)
-  function paneSauvegardes(c) {
-    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Sauvegardes du classeur" })]), etat = h("p", { c: "ed-vide", t: "Chargement…" }), liste = h("div", {}), res = h("div", {});
-    carte.appendChild(h("p", { c: "ed-vide", t: "IRIS copie chaque lundi vers 3 h le classeur dans le dossier Drive « IRIS - Sauvegardes » (12 copies gardées). Le test ouvre la copie la plus récente et la compare à aujourd’hui. Attention : ces copies restent dans le même compte Google et ne sont pas chiffrées ; elles ne remplacent pas une sauvegarde externe." }));
-    carte.appendChild(etat); carte.appendChild(liste);
-    function majEtat() {
-      appel("adminSauvegardes", { action: "etat" }, function (r) {
-        liste.textContent = "";
-        if (!(r && r.ok)) { etat.textContent = (r && r.msg) || "État indisponible."; return; }
-        etat.textContent = (r.programmee ? "Sauvegarde hebdomadaire programmée. " : "ATTENTION : aucune sauvegarde hebdomadaire programmée. ") + r.total + " copie(s) dans le dossier.";
-        (r.copies || []).slice(0, 6).forEach(function (x) { liste.appendChild(h("div", { c: "sg-m", t: x.nom + " — " + x.date + " (il y a " + x.ageJours + " j)" })); });
-      });
-    }
-    majEtat();
-    var bv = h("button", { c: "ed-b ed-p", t: "Tester la dernière copie", type: "button" }), bm = h("button", { c: "ed-b", t: "Faire une copie maintenant", type: "button" });
-    bv.onclick = function () {
-      bv.disabled = true; res.textContent = ""; res.appendChild(h("p", { c: "ed-vide", t: "Test en cours (quelques secondes)…" }));
-      appel("adminSauvegardes", { action: "verifier" }, function (r) {
-        bv.disabled = false; res.textContent = "";
-        if (!(r && r.ok)) { res.appendChild(h("p", { c: "ed-vide", t: (r && r.msg) || "Test impossible." })); return; }
-        res.appendChild(h("p", { c: "ed-vide", t: "Copie « " + r.copie + " » du " + r.date + " (il y a " + r.ageJours + " j) : lisible. " + (r.tropAncienne ? "ATTENTION : elle a plus de 8 jours, la sauvegarde hebdomadaire ne semble pas tourner. " : "") + (r.coherente ? "Feuilles cohérentes avec aujourd’hui." : "À voir : des écarts sont signalés ci-dessous.") }));
-        (r.lignes || []).forEach(function (x) { res.appendChild(h("div", { c: "sg-m", t: x.feuille + " : " + x.copie + " ligne(s) dans la copie, " + x.vivant + " aujourd’hui — " + x.etat })); });
-      });
-    };
-    bm.onclick = function () { bm.disabled = true; appel("adminSauvegardes", { action: "maintenant" }, function (r) { bm.disabled = false; msg((r && r.msg) || "Échec.", !(r && r.ok)); majEtat(); }); };
-    carte.appendChild(h("div", { c: "ed-row" }, [bv, bm])); carte.appendChild(res);
-    c.appendChild(carte);
-  }
-  // Sauvegarde externe chiffrée sur l'ordinateur : le classeur est récupéré puis chiffré DANS LE NAVIGATEUR (AES-256, phrase secrète de l'administrateur) ;
-  // le serveur ne connaît jamais la phrase. Le fichier produit se déchiffre sur la page « restaurer » (aucune donnée n'y est envoyée).
-  function irisOctets(b64) { var s = atob(b64), o = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) o[i] = s.charCodeAt(i); return o; }
-  function irisCle(phrase, sel, usages) {
-    var enc = new TextEncoder();
-    return crypto.subtle.importKey("raw", enc.encode(phrase), "PBKDF2", false, ["deriveKey"]).then(function (base) {
-      return crypto.subtle.deriveKey({ name: "PBKDF2", salt: sel, iterations: 250000, hash: "SHA-256" }, base, { name: "AES-GCM", length: 256 }, false, usages);
-    });
-  }
-  function irisChiffrer(octets, phrase) {
-    var sel = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
-    return irisCle(phrase, sel, ["encrypt"]).then(function (cle) { return crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, cle, octets); }).then(function (ct) {
-      var c = new Uint8Array(ct), out = new Uint8Array(36 + c.length); out.set(new TextEncoder().encode("IRISBAK1"), 0); out.set(sel, 8); out.set(iv, 24); out.set(c, 36); return out;
-    });
-  }
-  function irisDechiffrer(octets, phrase) {
-    if (octets.length < 37 || new TextDecoder().decode(octets.slice(0, 8)) !== "IRISBAK1") return Promise.reject(new Error("format"));
-    var sel = octets.slice(8, 24), iv = octets.slice(24, 36), ct = octets.slice(36);
-    return irisCle(phrase, sel, ["decrypt"]).then(function (cle) { return crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, cle, ct); }).then(function (c) { return new Uint8Array(c); });
-  }
-  window.irisChiffrer = irisChiffrer; window.irisDechiffrer = irisDechiffrer;
-  function paneSauvegardeExterne(c) {
-    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Sauvegarde externe chiffrée (sur votre ordinateur)" })]);
-    carte.appendChild(h("p", { c: "ed-vide", t: "IRIS récupère le classeur, puis le chiffre dans votre navigateur avec une phrase secrète que vous choisissez (AES-256) : le serveur ne connaît jamais cette phrase. Vous obtenez un fichier .irisbak à ranger hors de Google (ordinateur, disque externe). Pour le rouvrir : page « Restaurer une sauvegarde », avec la phrase secrète. ATTENTION : si vous perdez la phrase secrète, la sauvegarde est définitivement illisible. Seules les feuilles du classeur sont sauvegardées, pas les justificatifs et photos stockés dans Drive." }));
-    var code = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Votre code de sécurité" }), p1 = h("input", { type: "password", autocomplete: "new-password", placeholder: "Phrase secrète (12 caractères minimum)" }), p2 = h("input", { type: "password", autocomplete: "new-password", placeholder: "Répétez la phrase secrète" });
-    carte.appendChild(h("div", { c: "ed-row" }, [lab("Votre code de sécurité", code)]));
-    carte.appendChild(h("div", { c: "ed-row" }, [lab("Phrase secrète", p1), lab("Répétez-la", p2)]));
-    var go = h("button", { c: "ed-b ed-p", t: "Télécharger la sauvegarde chiffrée", type: "button" });
-    go.onclick = function () {
-      if (!window.crypto || !crypto.subtle) { msg("Ce navigateur ne permet pas le chiffrement.", true); return; }
-      if (!code.value) { msg("Saisissez votre code de sécurité.", true); return; }
-      if (p1.value.length < 12) { msg("La phrase secrète doit faire au moins 12 caractères.", true); return; }
-      if (p1.value !== p2.value) { msg("Les deux phrases secrètes ne sont pas identiques.", true); return; }
-      go.disabled = true; msg("Récupération du classeur… (quelques secondes)");
-      var phrase = p1.value, q = { code: code.value }; code.value = "";
-      appel("adminSauvegardeExport", q, function (r) {
-        if (!(r && r.ok)) { go.disabled = false; msg((r && r.msg) || "Échec de l’export.", true); return; }
-        var clair = irisOctets(r.b64);
-        msg("Chiffrement dans votre navigateur…");
-        irisChiffrer(clair, phrase).then(function (chiffre) {
-          msg("Vérification du déchiffrement…");
-          return irisDechiffrer(chiffre, phrase).then(function (retour) {
-            var egal = retour.length === clair.length; for (var i = 0; egal && i < clair.length; i++) if (retour[i] !== clair[i]) egal = false;
-            if (!egal) throw new Error("verification");
-            var blob = new Blob([chiffre], { type: "application/octet-stream" }), a = document.createElement("a");
-            a.href = URL.createObjectURL(blob); a.download = r.nom + ".irisbak"; document.body.appendChild(a); a.click();
-            setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
-            msg("Sauvegarde chiffrée téléchargée (" + Math.round(chiffre.length / 1024) + " Ko) et déchiffrement vérifié. Rangez-la hors de Google et gardez la phrase secrète.");
-          });
-        }).catch(function () { msg("Chiffrement impossible : rien n’a été téléchargé.", true); }).then(function () { go.disabled = false; p1.value = ""; p2.value = ""; });
-      });
-    };
-    carte.appendChild(h("div", { c: "ed-row" }, [go]));
-    c.appendChild(carte);
-  }
+  // Sauvegardes : état, test de lecture de la copie la plus récente, copie manuelle (la copie reste dans le même compte Google, non chiffrée)
+  function paneSauvegardes(c) {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Sauvegardes du classeur" })]), etat = h("p", { c: "ed-vide", t: "Chargement…" }), liste = h("div", {}), res = h("div", {});
+    carte.appendChild(h("p", { c: "ed-vide", t: "IRIS copie chaque lundi vers 3 h le classeur dans le dossier Drive « IRIS - Sauvegardes » (12 copies gardées). Le test ouvre la copie la plus récente et la compare à aujourd’hui. Attention : ces copies restent dans le même compte Google et ne sont pas chiffrées ; elles ne remplacent pas une sauvegarde externe." }));
+    carte.appendChild(etat); carte.appendChild(liste);
+    function majEtat() {
+      appel("adminSauvegardes", { action: "etat" }, function (r) {
+        liste.textContent = "";
+        if (!(r && r.ok)) { etat.textContent = (r && r.msg) || "État indisponible."; return; }
+        etat.textContent = (r.programmee ? "Sauvegarde hebdomadaire programmée. " : "ATTENTION : aucune sauvegarde hebdomadaire programmée. ") + r.total + " copie(s) dans le dossier.";
+        (r.copies || []).slice(0, 6).forEach(function (x) { liste.appendChild(h("div", { c: "sg-m", t: x.nom + " — " + x.date + " (il y a " + x.ageJours + " j)" })); });
+      });
+    }
+    majEtat();
+    var bv = h("button", { c: "ed-b ed-p", t: "Tester la dernière copie", type: "button" }), bm = h("button", { c: "ed-b", t: "Faire une copie maintenant", type: "button" });
+    bv.onclick = function () {
+      bv.disabled = true; res.textContent = ""; res.appendChild(h("p", { c: "ed-vide", t: "Test en cours (quelques secondes)…" }));
+      appel("adminSauvegardes", { action: "verifier" }, function (r) {
+        bv.disabled = false; res.textContent = "";
+        if (!(r && r.ok)) { res.appendChild(h("p", { c: "ed-vide", t: (r && r.msg) || "Test impossible." })); return; }
+        res.appendChild(h("p", { c: "ed-vide", t: "Copie « " + r.copie + " » du " + r.date + " (il y a " + r.ageJours + " j) : lisible. " + (r.tropAncienne ? "ATTENTION : elle a plus de 8 jours, la sauvegarde hebdomadaire ne semble pas tourner. " : "") + (r.coherente ? "Feuilles cohérentes avec aujourd’hui." : "À voir : des écarts sont signalés ci-dessous.") }));
+        (r.lignes || []).forEach(function (x) { res.appendChild(h("div", { c: "sg-m", t: x.feuille + " : " + x.copie + " ligne(s) dans la copie, " + x.vivant + " aujourd’hui — " + x.etat })); });
+      });
+    };
+    bm.onclick = function () { bm.disabled = true; appel("adminSauvegardes", { action: "maintenant" }, function (r) { bm.disabled = false; msg((r && r.msg) || "Échec.", !(r && r.ok)); majEtat(); }); };
+    carte.appendChild(h("div", { c: "ed-row" }, [bv, bm])); carte.appendChild(res);
+    c.appendChild(carte);
+  }
+  // Sauvegarde externe chiffrée sur l'ordinateur : le classeur est récupéré puis chiffré DANS LE NAVIGATEUR (AES-256, phrase secrète de l'administrateur) ;
+  // le serveur ne connaît jamais la phrase. Le fichier produit se déchiffre sur la page « restaurer » (aucune donnée n'y est envoyée).
+  function irisOctets(b64) { var s = atob(b64), o = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) o[i] = s.charCodeAt(i); return o; }
+  function irisCle(phrase, sel, usages) {
+    var enc = new TextEncoder();
+    return crypto.subtle.importKey("raw", enc.encode(phrase), "PBKDF2", false, ["deriveKey"]).then(function (base) {
+      return crypto.subtle.deriveKey({ name: "PBKDF2", salt: sel, iterations: 250000, hash: "SHA-256" }, base, { name: "AES-GCM", length: 256 }, false, usages);
+    });
+  }
+  function irisChiffrer(octets, phrase) {
+    var sel = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+    return irisCle(phrase, sel, ["encrypt"]).then(function (cle) { return crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, cle, octets); }).then(function (ct) {
+      var c = new Uint8Array(ct), out = new Uint8Array(36 + c.length); out.set(new TextEncoder().encode("IRISBAK1"), 0); out.set(sel, 8); out.set(iv, 24); out.set(c, 36); return out;
+    });
+  }
+  function irisDechiffrer(octets, phrase) {
+    if (octets.length < 37 || new TextDecoder().decode(octets.slice(0, 8)) !== "IRISBAK1") return Promise.reject(new Error("format"));
+    var sel = octets.slice(8, 24), iv = octets.slice(24, 36), ct = octets.slice(36);
+    return irisCle(phrase, sel, ["decrypt"]).then(function (cle) { return crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, cle, ct); }).then(function (c) { return new Uint8Array(c); });
+  }
+  window.irisChiffrer = irisChiffrer; window.irisDechiffrer = irisDechiffrer;
+  function paneSauvegardeExterne(c) {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Sauvegarde externe chiffrée (sur votre ordinateur)" })]);
+    carte.appendChild(h("p", { c: "ed-vide", t: "IRIS récupère le classeur, puis le chiffre dans votre navigateur avec une phrase secrète que vous choisissez (AES-256) : le serveur ne connaît jamais cette phrase. Vous obtenez un fichier .irisbak à ranger hors de Google (ordinateur, disque externe). Pour le rouvrir : page « Restaurer une sauvegarde », avec la phrase secrète. ATTENTION : si vous perdez la phrase secrète, la sauvegarde est définitivement illisible. Seules les feuilles du classeur sont sauvegardées, pas les justificatifs et photos stockés dans Drive." }));
+    var code = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Votre code de sécurité" }), p1 = h("input", { type: "password", autocomplete: "new-password", placeholder: "Phrase secrète (12 caractères minimum)" }), p2 = h("input", { type: "password", autocomplete: "new-password", placeholder: "Répétez la phrase secrète" });
+    carte.appendChild(h("div", { c: "ed-row" }, [lab("Votre code de sécurité", code)]));
+    carte.appendChild(h("div", { c: "ed-row" }, [lab("Phrase secrète", p1), lab("Répétez-la", p2)]));
+    var go = h("button", { c: "ed-b ed-p", t: "Télécharger la sauvegarde chiffrée", type: "button" });
+    go.onclick = function () {
+      if (!window.crypto || !crypto.subtle) { msg("Ce navigateur ne permet pas le chiffrement.", true); return; }
+      if (!code.value) { msg("Saisissez votre code de sécurité.", true); return; }
+      if (p1.value.length < 12) { msg("La phrase secrète doit faire au moins 12 caractères.", true); return; }
+      if (p1.value !== p2.value) { msg("Les deux phrases secrètes ne sont pas identiques.", true); return; }
+      go.disabled = true; msg("Récupération du classeur… (quelques secondes)");
+      var phrase = p1.value, q = { code: code.value }; code.value = "";
+      appel("adminSauvegardeExport", q, function (r) {
+        if (!(r && r.ok)) { go.disabled = false; msg((r && r.msg) || "Échec de l’export.", true); return; }
+        var clair = irisOctets(r.b64);
+        msg("Chiffrement dans votre navigateur…");
+        irisChiffrer(clair, phrase).then(function (chiffre) {
+          msg("Vérification du déchiffrement…");
+          return irisDechiffrer(chiffre, phrase).then(function (retour) {
+            var egal = retour.length === clair.length; for (var i = 0; egal && i < clair.length; i++) if (retour[i] !== clair[i]) egal = false;
+            if (!egal) throw new Error("verification");
+            var blob = new Blob([chiffre], { type: "application/octet-stream" }), a = document.createElement("a");
+            a.href = URL.createObjectURL(blob); a.download = r.nom + ".irisbak"; document.body.appendChild(a); a.click();
+            setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+            msg("Sauvegarde chiffrée téléchargée (" + Math.round(chiffre.length / 1024) + " Ko) et déchiffrement vérifié. Rangez-la hors de Google et gardez la phrase secrète.");
+          });
+        }).catch(function () { msg("Chiffrement impossible : rien n’a été téléchargé.", true); }).then(function () { go.disabled = false; p1.value = ""; p2.value = ""; });
+      });
+    };
+    carte.appendChild(h("div", { c: "ed-row" }, [go]));
+    c.appendChild(carte);
+  }
   function paneParam(c) {
     paneMdpAgents(c);
     paneRapport(c);
@@ -1506,38 +1535,38 @@ var IrisVoix = (function () {
       }).withFailureHandler(function () { RTN.enCours = false; }).adminRetardsSignales(CLE, "");
     } catch (e) { RTN.enCours = false; }
   }
-  // Alertes de durée légale : dépassements de 10 h par jour, 48 h par semaine, repos de 11 h (information, rien n'est modifié)
-  var LEG = { n: 0, liste: null, t: 0, enCours: false, err: "" };
-  function legCompteur(cb) {
-    if (LEG.enCours || !CLE) return; LEG.enCours = true;
-    try {
-      google.script.run.withSuccessHandler(function (r) {
-        LEG.enCours = false; LEG.t = Date.now();
-        if (!(r && r.ok)) { LEG.err = (r && r.msg) || "Alertes indisponibles pour le moment."; if (cb) cb(); return; }
-        LEG.err = ""; LEG.liste = r.alertes || []; var n = LEG.liste.length;
-        if (n !== LEG.n) { LEG.n = n; if (ov.className === "on" && !enEdition()) { dessiner(); return; } }
-        if (cb) cb();
-      }).withFailureHandler(function () { LEG.enCours = false; }).adminAlertesLegales(CLE, { jours: 30 });
-    } catch (e) { LEG.enCours = false; }
-  }
-  function carteAlertesLegales() {
-    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Alertes de durée légale (30 derniers jours)" })]), corps = h("div", {});
-    carte.appendChild(h("p", { c: "ed-vide", t: "IRIS repère dans les pointages : plus de 10 h travaillées par jour, plus de 48 h par semaine, moins de 11 h de repos entre deux journées (bornes du Code du travail ; la convention de la propreté peut prévoir des règles particulières). C’est une information : rien n’est modifié ni sanctionné. Un départ non pointé n’est jamais compté comme du travail." }));
-    carte.appendChild(corps);
-    function rend() {
-      corps.textContent = "";
-      if (LEG.err) { corps.appendChild(h("p", { c: "ed-vide", t: LEG.err })); return; }
-      if (!LEG.liste) { corps.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); return; }
-      if (!LEG.liste.length) { corps.appendChild(h("p", { c: "ed-vide", t: "Aucun dépassement détecté sur les 30 derniers jours." })); return; }
-      LEG.liste.slice(0, 40).forEach(function (a) {
-        corps.appendChild(h("div", { c: "sg-l" }, [h("b", { t: a.nom + " " + a.prenom + " — " + a.libelle }), h("div", { c: "sg-m", t: a.date + " · " + a.valeur + " (limite : " + a.limite + ")" })]));
-      });
-      if (LEG.liste.length > 40) corps.appendChild(h("p", { c: "ed-vide", t: LEG.liste.length + " alertes au total : les 40 plus récentes sont affichées." }));
-    }
-    rend();
-    if (!LEG.liste || Date.now() - LEG.t > 60000) legCompteur(rend);
-    return carte;
-  }
+  // Alertes de durée légale : dépassements de 10 h par jour, 48 h par semaine, repos de 11 h (information, rien n'est modifié)
+  var LEG = { n: 0, liste: null, t: 0, enCours: false, err: "" };
+  function legCompteur(cb) {
+    if (LEG.enCours || !CLE) return; LEG.enCours = true;
+    try {
+      google.script.run.withSuccessHandler(function (r) {
+        LEG.enCours = false; LEG.t = Date.now();
+        if (!(r && r.ok)) { LEG.err = (r && r.msg) || "Alertes indisponibles pour le moment."; if (cb) cb(); return; }
+        LEG.err = ""; LEG.liste = r.alertes || []; var n = LEG.liste.length;
+        if (n !== LEG.n) { LEG.n = n; if (ov.className === "on" && !enEdition()) { dessiner(); return; } }
+        if (cb) cb();
+      }).withFailureHandler(function () { LEG.enCours = false; }).adminAlertesLegales(CLE, { jours: 30 });
+    } catch (e) { LEG.enCours = false; }
+  }
+  function carteAlertesLegales() {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Alertes de durée légale (30 derniers jours)" })]), corps = h("div", {});
+    carte.appendChild(h("p", { c: "ed-vide", t: "IRIS repère dans les pointages : plus de 10 h travaillées par jour, plus de 48 h par semaine, moins de 11 h de repos entre deux journées (bornes du Code du travail ; la convention de la propreté peut prévoir des règles particulières). C’est une information : rien n’est modifié ni sanctionné. Un départ non pointé n’est jamais compté comme du travail." }));
+    carte.appendChild(corps);
+    function rend() {
+      corps.textContent = "";
+      if (LEG.err) { corps.appendChild(h("p", { c: "ed-vide", t: LEG.err })); return; }
+      if (!LEG.liste) { corps.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); return; }
+      if (!LEG.liste.length) { corps.appendChild(h("p", { c: "ed-vide", t: "Aucun dépassement détecté sur les 30 derniers jours." })); return; }
+      LEG.liste.slice(0, 40).forEach(function (a) {
+        corps.appendChild(h("div", { c: "sg-l" }, [h("b", { t: a.nom + " " + a.prenom + " — " + a.libelle }), h("div", { c: "sg-m", t: a.date + " · " + a.valeur + " (limite : " + a.limite + ")" })]));
+      });
+      if (LEG.liste.length > 40) corps.appendChild(h("p", { c: "ed-vide", t: LEG.liste.length + " alertes au total : les 40 plus récentes sont affichées." }));
+    }
+    rend();
+    if (!LEG.liste || Date.now() - LEG.t > 60000) legCompteur(rend);
+    return carte;
+  }
   // Carte « À traiter maintenant » : une seule liste, chaque ligne ouvre l'onglet concerné ; absente quand il n'y a rien à traiter
   function carteATraiter() {
     var np = ((DATA && DATA.conges) || []).filter(function (x) { return x.statut === "En attente"; }).length, nsg = nbSgOuverts();
