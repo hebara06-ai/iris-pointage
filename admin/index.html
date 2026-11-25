@@ -1129,9 +1129,63 @@ var IrisVoix = (function () {
     carte.appendChild(h("div", { c: "ed-row" }, [go("M’envoyer un essai (Gmail seulement)", { semestre: "courant", essai: true }), go("Envoyer le semestre précédent aux 2 adresses", { semestre: "precedent" }), go("Envoyer le semestre en cours aux 2 adresses", { semestre: "courant" })]));
     c.appendChild(carte);
   }
+  // Exports à la demande (CSV pour Excel) : heures, retards, pointages, absences, congés d'une période, protégés par le code de sécurité
+  function selectOptions(liste) {
+    var s = h("select"); liste.forEach(function (o) { var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; s.appendChild(op); }); return s;
+  }
+  function paneExport(c) {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Exporter pour la paie ou un contrôle (Excel)" })]);
+    carte.appendChild(h("p", { c: "ed-vide", t: "Choisissez la période et le contenu : IRIS prépare un fichier que vous ouvrez dans Excel. L’export exige votre code de sécurité et reste noté dans le journal d’activité. Aucune donnée n’est modifiée." }));
+    var per = selectOptions([["mois", "Un mois"], ["semaine", "Une semaine"], ["trimestre", "Un trimestre"], ["semestre", "Un semestre"], ["annee", "Une année"]]),
+      jour = h("input", { type: "date" }), cont = selectOptions([["recap", "Récapitulatif par agent : heures, retards, absences (paie)"], ["points", "Pointages détaillés"], ["abs", "Absences et retards excusés"], ["conges", "Congés"]]),
+      code = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Code de sécurité" });
+    jour.value = iso(); code.style.cssText = "width:14em";
+    carte.appendChild(h("div", { c: "ed-row" }, [lab("Période", per), lab("Un jour de cette période", jour)]));
+    carte.appendChild(h("div", { c: "ed-row" }, [lab("Contenu", cont), lab("Code de sécurité", code)]));
+    var go = h("button", { c: "ed-b ed-p", t: "Télécharger le fichier", type: "button" });
+    go.onclick = function () {
+      if (!code.value) { msg("Saisissez votre code de sécurité.", true); return; }
+      if (!jour.value) { msg("Choisissez un jour de la période.", true); return; }
+      go.disabled = true; msg("Préparation du fichier…");
+      var q = { type: per.value, ref: fr(jour.value), partie: cont.value, code: code.value }; code.value = "";
+      appel("adminExport", q, function (r) {
+        go.disabled = false;
+        if (!(r && r.ok)) { msg((r && r.msg) || "Échec de l’export.", true); return; }
+        var blob = new Blob([r.csv], { type: "text/csv;charset=utf-8" }), a = document.createElement("a");
+        a.href = URL.createObjectURL(blob); a.download = r.nom; document.body.appendChild(a); a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+        msg("Fichier prêt : " + r.periode + " (" + r.lignes + " ligne" + (r.lignes > 1 ? "s" : "") + ").");
+      });
+    };
+    carte.appendChild(h("div", { c: "ed-row" }, [go]));
+    c.appendChild(carte);
+  }
+  // Journal d'activité : opérations sensibles de l'administration, les plus récentes d'abord, avec recherche
+  function paneJournal(c) {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Journal d’activité" })]), liste = h("div", {}), q = h("input", { type: "search", placeholder: "Rechercher (nom, action, date…)" });
+    carte.appendChild(h("p", { c: "ed-vide", t: "Qui a fait quoi et quand : suppressions, corrections, exports, rapports, sécurité. Les 300 plus récentes lignes." }));
+    function charge() {
+      liste.textContent = ""; liste.appendChild(h("p", { c: "ed-vide", t: "Chargement…" }));
+      appel("adminJournal", { q: q.value }, function (r) {
+        liste.textContent = "";
+        if (!(r && r.ok)) { liste.appendChild(h("p", { c: "ed-vide", t: (r && r.msg) || "Journal indisponible." })); return; }
+        if (!r.lignes.length) { liste.appendChild(h("p", { c: "ed-vide", t: "Aucune ligne." })); return; }
+        r.lignes.forEach(function (x) {
+          var l = h("div", { c: "sg-l" }, [h("div", { c: "sg-m", t: x.date + " à " + x.heure }), h("b", { t: x.action })]);
+          if (x.detail) l.appendChild(h("div", { c: "sg-m", t: x.detail }));
+          liste.appendChild(l);
+        });
+      });
+    }
+    var bt = h("button", { c: "ed-b", t: "Rechercher", type: "button" }); bt.onclick = charge;
+    q.onkeydown = function (e) { if (e.key === "Enter") charge(); };
+    carte.appendChild(h("div", { c: "ed-row" }, [q, bt])); carte.appendChild(liste); c.appendChild(carte); charge();
+  }
   function paneParam(c) {
     paneMdpAgents(c);
     paneRapport(c);
+    paneExport(c);
+    paneJournal(c);
     var an = h("input", { type: "password", autocomplete: "current-password", placeholder: "Ancien mot de passe" }), nv = h("input", { type: "password", autocomplete: "new-password", placeholder: "Nouveau mot de passe (10 caractères minimum, lettre + chiffre)" }), cf = h("input", { type: "password", autocomplete: "new-password", placeholder: "Confirmer le nouveau mot de passe" }), cd = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Code de sécurité (obligatoire)" });
     var ok = h("button", { c: "ed-b ed-p", t: "Modifier mon mot de passe", type: "button" });
     ok.onclick = function () {
