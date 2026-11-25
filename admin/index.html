@@ -495,6 +495,7 @@ var IrisVoix = (function () {
     dessiner(); charger();
   };
   function panePt(c) {
+    var cat = carteATraiter(); if (cat) c.appendChild(cat);
     var di = h("input", { type: "date" }); di.value = jourSel; di.onchange = function () { jourSel = di.value; charger(); };
     var tous = h("button", { c: "ed-b", t: "150 derniers pointages", type: "button" }); tous.onclick = function () { jourSel = ""; charger(); };
     var auj = h("button", { c: "ed-b", t: "Aujourd’hui", type: "button" }); auj.onclick = function () { jourSel = iso(); charger(); };
@@ -675,7 +676,7 @@ var IrisVoix = (function () {
       RSG.t = Date.now();
       var echec = function () { RSG.err = "Connexion impossible : rouvrez l’onglet pour réessayer."; RSG.t = 0; rend(); };
       try {
-        google.script.run.withSuccessHandler(function (r) { if (r && r.ok) { RSG.liste = r.retards || []; RSG.err = ""; } else RSG.err = (r && r.msg) || "Retards signalés indisponibles pour le moment."; rend(); })
+        google.script.run.withSuccessHandler(function (r) { if (r && r.ok) { RSG.liste = r.retards || []; RTN.n = RSG.liste.filter(function (x) { return x.statut === "Signalé"; }).length; RSG.err = ""; } else RSG.err = (r && r.msg) || "Retards signalés indisponibles pour le moment."; rend(); })
           .withFailureHandler(echec).adminRetardsSignales(CLE, "");
       } catch (e) { echec(); }
     }
@@ -1179,6 +1180,35 @@ var IrisVoix = (function () {
     c.appendChild(h("p", { c: "ed-vide", t: "Modifier un nom met aussi à jour son historique de pointages et de justificatifs." }));
     c.appendChild(carteRecup()); c.appendChild(carteImport());
   }
+  var RTN = { n: 0, enCours: false };
+  function retardsAttente() { return RTN.n || 0; }
+  function retardsCompteur() {
+    if (RTN.enCours || !CLE) return; RTN.enCours = true;
+    try {
+      google.script.run.withSuccessHandler(function (r) {
+        RTN.enCours = false;
+        if (!(r && r.ok)) return;
+        var n = (r.retards || []).filter(function (x) { return x.statut === "Signalé"; }).length;
+        if (n !== RTN.n) { RTN.n = n; if (ov.className === "on" && !enEdition()) dessiner(); }
+      }).withFailureHandler(function () { RTN.enCours = false; }).adminRetardsSignales(CLE, "");
+    } catch (e) { RTN.enCours = false; }
+  }
+  // Carte « À traiter maintenant » : une seule liste, chaque ligne ouvre l'onglet concerné ; absente quand il n'y a rien à traiter
+  function carteATraiter() {
+    var np = ((DATA && DATA.conges) || []).filter(function (x) { return x.statut === "En attente"; }).length, nsg = nbSgOuverts();
+    var lignes = [[retardsAttente(), "retard", "retards", "ab"], [np, "demande de congé", "demandes de congé", "cg"], [nsg, "signalement", "signalements", "sg"],
+      [Number(QS.aTraiter) || 0, "question IRIS", "questions IRIS", "qs"], [gaNonLus(), "dossier administratif", "dossiers administratifs", "ga"]]
+      .filter(function (x) { return x[0] > 0; });
+    if (!lignes.length) return null;
+    var card = h("div", { c: "ed-card" }, [h("h3", { t: "À traiter maintenant" })]);
+    lignes.forEach(function (x) {
+      var b = h("button", { c: "ed-b", type: "button", t: x[0] + " " + (x[0] > 1 ? x[2] : x[1]) + " à traiter" });
+      b.style.cssText = "display:block;width:100%;text-align:center;margin:6px 0";
+      b.onclick = function () { onglet = x[3]; dessiner(); };
+      card.appendChild(b);
+    });
+    return card;
+  }
   var SG = null;
   function chargerSg(cb) { appel("adminSignalements", "", function (r) { if (!r) { msg("Accès refusé.", true); return; } SG = r; if (cb) cb(); }); }
   function pillSg(st) { var k = /acceptée/.test(st) ? "s-pr" : /refusée/.test(st) ? "s-ab" : /Clôturée/.test(st) ? "s-re" : "s-at"; return h("span", { c: "pl " + k, t: st }); }
@@ -1441,7 +1471,7 @@ var IrisVoix = (function () {
   function nbSgOuverts() { return SG && SG.signalements ? SG.signalements.filter(function (x) { return ["Correction acceptée", "Correction refusée", "Clôturée"].indexOf(x.statut) < 0; }).length : 0; }
   function sgCompteur() { var avant = nbSgOuverts(); chargerSg(function () { if (nbSgOuverts() !== avant && !enEdition()) dessiner(); }); }
   setInterval(function () { if (ov.className === "on" && !document.hidden && onglet !== "qs" && !QS.err && !QS.chargement) qsCharge(); }, 60000);
-  setInterval(function () { if (ov.className === "on" && !document.hidden) { gaCompteur(); if (onglet !== "sg" && !enEdition()) sgCompteur(); } }, 60000);
+  setInterval(function () { if (ov.className === "on" && !document.hidden) { gaCompteur(); retardsCompteur(); if (onglet !== "sg" && !enEdition()) sgCompteur(); } }, 60000);
   // Correction / reformulation par IA (fonctions du serveur d'administration) au format attendu par IrisVoix : f(texte, cb(erreur, texte))
   function qsReecrire(nom) { return function (t, cb) { qsAppel(nom, t, function (r) { cb(r && r.ok ? null : (r && r.msg) || "Indisponible pour le moment.", r && r.texte); }, function () { cb("Connexion impossible, réessayez."); }); }; }
   var QS_OUTILS = { corriger: qsReecrire("corrigerTexte"), reformuler: qsReecrire("reformulerTexte") };
@@ -2278,7 +2308,7 @@ var IrisVoix = (function () {
     var y = ov.scrollTop; ov.textContent = "";
     var np = ((DATA && DATA.conges) || []).filter(function (x) { return x.statut === "En attente"; }).length;
     var nsg = SG ? SG.signalements.filter(function (x) { return ["Correction acceptée", "Correction refusée", "Clôturée"].indexOf(x.statut) < 0; }).length : 0;
-    var seg = h("div", { c: "ed-seg" }, [["pt", "Pointages", nbRegul()], ["ab", "Absences et retards", 0], ["cg", "Congés", np], ["sg", "Signalements", nsg], ["qs", "Questions IRIS" + qsBadge(), Number(QS.aTraiter) || 0], ["cm", "Communications" + cmBadge(), (typeof CM !== "undefined" && CM && Number(CM.nonLus)) || 0], ["ag", "Agents", 0], ["ga", "Gestion administrative", gaNonLus()], ["pa", "Paramètres", 0]].map(function (o) { var b = h("button", { t: o[1], type: "button" }); if (o[2] > 0) b.appendChild(pastilleOnglet(o[2])); if (o[0] === onglet) b.className = "on"; b.onclick = function () { onglet = o[0]; dessiner(); }; return b; }));
+    var seg = h("div", { c: "ed-seg" }, [["pt", "Pointages", nbRegul()], ["ab", "Absences et retards", retardsAttente()], ["cg", "Congés", np], ["sg", "Signalements", nsg], ["qs", "Questions IRIS" + qsBadge(), Number(QS.aTraiter) || 0], ["cm", "Communications" + cmBadge(), (typeof CM !== "undefined" && CM && Number(CM.nonLus)) || 0], ["ag", "Agents", 0], ["ga", "Gestion administrative", gaNonLus()], ["pa", "Paramètres", 0]].map(function (o) { var b = h("button", { t: o[1], type: "button" }); if (o[2] > 0) b.appendChild(pastilleOnglet(o[2])); if (o[0] === onglet) b.className = "on"; b.onclick = function () { onglet = o[0]; dessiner(); }; return b; }));
     var x = h("button", { c: "ed-x", t: "Fermer", type: "button" }); x.onclick = fermer;
     ov.appendChild(h("div", { c: "ed-top" }, [h("h2", { t: "Corrections" }), seg, x]));
     var corps = h("div", { c: "ed-body" }); ov.appendChild(corps);
@@ -2287,7 +2317,7 @@ var IrisVoix = (function () {
   }
   function fermer() { ov.className = ""; document.body.style.overflow = ""; }
   btn.onclick = function () { agFiltre = null; ov.className = "on"; document.body.style.overflow = "hidden"; if (!jourSel) jourSel = iso(); DATA = null; SG = null; dessiner(); charger(); };
-  (function () { var ouvrir = btn.onclick; btn.onclick = function () { ouvrir.apply(this, arguments); qsCompteur(); gaCompteur(); sgCompteur(); try { cmCompteurMaj(); } catch (e) { } }; })();
+  (function () { var ouvrir = btn.onclick; btn.onclick = function () { ouvrir.apply(this, arguments); qsCompteur(); gaCompteur(); sgCompteur(); retardsCompteur(); try { cmCompteurMaj(); } catch (e) { } }; })();
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") fermer(); });
 })();</script><script>var MOIS="",minuterie=null,CL={"Présent":"s-pr","Parti":"s-pa","Absent":"s-ab","Attendu":"s-at","Repos":"s-re","En retard":"s-rt","Justifiée":"s-ju"};function g(i){return document.getElementById(i)}function td(tr,t,c){var x=document.createElement("td");if(c)x.className=c;x.textContent=t;tr.appendChild(x);return x}function pl(t,c,titre){var s=document.createElement("span");s.className="pl "+c;s.textContent=t;if(titre)s.title=titre;return s}var ADM=null,DERN=null,ADMT=null,FICHE=null,PER={type:"mois",ref:""},PERD=null,PERN=0,REF=null,POSTF=[];function fj(n){return String(Math.round(Number(n||0)*100)/100).replace(".",",")}var ET={vt:"#16a34a",ja:"#facc15",or:"#f97316",ro:"#dc2626",vi:"#7c3aed",gr:"#9ca3af"},ETX={vt:"#15803d",ja:"#a16207",or:"#c2410c",ro:"#b91c1c",vi:"#6d28d9",gr:"#4b5563"};function etatSolde(so){var T=so?(so.total!==undefined&&so.total!==null?Number(so.total):Number(so.reliquat||0)+Number(so.acquis||0)):NaN,r=so&&so.reste!==null&&so.reste!==undefined&&so.reste!==""?Math.round(Number(so.reste)*100)/100:NaN;if(!so||!isFinite(r)||!isFinite(T))return{k:"gr",col:ET.gr,lib:"Solde non vérifié",pill:"N/A",pct:0,r:NaN,T:T};var pct=T>0?Math.max(0,Math.min(1,r/T)):0;if(r<0)return{k:"vi",col:ET.vi,lib:"Dépassement à vérifier",pill:"−"+fj(-r)+" j",pct:0,r:r,T:T};if(r===0)return{k:"ro",col:ET.ro,lib:"CONGÉS ÉPUISÉS",pill:"Congés épuisés",pct:0,r:r,T:T};var k=r<=5?"or":r<=10?"ja":"vt",lib=r<=5?"Solde faible":r<=10?"Solde à surveiller":"Solde confortable";return{k:k,col:ET[k],lib:lib,pill:Math.round(100*pct)+" %",pct:pct,r:r,T:T}}function jaugeEl(et,c){var w=document.createElement("div");w.className="jq";var t=document.createElement("div");t.className="jt "+et.k;var i=document.createElement("i");i.style.width=(100*et.pct)+"%";i.style.background=et.col;t.appendChild(i);w.appendChild(t);var p=document.createElement("span");p.className="jp "+et.k;p.textContent=c&&et.k==="ro"?"Épuisés":et.pill;w.appendChild(p);w.title=et.lib+(isFinite(et.r)?" : "+fj(et.r)+" j disponible"+(et.r>1?"s":"")+" sur "+fj(et.T):"");w.setAttribute("role","img");w.setAttribute("aria-label",w.title);return w}function mixW(h,a){var n=parseInt(h.slice(1),16),r=n>>16,g1=(n>>8)&255,b=n&255;function m(c){return Math.round(c*a+255*(1-a))}return"#"+[m(r),m(g1),m(b)].map(function(c){return("0"+c.toString(16)).slice(-2)}).join("")}
 function legSolde(){var w=document.createElement("div");w.className="lgs";[["vt","Solde confortable","plus de 10 jours"],["ja","Solde à surveiller","6 à 10 jours"],["or","Solde faible","1 à 5 jours"],["ro","CONGÉS ÉPUISÉS","exactement 0 jour"],["vi","Dépassement à vérifier","solde négatif ou congés anticipés"],["gr","Solde non vérifié","données indisponibles"]].forEach(function(z){var d=document.createElement("span"),i=document.createElement("i");i.style.background=ET[z[0]];d.appendChild(i);d.appendChild(document.createTextNode(z[1]+" ("+z[2]+")"));w.appendChild(d)});return w}
