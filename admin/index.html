@@ -626,7 +626,29 @@ var IrisVoix = (function () {
     nm.onclick = function () { ouvert = !ouvert; det.style.display = ouvert ? "" : "none"; nm.setAttribute("aria-expanded", ouvert ? "true" : "false"); if (ouvert) remplir(); };
     return h("div", { c: "ed-la" }, [nm, h("span", { t: x.debut + (x.fin !== x.debut ? " → " + x.fin : "") + " · " + x.jours + " j" }), h("span", { t: x.motif || "", style: "white-space:pre-wrap" }), x.pj ? btnPiece("conge", x.id) : h("span", {}), h("span", { c: "ed-tag", t: x.etat || st }), det]);
   }
+  // Retards signalés par les agents (onglet « Mes retards » de l'espace agent) : lecture seule, les plus récents d'abord
+  var RSG = { t: 0, liste: null, err: "" };
+  function carteRetardsSignales() {
+    var corps = h("div", {}), card = h("div", { c: "ed-card" }, [h("h3", { t: "Retards signalés par les agents" }), corps]);
+    function rend() {
+      corps.textContent = "";
+      if (RSG.err) { corps.appendChild(h("p", { c: "ed-vide", t: RSG.err })); return; }
+      if (!RSG.liste) { corps.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); return; }
+      if (!RSG.liste.length) { corps.appendChild(h("p", { c: "ed-vide", t: "Aucun retard signalé." })); return; }
+      RSG.liste.slice(0, 30).forEach(function (x) {
+        corps.appendChild(h("div", { c: "ed-la" }, [h("b", { t: x.nom + " " + x.prenom }), h("span", { t: x.jour }), h("span", { t: "Prévu " + x.prevue + " · Arrivée " + x.arrivee + " · " + x.min + " min" }), h("span", { t: x.motif + (x.precision ? " — " + x.precision : ""), style: "white-space:pre-wrap" }), h("span", { t: (x.site ? x.site + " · " : "") + "signalé le " + x.depot })]));
+      });
+      if (RSG.liste.length > 30) corps.appendChild(h("p", { c: "ed-vide", t: "Les 30 retards les plus récents sont affichés (" + RSG.liste.length + " au total)." }));
+    }
+    rend();
+    if (!RSG.liste || Date.now() - RSG.t > 30000) {
+      RSG.t = Date.now();
+      appel("adminRetardsSignales", "", function (r) { if (r && r.ok) { RSG.liste = r.retards || []; RSG.err = ""; } else RSG.err = (r && r.msg) || "Retards signalés indisponibles pour le moment."; rend(); });
+    }
+    return card;
+  }
   function paneAb(c) {
+    c.appendChild(carteRetardsSignales());
     var sel = agentSelect(), da = h("input", { type: "date" }), ty = h("select"), mo = h("textarea", { placeholder: "Motif (obligatoire) : écrivez ici, le texte passe à la ligne et vous pouvez remonter pour relire", rows: "4", maxlength: "1000", spellcheck: "true", lang: "fr", autocapitalize: "sentences" });
     da.value = iso(); mo.style.width = "100%"; mo.style.minHeight = "120px"; mo.style.resize = "vertical";
     [["Absence", "Absence justifiée"], ["Retard", "Retard excusé"], ["Absence non justifiée", "Absence non justifiée"], ["Retard non excusé", "Retard non excusé"]].forEach(function (o) { ty.appendChild(h("option", { value: o[0], t: o[1] })); });
