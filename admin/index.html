@@ -631,12 +631,14 @@ var IrisVoix = (function () {
   // Retards signalés par les agents (onglet « Mes retards » de l'espace agent) : lecture seule, les plus récents d'abord
   var RSG = { t: 0, liste: null, err: "" };
   function carteRetardsSignales() {
+    var lotCourant = null;
     var corps = h("div", {}), card = h("div", { c: "ed-card" }, [h("h3", { t: "Retards signalés par les agents" }), corps]);
     function ligneRetard(x) {
       var st = String(x.statut || ""), coul = st === "Justifié" ? ["#e3f5ea", "#13813e"] : (st === "Non justifié" ? ["#fdecec", "#b91c1c"] : ["#f3ecd6", "#8a6d1d"]);
       var libelle = st === "Signalé" ? "En attente de décision" : (x.auto ? "Clôturé automatiquement (sans décision)" : ("Retard " + st.charAt(0).toLowerCase() + st.slice(1)));
       var pastille = h("span", { t: libelle, style: "background:" + coul[0] + ";color:" + coul[1] + ";font-weight:700;font-size:13px;padding:6px 12px;border-radius:999px;white-space:nowrap" });
       var tete = h("div", { style: "display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap" }, [h("b", { t: String(x.nom || "") + " " + String(x.prenom || ""), style: "font-size:17px;overflow-wrap:anywhere" }), pastille]);
+      if (st === "Signalé" && lotCourant) tete.insertBefore(lotCourant.ajouter(x), tete.firstChild); tete.children[1].style.flex = "1 1 auto";
       var ligne = h("div", { style: "padding:16px 0;border-top:1px solid #eee7d6;display:flex;flex-direction:column;gap:6px" }, [
         tete,
         h("div", { t: String(x.jour || "") + " · prévu " + String(x.prevue || "") + " → arrivée " + String(x.arrivee || "") + " · " + (Number(x.min) || 0) + " min", style: "font-weight:600" }),
@@ -682,6 +684,9 @@ var IrisVoix = (function () {
       if (!RSG.liste) { corps.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); return; }
       var L = RSG.liste.filter(function (x) { return x && x.id; });
       if (!L.length) { corps.appendChild(h("p", { c: "ed-vide", t: "Aucun retard signalé." })); return; }
+      var attente = L.slice(0, 30).filter(function (x) { return x.statut === "Signalé"; });
+      lotCourant = attente.length > 1 ? lotUI("adminRetardDecider", [{ label: "Justifier la sélection", fabrique: function (x, com) { return { id: x.id, decision: "Justifié", commentaire: com }; } }, { label: "Mettre la sélection en non justifié", fabrique: function (x, com) { return { id: x.id, decision: "Non justifié", commentaire: com }; } }], function () { RSG.liste = null; RSG.t = 0; charger(); }) : null;
+      if (lotCourant) corps.appendChild(lotCourant.barre);
       try { L.slice(0, 30).forEach(function (x) { corps.appendChild(ligneRetard(x)); }); }
       catch (e) { RSG.liste = null; RSG.t = 0; corps.textContent = ""; corps.appendChild(h("p", { c: "ed-vide", t: "Retards signalés illisibles pour le moment. Rouvrez l’onglet." })); return; }
       if (L.length > 30) corps.appendChild(h("p", { c: "ed-vide", t: "Les 30 retards les plus récents sont affichés (" + L.length + " au total)." }));
@@ -896,7 +901,9 @@ var IrisVoix = (function () {
     }
     var c1 = h("div", { c: "ed-card" }, [h("h3", { t: att.length ? att.length + " demande(s) en attente" : "Demandes en attente" })]);
     if (!att.length) c1.appendChild(h("p", { c: "ed-vide", t: "Aucune demande en attente." }));
-    att.forEach(function (x) { c1.appendChild(ligne(x)); });
+    var lotC = att.length > 1 ? lotUI("adminConges", [{ label: "Autoriser la sélection", fabrique: function (x) { return { action: "statut", l: x.l, id: x.id, statut: "Autorisé" }; } }, { label: "Refuser la sélection", danger: true, fabrique: function (x, com) { return { action: "statut", l: x.l, id: x.id, statut: "Refusé", commentaire: com }; } }], function () { charger(); if (typeof maj === "function") maj(); }) : null;
+    if (lotC) c1.appendChild(lotC.barre);
+    att.forEach(function (x) { var e = ligne(x); if (lotC) e.insertBefore(lotC.ajouter(x), e.firstChild); c1.appendChild(e); });
     c.appendChild(c1);
     var sel = agentSelect(), ty = h("select"), d1 = h("input", { type: "date" }), d2 = h("input", { type: "date" }), age = h("input", { type: "text", maxlength: "80" }), info = h("p", { c: "ed-vide" }), site = champSiteCg("iris-sites-cg"), pr = champPrecisionCg();
     var mo = h("textarea", { placeholder: "Motif (obligatoire pour une absence) : écrivez ici, le texte passe à la ligne et vous pouvez remonter pour relire", rows: "4", maxlength: "1000", spellcheck: "true", lang: "fr", autocapitalize: "sentences" });
@@ -2678,6 +2685,73 @@ var IrisVoix = (function () {
     SG.notifications.forEach(function (x) { nc.appendChild(h("div", { c: "sg-l" }, [h("div", { c: "sg-h" }, [h("b", { t: x.sujet }), h("span", { c: "sg-m", t: x.date + " " + x.heure })]), h("div", { c: "sg-m", t: x.message }), h("div", { c: "sg-m", t: "État : " + x.statut })])); });
     c.appendChild(nc);
   }
+  // ---- Actions groupées (cases à cocher, une demande après l'autre, 25 au plus par lot) et recherche globale ----
+  function appelLot(nom, arg, cb) {
+    try { google.script.run.withSuccessHandler(function (r) { cb(r); }).withFailureHandler(function () { cb(null); })[nom](CLE, arg); } catch (e) { cb(null); }
+  }
+  function chaineLot(liste, nomFn, fabrique, fin) {
+    var i = 0, ok = 0, ko = [];
+    (function suite() {
+      if (i >= liste.length) { fin(ok, ko); return; }
+      var x = liste[i++]; msg("Traitement " + i + " sur " + liste.length + "…");
+      appelLot(nomFn, fabrique(x), function (r) { if (r && r.ok) ok++; else ko.push(x.nom + " " + x.prenom + " : " + ((r && r.msg) || "pas de réponse")); suite(); });
+    })();
+  }
+  function lotUI(nomFn, actions, apres) {
+    var cases = [], tout = h("input", { type: "checkbox" }), com = h("input", { type: "text", placeholder: "Commentaire commun (facultatif)", maxlength: "200", autocomplete: "off" }), compte = h("span", { c: "ed-vide", t: "0 sélectionné" });
+    var barre = h("div", { c: "ed-row" }), boutons = [];
+    function sel() { return cases.filter(function (z) { return z.cb.checked; }).map(function (z) { return z.x; }); }
+    function majCompte() { compte.textContent = sel().length + " sélectionné(s)"; }
+    tout.onchange = function () { cases.forEach(function (z) { z.cb.checked = tout.checked; }); majCompte(); };
+    barre.style.cssText = "align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid #eee7d6";
+    com.style.cssText = "flex:1 1 220px;min-width:0";
+    barre.appendChild(h("label", { style: "display:flex;gap:6px;align-items:center" }, [tout, h("span", { t: "Tout sélectionner" })])); barre.appendChild(compte); barre.appendChild(com);
+    actions.forEach(function (a) {
+      var b = sure(a.label, !!a.danger, function () {
+        var L = sel().slice(0, 25); if (!L.length) { msg("Cochez d’abord au moins une ligne.", true); return; }
+        boutons.forEach(function (z) { z.disabled = true; });
+        chaineLot(L, nomFn, function (x) { return a.fabrique(x, com.value); }, function (ok, ko) {
+          boutons.forEach(function (z) { z.disabled = false; });
+          msg(ok + " traité(s)" + (ko.length ? ", " + ko.length + " échec(s) : " + ko.slice(0, 3).join(" ; ") : "."), ko.length > 0);
+          apres();
+        });
+      });
+      boutons.push(b); barre.appendChild(b);
+    });
+    return { barre: barre, ajouter: function (x) { var cb = h("input", { type: "checkbox", "aria-label": "Sélectionner " + x.nom + " " + x.prenom }); cb.onchange = majCompte; cases.push({ cb: cb, x: x }); return cb; } };
+  }
+  var GS = { q: "" };
+  function normRech(s) { return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
+  function rechercheGlobale() {
+    var zone = h("div", { c: "ed-body" }), inp = h("input", { type: "search", placeholder: "Rechercher un agent, un nom, une date, un motif…", autocomplete: "off", "aria-label": "Recherche dans les données déjà chargées" }), res = h("div", {}), tm = null;
+    inp.value = GS.q; inp.style.cssText = "width:100%;box-sizing:border-box;font-size:16px;padding:12px 14px;border-radius:14px;border:1px solid #d9b15f"; zone.style.paddingBottom = "0";
+    function groupe(titre, items, onglet2) {
+      if (!items.length) return;
+      var g = h("div", {}); g.appendChild(h("h4", { t: titre + " (" + items.length + ")" })); g.lastChild.style.cssText = "margin:12px 0 4px;font-size:15px";
+      items.slice(0, 6).forEach(function (it) {
+        var l = h("div", { c: "sg-l" }, [h("b", { t: it.t }), h("div", { c: "sg-m", t: it.d })]); l.style.cursor = "pointer"; l.setAttribute("role", "button"); l.tabIndex = 0;
+        var aller = function () { if (it.go) it.go(); onglet = onglet2; dessiner(); }; l.onclick = aller; l.onkeydown = function (e) { if (e.key === "Enter") aller(); };
+        g.appendChild(l);
+      });
+      if (items.length > 6) g.appendChild(h("p", { c: "ed-vide", t: "+ " + (items.length - 6) + " autres : précisez la recherche." }));
+      res.appendChild(g);
+    }
+    function chercher() {
+      GS.q = inp.value; res.textContent = "";
+      var mots = normRech(inp.value).split(/\s+/).filter(Boolean); if (!mots.length) return;
+      function ok(txt) { var n = normRech(txt); return mots.every(function (m) { return n.indexOf(m) >= 0; }); }
+      var D = DATA || {};
+      groupe("Agents", (D.agents || []).filter(function (a) { return ok([a.nom, a.prenom, a.tel, a.service, a.secteur, a.email, a.badge].join(" ")); }).map(function (a) { return { t: a.nom + " " + a.prenom, d: [a.service, a.tel].filter(Boolean).join(" · "), go: function () { agFiltre = { nom: a.nom, prenom: a.prenom }; } }; }), "pt");
+      groupe("Demandes de congé et d’absence", (D.conges || []).filter(function (x) { return ok([x.nom, x.prenom, x.debut, x.fin, x.type, x.statut, x.motif, x.agence].join(" ")); }).map(function (x) { return { t: x.nom + " " + x.prenom + " — " + x.statut, d: x.debut + (x.fin !== x.debut ? " → " + x.fin : "") + " · " + x.type }; }), "cg");
+      groupe("Retards signalés", ((typeof RSG !== "undefined" && RSG.liste) || []).filter(function (x) { return ok([x.nom, x.prenom, x.jour, x.motif, x.statut, x.site].join(" ")); }).map(function (x) { return { t: x.nom + " " + x.prenom + " — " + x.statut, d: x.jour + " · " + x.motif }; }), "ab");
+      groupe("Signalements", ((SG && SG.signalements) || []).filter(function (x) { return ok([x.nom, x.prenom, x.type, x.motif, x.statut, x.ref, x.dateEv].join(" ")); }).map(function (x) { return { t: x.nom + " " + x.prenom + " — " + x.type, d: x.dateEv + " · " + x.statut }; }), "sg");
+      groupe("Pointages affichés", (D.pointages || []).filter(function (p) { return ok([p.nom, p.prenom, p.date, p.jour, p.arrivee, p.depart].join(" ")); }).map(function (p) { return { t: p.nom + " " + p.prenom, d: (p.date || p.jour || "") + " · " + (p.arrivee || "") + (p.depart ? " → " + p.depart : ""), go: function () { agFiltre = { nom: p.nom, prenom: p.prenom }; } }; }), "pt");
+      if (!res.childNodes.length) res.appendChild(h("p", { c: "ed-vide", t: "Aucun résultat dans les données chargées (agents, demandes, retards, signalements, pointages affichés)." }));
+    }
+    inp.oninput = function () { clearTimeout(tm); tm = setTimeout(chercher, 150); };
+    zone.appendChild(inp); zone.appendChild(res); if (GS.q) chercher();
+    return zone;
+  }
   function dessiner() {
     var y = ov.scrollTop; ov.textContent = "";
     var np = ((DATA && DATA.conges) || []).filter(function (x) { return x.statut === "En attente"; }).length;
@@ -2685,6 +2759,7 @@ var IrisVoix = (function () {
     var seg = h("div", { c: "ed-seg" }, [["pt", "Pointages", nbRegul()], ["ab", "Absences et retards", retardsAttente()], ["cg", "Congés", np], ["sg", "Signalements", nsg], ["qs", "Questions IRIS" + qsBadge(), Number(QS.aTraiter) || 0], ["cm", "Communications" + cmBadge(), (typeof CM !== "undefined" && CM && Number(CM.nonLus)) || 0], ["ag", "Agents", 0], ["ga", "Gestion administrative", gaNonLus()], ["pa", "Paramètres", 0]].map(function (o) { var b = h("button", { t: o[1], type: "button" }); if (o[2] > 0) b.appendChild(pastilleOnglet(o[2])); if (o[0] === onglet) b.className = "on"; b.onclick = function () { onglet = o[0]; dessiner(); }; return b; }));
     var x = h("button", { c: "ed-x", t: "Fermer", type: "button" }); x.onclick = fermer;
     ov.appendChild(h("div", { c: "ed-top" }, [h("h2", { t: "Corrections" }), seg, x]));
+    ov.appendChild(rechercheGlobale());
     var corps = h("div", { c: "ed-body" }); ov.appendChild(corps);
     if (!DATA) corps.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); else (onglet === "pt" ? panePt : onglet === "ab" ? paneAb : onglet === "cg" ? paneCg : onglet === "sg" ? paneSg : onglet === "pa" ? paneParam : onglet === "ga" ? paneGa : onglet === "qs" ? paneQs : onglet === "cm" ? paneCm : paneAg)(corps);
     ov.scrollTop = y;
