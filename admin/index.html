@@ -1297,6 +1297,28 @@ var IrisVoix = (function () {
     carte.appendChild(h("div", { c: "ed-row" }, [bAct, bOff]));
     c.appendChild(carte);
   }
+  // Scellés des pointages : empreinte quotidienne chaînée, vérifiable à tout moment (preuve que les pointages n'ont pas été retouchés en silence)
+  function paneScelles(c) {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Scellés des pointages (preuve d’intégrité)" })]), etat = h("p", { c: "ed-vide", t: "Chargement…" }), res = h("div", {});
+    carte.appendChild(h("p", { c: "ed-vide", t: "Chaque jour terminé, IRIS enregistre une empreinte de tous les pointages du jour, chaînée à celle de la veille. Si un pointage est modifié, ajouté ou supprimé après coup, ou si les scellés sont retouchés, la vérification le montre. Une correction faite par le responsable apparaît aussi : elle est notée dans le journal d’activité. Ce n’est pas une signature électronique." }));
+    carte.appendChild(etat);
+    function majEtat() { appel("adminScelles", { action: "etat" }, function (r) { etat.textContent = r && r.ok ? (r.total ? r.total + " jour(s) scellé(s), du " + r.premier + " au " + r.dernier + "." : "Aucun jour scellé pour le moment.") : "État indisponible."; }); }
+    majEtat();
+    var bs = h("button", { c: "ed-b ed-p", t: "Sceller maintenant les jours terminés", type: "button" }), bv = h("button", { c: "ed-b", t: "Vérifier l’intégrité", type: "button" });
+    bs.onclick = function () { bs.disabled = true; appel("adminScelles", { action: "sceller" }, function (r) { bs.disabled = false; msg((r && r.msg) || "Échec.", !(r && r.ok)); majEtat(); }); };
+    bv.onclick = function () {
+      bv.disabled = true; res.textContent = ""; res.appendChild(h("p", { c: "ed-vide", t: "Vérification…" }));
+      appel("adminScelles", { action: "verifier" }, function (r) {
+        bv.disabled = false; res.textContent = "";
+        if (!(r && r.ok)) { res.appendChild(h("p", { c: "ed-vide", t: (r && r.msg) || "Vérification impossible." })); return; }
+        if (!r.anomalies.length) { res.appendChild(h("p", { c: "ed-vide", t: "Intègre : " + r.total + " jour(s) scellé(s), aucun écart." })); return; }
+        res.appendChild(h("p", { c: "ed-vide", t: r.anomalies.length + " écart(s) détecté(s) sur " + r.total + " jour(s) scellé(s) :" }));
+        r.anomalies.slice(0, 40).forEach(function (a) { res.appendChild(h("div", { c: "sg-l" }, [h("b", { t: a.jour }), h("div", { c: "sg-m", t: a.msg })])); });
+      });
+    };
+    carte.appendChild(h("div", { c: "ed-row" }, [bs, bv])); carte.appendChild(res);
+    c.appendChild(carte);
+  }
   function paneParam(c) {
     paneMdpAgents(c);
     paneRapport(c);
@@ -1304,6 +1326,7 @@ var IrisVoix = (function () {
     paneCertificat(c);
     paneProfilPaie(c);
     paneConservation(c);
+    paneScelles(c);
     paneDeuxFacteurs(c);
     paneJournal(c);
     var an = h("input", { type: "password", autocomplete: "current-password", placeholder: "Ancien mot de passe" }), nv = h("input", { type: "password", autocomplete: "new-password", placeholder: "Nouveau mot de passe (10 caractères minimum, lettre + chiffre)" }), cf = h("input", { type: "password", autocomplete: "new-password", placeholder: "Confirmer le nouveau mot de passe" }), cd = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Code de sécurité (obligatoire)" });
