@@ -636,7 +636,26 @@ var IrisVoix = (function () {
       if (!RSG.liste) { corps.appendChild(h("p", { c: "ed-vide", t: "Chargement…" })); return; }
       if (!RSG.liste.length) { corps.appendChild(h("p", { c: "ed-vide", t: "Aucun retard signalé." })); return; }
       RSG.liste.slice(0, 30).forEach(function (x) {
-        corps.appendChild(h("div", { c: "ed-la" }, [h("b", { t: x.nom + " " + x.prenom }), h("span", { t: x.jour }), h("span", { t: "Prévu " + x.prevue + " · Arrivée " + x.arrivee + " · " + x.min + " min" }), h("span", { t: x.motif + (x.precision ? " — " + x.precision : ""), style: "white-space:pre-wrap" }), h("span", { t: (x.site ? x.site + " · " : "") + "signalé le " + x.depot })]));
+        var coul = x.statut === "Justifié" ? ["#e3f5ea", "#13813e"] : (x.statut === "Non justifié" ? ["#fdecec", "#b91c1c"] : ["#f3ecd6", "#8a6d1d"]);
+        var libelle = x.statut === "Signalé" ? "En attente de décision" : ("Retard " + x.statut.charAt(0).toLowerCase() + x.statut.slice(1) + (x.auto ? " automatiquement" : ""));
+        var pastille = h("span", { t: libelle, style: "background:" + coul[0] + ";color:" + coul[1] + ";font-weight:700;font-size:13px;padding:6px 12px;border-radius:999px;white-space:nowrap" });
+        var tete = h("div", { style: "display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap" }, [h("b", { t: x.nom + " " + x.prenom, style: "font-size:17px" }), pastille]);
+        var ligne = h("div", { style: "padding:16px 0;border-top:1px solid #eee7d6;display:flex;flex-direction:column;gap:6px" }, [
+          tete,
+          h("div", { t: x.jour + " · prévu " + x.prevue + " → arrivée " + x.arrivee + " · " + x.min + " min", style: "font-weight:600" }),
+          h("div", { t: x.motif + (x.precision ? " — " + x.precision : ""), style: "white-space:pre-wrap" }),
+          h("div", { t: (x.site ? x.site + " · " : "") + "signalé le " + x.depot + (x.decide && x.statut !== "Signalé" ? " · décision le " + x.decide : ""), c: "ed-vide" })]);
+        if (x.statut === "Signalé") ligne.appendChild(h("div", { t: "Sans décision de votre part sous 24 heures, ce retard sera justifié automatiquement.", c: "ed-vide" }));
+        else if (x.auto) ligne.appendChild(h("div", { t: "Aucune décision sous 24 heures : justifié automatiquement.", c: "ed-vide" }));
+        else if (x.commentaire) ligne.appendChild(h("div", { t: "Commentaire : " + x.commentaire, c: "ed-vide" }));
+        if (x.statut === "Signalé") {
+          var com = h("input", { type: "text", placeholder: "Commentaire (facultatif)", maxlength: "200", autocomplete: "off" }), bj = h("button", { c: "ed-b ed-p", t: "Justifier", type: "button" }), bn = h("button", { c: "ed-b", t: "Non justifié", type: "button" });
+          var decider = function (d) { bj.disabled = bn.disabled = true; appel("adminRetardDecider", { id: x.id, decision: d, commentaire: com.value }, function (r) { if (r && r.ok) { msg(r.msg); RSG.liste = null; RSG.t = 0; charger(); } else { bj.disabled = bn.disabled = false; msg((r && r.msg) || "Échec.", true); } }); };
+          bj.onclick = function () { decider("Justifié"); }; bn.onclick = function () { decider("Non justifié"); };
+          com.style.cssText = "flex:1 1 220px;min-width:0";
+          ligne.appendChild(h("div", { style: "display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px" }, [com, bj, bn]));
+        }
+        corps.appendChild(ligne);
       });
       if (RSG.liste.length > 30) corps.appendChild(h("p", { c: "ed-vide", t: "Les 30 retards les plus récents sont affichés (" + RSG.liste.length + " au total)." }));
     }
