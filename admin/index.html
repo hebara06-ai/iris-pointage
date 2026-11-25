@@ -1567,7 +1567,36 @@ var IrisVoix = (function () {
       lab("Nouveau code de sécurité (8 chiffres)", nv), lab("Confirmer le nouveau code", cf), lab("Numéro de portable", tel),
       h("div", { c: "ed-row", style: "margin-top:14px" }, [ok])]));
   }
+  // Planning de la semaine : jours et horaires de chaque agent, congés et absences justifiées (lecture seule)
+  function cartePlanning() {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Planning de la semaine" })]), corps = h("div", {}), titre = h("p", { c: "ed-vide" }), lundi = "";
+    function aller(delta) {
+      var d = null; if (lundi) { var p = lundi.split("/"); d = new Date(Number(p[2]), Number(p[1]) - 1, Number(p[0]) + delta * 7, 12); }
+      var arg = d ? ("0" + d.getDate()).slice(-2) + "/" + ("0" + (d.getMonth() + 1)).slice(-2) + "/" + d.getFullYear() : "";
+      corps.textContent = ""; corps.appendChild(h("p", { c: "ed-vide", t: "Chargement…" }));
+      appel("adminPlanning", { debut: arg }, function (r) {
+        corps.textContent = "";
+        if (!(r && r.ok)) { corps.appendChild(h("p", { c: "ed-vide", t: (r && r.msg) || "Planning indisponible." })); return; }
+        lundi = r.lundi; titre.textContent = "Semaine du " + r.lundi;
+        if (!r.agents.length) { corps.appendChild(h("p", { c: "ed-vide", t: "Aucun agent." })); return; }
+        r.agents.forEach(function (a) {
+          var jours = h("div", {}); jours.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;margin-top:6px";
+          a.jours.forEach(function (x) {
+            var fond = x.etat === "travail" ? ["#e3f5ea", "#13813e"] : x.etat === "repos" ? ["#eeeeee", "#6b7280"] : ["#f3ecd6", "#8a6d1d"];
+            var ch = h("span", { t: x.jour.slice(0, 3) + " " + x.date.slice(0, 2) + " · " + x.libelle }); ch.style.cssText = "background:" + fond[0] + ";color:" + fond[1] + ";font-size:13px;padding:4px 10px;border-radius:999px;white-space:nowrap"; jours.appendChild(ch);
+          });
+          corps.appendChild(h("div", { c: "sg-l" }, [h("b", { t: a.nom + " " + a.prenom + (a.service ? " — " + a.service : "") }), jours]));
+        });
+        corps.appendChild(h("p", { c: "ed-vide", t: "Les jours fériés ne sont pas gérés : ils apparaissent comme des jours de travail habituels." }));
+      });
+    }
+    var bp = h("button", { c: "ed-b", t: "◀ Semaine précédente", type: "button" }), bc = h("button", { c: "ed-b", t: "Cette semaine", type: "button" }), bs = h("button", { c: "ed-b", t: "Semaine suivante ▶", type: "button" });
+    bp.onclick = function () { aller(-1); }; bs.onclick = function () { aller(1); }; bc.onclick = function () { lundi = ""; aller(0); };
+    carte.appendChild(h("div", { c: "ed-row" }, [bp, bc, bs])); carte.appendChild(titre); carte.appendChild(corps); aller(0);
+    return carte;
+  }
   function paneAg(c) {
+    c.appendChild(cartePlanning());
     c.appendChild(carteAg({ nom: "", prenom: "", tel: "", jours: "" }, true));
     DATA.agents.forEach(function (a) { c.appendChild(carteAg(a, false)); });
     c.appendChild(h("p", { c: "ed-vide", t: "Modifier un nom met aussi à jour son historique de pointages et de justificatifs." }));
