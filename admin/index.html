@@ -642,7 +642,21 @@ var IrisVoix = (function () {
         h("div", { t: String(x.motif || "") + (x.precision ? " — " + x.precision : ""), style: "white-space:pre-wrap;overflow-wrap:anywhere" }),
         h("div", { t: (x.site ? x.site + " · " : "") + "signalé le " + String(x.depot || "") + (x.decide && st !== "Signalé" ? " · décision le " + x.decide : ""), c: "ed-vide" })]);
       if (st === "Signalé") ligne.appendChild(h("div", { t: "Sans décision de votre part sous 24 heures, ce retard sera clôturé automatiquement (excusé, sans décision de votre part).", c: "ed-vide" }));
-      else if (x.auto) ligne.appendChild(h("div", { t: "Aucune décision sous 24 heures : clôturé automatiquement (retard excusé, sans décision du responsable).", c: "ed-vide" }));
+      else if (x.auto) {
+        ligne.appendChild(h("div", { t: "Aucune décision sous 24 heures : clôturé automatiquement (retard excusé, sans décision du responsable).", c: "ed-vide" }));
+        if (st === "Justifié") {
+          var comR = h("input", { type: "text", placeholder: "Commentaire (facultatif)", maxlength: "200", autocomplete: "off" }); comR.style.cssText = "flex:1 1 220px;min-width:0";
+          var brev = sure("Repasser en non justifié", true, function () {
+            if (brev.disabled) return; brev.disabled = true;
+            var garde = setTimeout(function () { brev.disabled = false; msg("Pas de réponse du serveur : réessayez.", true); }, 30000);
+            try {
+              google.script.run.withSuccessHandler(function (r) { clearTimeout(garde); brev.disabled = false; if (r && r.ok) { msg(r.msg); RSG.liste = null; RSG.t = 0; charger(); } else msg((r && r.msg) || "Échec.", true); })
+                .withFailureHandler(function () { clearTimeout(garde); brev.disabled = false; msg("Connexion impossible, réessayez.", true); }).adminRetardDecider(CLE, { id: x.id, decision: "Non justifié", commentaire: comR.value });
+            } catch (e) { clearTimeout(garde); brev.disabled = false; msg("Connexion impossible, réessayez.", true); }
+          });
+          ligne.appendChild(h("div", { style: "display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px" }, [comR, brev]));
+        }
+      }
       else if (x.commentaire) ligne.appendChild(h("div", { t: "Commentaire : " + x.commentaire, c: "ed-vide" }));
       if (st === "Signalé") {
         var com = h("input", { type: "text", placeholder: "Commentaire (facultatif)", maxlength: "200", autocomplete: "off" }), bj = h("button", { c: "ed-b ed-p", t: "Justifier", type: "button" }), bn = h("button", { c: "ed-b", t: "Non justifié", type: "button" });
