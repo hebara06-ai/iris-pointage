@@ -1176,7 +1176,7 @@ var IrisVoix = (function () {
     c.appendChild(so); c.appendChild(tout);
   }
   function carteAg(a, neuf) {
-    if (!document.getElementById("ed-g6css")) { var stg = document.createElement("style"); stg.id = "ed-g6css"; stg.textContent = ".ed-g6{grid-template-columns:repeat(5,minmax(0,1fr))}.ed-g6 .ed-hor input{padding:11px 6px;font-size:15px;min-width:0;width:100%}@media(max-width:900px){.ed-g6{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}}"; document.head.appendChild(stg); }
+    if (!document.getElementById("ed-g6css")) { var stg = document.createElement("style"); stg.id = "ed-g6css"; stg.textContent = ".ed-g6{grid-template-columns:repeat(5,minmax(0,1fr))}.ed-g6 .ed-hor{display:grid;grid-template-columns:1fr 1fr;gap:8px}.ed-g6 .ed-hor .ed-lab{text-align:center}.ed-g6 .ed-hor input{padding:11px 6px;font-size:15px;min-width:0;width:100%;text-align:center}@media(max-width:900px){.ed-g6{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}}"; document.head.appendChild(stg); }
     var f = {}, g = h("div", { c: "ed-g ed-g6" }), cb = [], low = String(a.jours || "").toLowerCase(), ch = h("div", { c: "ed-ch" });
     function champ(k, l, typ, v) { var i = h("input", { type: typ || "text" }); i.value = v || ""; f[k] = i; g.appendChild(lab(l, i)); }
     champ("nom", "Nom", "text", a.nom); champ("prenom", "Prénom", "text", a.prenom); champ("tel", "Téléphone", "tel", a.tel); champ("email", "Adresse e-mail (facultatif)", "email", a.email);
@@ -1184,7 +1184,7 @@ var IrisVoix = (function () {
     var ssOk = !!SSM[a.l], cs = h("input", { type: "text", maxlength: "21", inputmode: "numeric", autocomplete: "off", placeholder: neuf ? "Après ajout" : (ssOk ? "Enregistré (masqué)" : "À remplir") }); cs.disabled = !!neuf; g.appendChild(lab("Sécurité sociale", cs));
     champ("codeServeur", "Matricule", "text", a.secteur || ""); f.codeServeur.autocomplete = "off"; f.codeServeur.setAttribute("inputmode", "numeric"); f.codeServeur.placeholder = "Non renseigné"; champ("badge", "N° de badge", "text", a.badge); champ("carte", "N° d’accès", "text", a.carte);
     var idb = h("input", { type: "time", "aria-label": "Heure de début" }), ifn = h("input", { type: "time", "aria-label": "Heure de fin" }); idb.value = hm(a.debut) || ""; ifn.value = hm(a.fin) || ""; f.debut = idb; f.fin = ifn;
-    var hor = h("div", { c: "ed-hor" }, [idb, h("span", { t: "–" }), ifn]); hor.style.cssText = "display:flex;align-items:center;gap:6px"; hor.firstChild.style.flex = hor.lastChild.style.flex = "1"; var cellH = lab("Début – Fin", hor); cellH.className += " ed-hors"; g.appendChild(cellH);
+    var cellH = h("div", { c: "ed-hor" }, [lab("Début", idb), lab("Fin", ifn)]); g.appendChild(cellH);
     NJ.forEach(function (n, i) { var x = h("input", { type: "checkbox" }); x.checked = a.jours ? low.indexOf(n.toLowerCase()) >= 0 : i < 5; cb.push(x); ch.appendChild(h("label", { c: "ed-cj" }, [x, h("span", { t: n })])); });
     function vals() { return { nom: f.nom.value, prenom: f.prenom.value, tel: f.tel.value, email: f.email.value, codeServeur: f.codeServeur.value, service: f.service.value, badge: f.badge.value, carte: f.carte.value, debut: f.debut.value, fin: f.fin.value, jours: NJ.filter(function (n, i) { return cb[i].checked; }).join(" ") }; }
     function avec(o) { var v = vals(); for (var k in o) v[k] = o[k]; return v; }
