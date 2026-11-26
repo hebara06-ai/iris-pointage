@@ -1241,26 +1241,25 @@ var IrisVoix = (function () {
     appel(nom, o, function (r) { if (r && r.ok) { msg(r.msg || "Enregistré"); apres(r); } else { msg((r && r.msg) || "Échec.", true); if (r && r.rafraichir) apres(r); } });
   }
   function ligneMdp(x, rendu) {
-    var av = [x.nom, x.prenom], tete = [h("b", { t: x.nom + " " + x.prenom })];
-    tete.push(h("span", { c: "ed-tag", t: x.appareil ? "Téléphone associé" : "Aucun téléphone associé" }));
-    var tg = h("span", { c: "ed-tag", t: x.code ? "Mot de passe défini" : "Sans mot de passe (ancien contrôle)" }); if (!x.code) tg.style.cssText = "background:#fdecdc;color:#b4540a"; tete.push(tg);
-    var infos = h("p", { c: "ed-vide", t: "Téléphone : " + (x.tel || "—") + "  ·  E-mail : " + (x.email || "—") + (x.email ? (x.emailOk ? " (vérifié)" : " (non vérifié)") : "") + "  ·  Matricule : " + (x.matricule || "—") + "  ·  N° de badge : " + (x.badge || "—") + "  ·  N° d’accès : " + (x.carte || "—") });
-    var ci = h("input", { type: "text", maxlength: "6", inputmode: "numeric", autocomplete: "off", placeholder: "6 chiffres" }); ci.value = x.code || ""; ci.style.cssText = "font-size:20px;letter-spacing:.2em;width:9em;text-align:center";
-    var bv = h("button", { c: "ed-b ed-p", t: "Valider ce mot de passe", type: "button" });
+    var av = [x.nom, x.prenom], g = h("div", { c: "ed-g" });
+    function fixe(l, v) { var i = h("input", { type: "text" }); i.value = v || ""; i.readOnly = true; i.tabIndex = -1; i.placeholder = "Non renseigné"; i.style.background = "#f8f4e9"; g.appendChild(lab(l, i)); return i; }
+    fixe("Nom", x.nom); fixe("Prénom", x.prenom); fixe("Téléphone", x.tel); fixe("Adresse e-mail", x.email);
+    var cs = h("input", { type: "text", maxlength: "21", inputmode: "numeric", autocomplete: "off", placeholder: x.ssSet ? "Enregistré (masqué)" : "À remplir" }); g.appendChild(lab("Sécurité sociale", cs));
+    fixe("Matricule", x.matricule); fixe("N° de badge", x.badge); fixe("N° d’accès", x.carte);
+    var ci = h("input", { type: "text", maxlength: "6", inputmode: "numeric", autocomplete: "off", placeholder: "6 chiffres" }); ci.value = x.code || ""; ci.style.cssText = "letter-spacing:.2em;font-weight:700"; g.appendChild(lab("Mot de passe de l’agent", ci));
+    var tg = x.code ? null : h("span", { c: "ed-tag", t: "Sans mot de passe (ancien contrôle)" }); if (tg) tg.style.cssText = "background:#fdecdc;color:#b4540a";
+    var tete = h("div", { c: "ed-ah" }, [h("b", { t: x.nom + " " + x.prenom }), h("span", { c: "ed-tag", t: x.appareil ? "Téléphone associé" : "Aucun téléphone associé" }), x.email ? h("span", { c: "ed-tag", t: x.emailOk ? "E-mail vérifié" : "E-mail non vérifié" }) : null, tg]);
+    var bv = h("button", { c: "ed-b ed-p", t: "Valider le mot de passe", type: "button" });
     bv.onclick = function () { var c6 = ci.value.replace(/\D/g, ""); if (c6.length !== 6) { msg("Le mot de passe doit faire exactement 6 chiffres.", true); ci.focus(); return; } mdpAppel("adminCodes", { action: "definir", l: x.l, av: av, code: c6 }, rendu); };
     var bars = [bv, sure(x.code ? "Régénérer" : "Générer un code", false, function () { mdpAppel("adminCodes", { action: "generer", l: x.l, av: av }, rendu); })];
     if (x.code && x.emailOk) bars.push(sure("Envoyer à l’agent par e-mail", false, function () { mdpAppel("adminCodes", { action: "envoyer", l: x.l, av: av }, rendu); }));
-    if (x.code) bars.push(sure("Retirer", true, function () { mdpAppel("adminCodes", { action: "retirer", l: x.l, av: av }, rendu); }));
-    var cs = h("input", { type: "text", maxlength: "21", inputmode: "numeric", autocomplete: "off", placeholder: "N° de sécurité sociale (15 caractères)" }); cs.style.display = "none"; cs.style.cssText = "display:none;width:17em";
-    var vue = h("span", { c: "ed-vide", t: x.ssSet ? "N° de sécurité sociale : enregistré (masqué)" : "N° de sécurité sociale : non renseigné" });
-    var bs = [], bo = h("button", { c: "ed-b", t: "Afficher", type: "button" }), bm = h("button", { c: "ed-b", t: x.ssSet ? "Modifier" : "Saisir", type: "button" }), be = h("button", { c: "ed-b ed-p", t: "Enregistrer", type: "button" });
-    be.style.display = "none"; if (!x.ssSet) bo.style.display = "none";
-    var visible = false;
+    if (x.code) bars.push(sure("Retirer le mot de passe", true, function () { mdpAppel("adminCodes", { action: "retirer", l: x.l, av: av }, rendu); }));
+    var visible = false, bo = h("button", { c: "ed-b", t: "Afficher la sécurité sociale", type: "button" }), be = h("button", { c: "ed-b", t: "Enregistrer la sécurité sociale", type: "button" });
+    if (!x.ssSet) bo.style.display = "none";
     bo.onclick = function () {
-      if (visible) { visible = false; vue.textContent = "N° de sécurité sociale : enregistré (masqué)"; bo.textContent = "Afficher"; return; }
-      appel("adminSecu", { action: "voir", l: x.l, av: av }, function (r) { if (r && r.ok) { visible = true; vue.textContent = "N° de sécurité sociale : " + r.valeur; bo.textContent = "Masquer"; } else msg((r && r.msg) || "Échec.", true); });
+      if (visible) { visible = false; cs.value = ""; bo.textContent = "Afficher la sécurité sociale"; return; }
+      appel("adminSecu", { action: "voir", l: x.l, av: av }, function (r) { if (r && r.ok) { visible = true; cs.value = r.valeur; bo.textContent = "Masquer la sécurité sociale"; } else msg((r && r.msg) || "Échec.", true); });
     };
-    bm.onclick = function () { cs.style.display = "inline-block"; be.style.display = ""; cs.focus(); };
     function enreg(force) {
       appel("adminSecu", { action: "definir", l: x.l, av: av, valeur: cs.value, force: force }, function (r) {
         if (r && r.ok) { msg(r.msg); cs.value = ""; rendu(); }
@@ -1268,10 +1267,9 @@ var IrisVoix = (function () {
         else msg((r && r.msg) || "Échec.", true);
       });
     }
-    be.onclick = function () { if (!cs.value.trim()) { msg("Saisissez le numéro.", true); return; } enreg(false); };
-    var ligneSS = [vue, bo, bm, cs, be];
-    if (x.ssSet) ligneSS.push(sure("Effacer", true, function () { mdpAppel("adminSecu", { action: "effacer", l: x.l, av: av }, rendu); }));
-    return h("div", { c: "ed-l" }, tete.concat([infos, h("div", { c: "ed-row" }, [lab("Mot de passe de l’agent", ci)].concat(bars)), h("div", { c: "ed-row" }, ligneSS)]));
+    be.onclick = function () { if (!cs.value.trim()) { msg("Saisissez le numéro de sécurité sociale.", true); cs.focus(); return; } enreg(false); };
+    var ligneSS = [be, bo]; if (x.ssSet) ligneSS.push(sure("Effacer la sécurité sociale", true, function () { mdpAppel("adminSecu", { action: "effacer", l: x.l, av: av }, rendu); }));
+    return h("div", { c: "ed-card" }, [tete, g, h("div", { c: "ed-row" }, bars), h("div", { c: "ed-row" }, ligneSS), h("p", { c: "ed-vide", t: "Nom, prénom, téléphone, e-mail, matricule, badge et n° d’accès se modifient dans l’onglet Agents." })]);
   }
   function paneMdpAgents(c) {
     var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Mots de passe des agents" })]), corps = h("div", {}, [h("p", { c: "ed-vide", t: "Chargement…" })]);
