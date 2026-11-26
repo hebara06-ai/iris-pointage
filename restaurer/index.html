@@ -74,5 +74,10 @@ button:disabled{opacity:.55;cursor:default}
   };
 })();
 </script>
+<script>/* Bouton Afficher / Masquer sous chaque champ de mot de passe */
+(function(){function aj(i){if(i.__oeil||i.type!=='password')return;i.__oeil=1;var b=document.createElement('button');b.type='button';b.textContent='Afficher';b.setAttribute('aria-label','Afficher ou masquer ce que vous avez saisi');b.style.cssText='display:block;margin:4px 0 0;padding:2px 4px;background:none;border:0;color:inherit;font:inherit;font-size:13px;text-decoration:underline;cursor:pointer;opacity:.85';b.onclick=function(e){e.preventDefault();e.stopPropagation();var v=i.type==='password';i.type=v?'text':'password';b.textContent=v?'Masquer':'Afficher'};i.insertAdjacentElement('afterend',b)}
+function tout(){document.querySelectorAll('input[type=password]').forEach(aj)}
+tout();new MutationObserver(tout).observe(document.documentElement,{childList:true,subtree:true})})();
+</script>
 </body>
 </html>

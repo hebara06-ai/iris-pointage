@@ -3526,4 +3526,9 @@ if(DERN)window.tbDraw(DERN);else maj2();
   // appareil sans lien mémorisé : le panneau « nouvel appareil » est proposé directement
   try { if (!localStorage.getItem("iris_admin")) setTimeout(ouvrirPanneau, 400); } catch (e) { }
 })();
-</script><script>(function(){if((location.search||"").indexOf("solo=1")<0)return;var st=document.createElement("style");st.textContent="#ed .ed-top{display:none!important}";document.head.appendChild(st);var fait=false,t=setInterval(function(){var vk=document.getElementById("vk"),b=document.getElementById("btned");if(!vk||!b){return}if(vk.style.display==="none"&&!fait){fait=true;clearInterval(t);b.click()}},300)})();</script></body></html>
+</script><script>(function(){if((location.search||"").indexOf("solo=1")<0)return;var st=document.createElement("style");st.textContent="#ed .ed-top{display:none!important}";document.head.appendChild(st);var fait=false,t=setInterval(function(){var vk=document.getElementById("vk"),b=document.getElementById("btned");if(!vk||!b){return}if(vk.style.display==="none"&&!fait){fait=true;clearInterval(t);b.click()}},300)})();</script><script>/* Bouton Afficher / Masquer sous chaque champ de mot de passe */
+(function(){function aj(i){if(i.__oeil||i.type!=='password')return;i.__oeil=1;var b=document.createElement('button');b.type='button';b.textContent='Afficher';b.setAttribute('aria-label','Afficher ou masquer ce que vous avez saisi');b.style.cssText='display:block;margin:4px 0 0;padding:2px 4px;background:none;border:0;color:inherit;font:inherit;font-size:13px;text-decoration:underline;cursor:pointer;opacity:.85';b.onclick=function(e){e.preventDefault();e.stopPropagation();var v=i.type==='password';i.type=v?'text':'password';b.textContent=v?'Masquer':'Afficher'};i.insertAdjacentElement('afterend',b)}
+function tout(){document.querySelectorAll('input[type=password]').forEach(aj)}
+tout();new MutationObserver(tout).observe(document.documentElement,{childList:true,subtree:true})})();
+</script>
+</body></html>
