@@ -1381,6 +1381,14 @@ var IrisVoix = (function () {
     bascule.onclick = function () { ouvertJ = !ouvertJ; corpsJ.style.display = ouvertJ ? "" : "none"; bascule.textContent = ouvertJ ? "Masquer" : "Afficher"; if (ouvertJ && !charge0) { charge0 = true; charge(); } };
   }
   // Profil Paie : vue réduite (export seul) pour la personne qui prépare les paies
+  // IRIS Guardian — page dédiée, ouverte depuis le menu principal ; accès = connexion administrateur (même mot de passe que le tableau de bord)
+  window.ouvrirGuardian = function () {
+    ov.className = "on"; document.body.style.overflow = "hidden"; ov.textContent = "";
+    var w = h("div", {}); w.style.cssText = "max-width:560px;margin:0 auto;padding:20px 14px 44px";
+    var ret = h("button", { c: "ed-b", t: "← Retour au menu", type: "button" }); ret.onclick = function () { location.href = "../menu/"; };
+    var hr = h("div", { c: "ed-row" }, [ret]); hr.style.marginBottom = "12px"; w.appendChild(hr);
+    paneGuardian(w); ov.appendChild(w);
+  };
   window.ouvrirPaie = function () {
     window.__paie = true; ov.className = "on"; document.body.style.overflow = "hidden"; ov.textContent = "";
     var w = h("div", {}); w.style.cssText = "max-width:720px;margin:0 auto;padding:28px 16px 40px;text-align:center";
@@ -1781,94 +1789,147 @@ var IrisVoix = (function () {
     paneJournal(c);
   }
   // IRIS Guardian — module isolé, MODE LABORATOIRE (essais à domicile, participants informés et consentants).
-  // États affichés = états RÉELS rapportés par l'appareil jumelé ; rien n'est simulé ; aucun enregistrement.
+  // États affichés = états RÉELS rapportés par l'appareil jumelé ; chaque fonction a son interrupteur (sauf le voyant de captation, toujours actif).
   function paneGuardian(c) {
     var OR = "#D4B77E", VERT = "#63D9A0", BLANC = "#E1E7F0", GRIS = "#A3AFBF", SEP = "#35445A";
     var carte = h("div", { c: "ed-card" });
     carte.style.cssText = "background:#131D2E;color:" + BLANC + ";border:1px solid " + SEP + ";padding:24px;border-radius:26px";
-    var ET = null, pc = null, micStream = null, micTrack = null, vue = false, sondeur = null, repTimer = null, journalOuvert = false;
+    var ET = null, pc = null, micStream = null, micTrack = null, vue = false, sondeur = null, repTimer = null, journalOuvert = false, rec = null, recMorceaux = [];
     function el(tag, st, txt) { var e = h(tag, txt ? { t: txt } : {}); if (st) e.style.cssText = st; return e; }
     function svg(vb, w, trait, inner) { var s = document.createElementNS("http://www.w3.org/2000/svg", "svg"); s.setAttribute("viewBox", vb); s.setAttribute("width", w); s.setAttribute("height", w); s.setAttribute("fill", "none"); s.setAttribute("stroke", OR); s.setAttribute("stroke-width", trait); s.setAttribute("stroke-linecap", "round"); s.setAttribute("stroke-linejoin", "round"); s.innerHTML = inner; return s; }
     // ---- en-tête (reproduction de la capture) ----
     var tete = el("div", "display:flex;align-items:flex-start;justify-content:space-between;gap:12px");
     var tt = el("div"); tt.appendChild(el("div", "font-size:26px;font-weight:800;letter-spacing:.015em;color:" + OR + ";line-height:1.1", "IRIS GUARDIAN"));
-    tt.appendChild(el("div", "margin-top:10px;font-size:14px;font-weight:600;letter-spacing:.07em;color:" + GRIS, "MODE LABORATOIRE — APERÇU"));
-    var sous = tt.lastChild; tete.appendChild(tt); tete.appendChild(svg("0 0 24 24", "34", "1.8", '<path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/>')); carte.appendChild(tete);
+    tt.appendChild(el("div", "margin-top:10px;font-size:14px;font-weight:600;letter-spacing:.07em;color:" + GRIS + ";line-height:1.45", "MODE LABORATOIRE — DÉTECTION MULTISENSORIELLE"));
+    tete.appendChild(tt); tete.appendChild(svg("0 0 24 24", "34", "1.8", '<path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/>')); carte.appendChild(tete);
     carte.appendChild(el("div", "height:1px;background:" + SEP + ";margin:22px 0"));
     // ---- encadré vidéo central ----
     var cadre = el("div", "background:#0A111D;border-radius:24px;height:200px;margin-bottom:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;position:relative;overflow:hidden");
     var video = document.createElement("video"); video.setAttribute("playsinline", ""); video.muted = true; video.autoplay = true; video.style.cssText = "display:none;width:100%;height:100%;object-fit:contain;background:#000";
     var audio = document.createElement("audio"); audio.autoplay = true;
+    var pastille = el("div", "display:none;position:absolute;top:10px;left:12px;background:#3a0f14;color:#ffd7da;border:1px solid #ff4d5a;border-radius:10px;padding:4px 10px;font-size:12px;font-weight:800", "● ENREGISTREMENT");
     var veille = el("div"); veille.appendChild(svg("0 0 24 24", "46", "1.6", '<rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="M16 10l5-3v10l-5-3z"/>'));
     var v1 = el("div", "font-size:24px;font-weight:800;color:#fff;margin-top:14px", "Caméra en veille"), v2 = el("div", "font-size:15px;color:" + GRIS + ";margin-top:6px", "En attente de détection");
-    veille.appendChild(v1); veille.appendChild(v2); cadre.appendChild(video); cadre.appendChild(veille); carte.appendChild(cadre);
-    // ---- lignes d'état ----
-    var lignes = {}; var ordre = ["Connexion à distance", "Détection de mouvement", "Activation automatique", "Microphone", "Transmission audio", "Vision nocturne", "Indicateur de captation", "Enregistrement"];
-    ordre.forEach(function (n) { var r = el("div", "display:flex;justify-content:space-between;align-items:center;min-height:36px;font-size:17px"); r.appendChild(el("span", "", n)); var v = el("span", "font-weight:600;color:" + GRIS, "…"); r.appendChild(v); lignes[n] = v; carte.appendChild(r); });
+    veille.appendChild(v1); veille.appendChild(v2); cadre.appendChild(video); cadre.appendChild(pastille); cadre.appendChild(veille); carte.appendChild(cadre);
+    // ---- lignes d'état (ordre de la capture de référence) + interrupteur de chaque fonction ----
+    function api(arg, cb) { appel("adminGuardian", arg, function (r) { cb(r || { ok: false, msg: "Réponse vide." }); }); }
+    var msgG = el("div", "min-height:20px;font-size:14px;color:" + OR + ";margin:6px 0"); msgG.setAttribute("role", "status");
+    var lignes = {}, inter = {};
+    // [intitulé, type de réglage, nom] : mode = détection, fonction = fonction, auto = activation automatique ; null = non pilotable
+    var DEF = [["Connexion à distance", "fonction", "remote"], ["Détection de mouvement", "mode", "mvt"], ["Détection sonore", "mode", "son"], ["Détection de vibrations", "mode", "vib"], ["Détection multisensorielle", "fonction", "multi"], ["Distance cible", null, ""], ["Activation automatique", "auto", ""], ["Microphone", "fonction", "micro"], ["Transmission audio", "fonction", "audio"], ["Vision nocturne", "fonction", "nuit"], ["Indicateur de captation", null, ""], ["Enregistrement", "fonction", "rec"]];
+    function valeurConfig(d) { if (!ET) return false; return d[1] === "mode" ? !!(ET.modes && ET.modes[d[2]]) : d[1] === "fonction" ? !!(ET.f && ET.f[d[2]]) : d[1] === "auto" ? !!ET.auto : false; }
+    function basculer(d) {
+      if (!ET || !ET.labo) { msgG.textContent = "Activez d’abord le mode laboratoire."; return; }
+      var nv = !valeurConfig(d), arg = d[1] === "mode" ? { action: "commande", cmd: "mode", mode: d[2], valeur: nv } : d[1] === "fonction" ? { action: "commande", cmd: "fonction", mode: d[2], valeur: nv } : { action: "commande", cmd: "auto", valeur: nv };
+      if (d[2] === "rec" && nv && !window.confirm("Activer l’enregistrement ? Le fichier sera créé sur CET ordinateur pendant les vues en direct ; un message rouge l’indiquera sur le téléphone d’essai. Les participants doivent en être informés et d’accord.")) return;
+      api(arg, function (r) { msgG.textContent = r.ok ? "" : (r.msg || "Échec."); sonde(); });
+    }
+    DEF.forEach(function (d) {
+      var r = el("div", "display:flex;justify-content:space-between;align-items:center;min-height:38px;font-size:17px;gap:10px"); r.appendChild(el("span", "", d[0]));
+      var droite = el("div", "display:flex;align-items:center;gap:12px"), v = el("span", "font-weight:600;color:" + GRIS, "…"); droite.appendChild(v);
+      if (d[1]) { var sw = h("button", { type: "button", role: "switch", "aria-label": d[0] }); sw.style.cssText = "position:relative;width:46px;height:26px;border-radius:13px;border:1px solid " + SEP + ";background:#1d2a42;cursor:pointer;padding:0;margin:0;flex:0 0 auto;transition:background .15s"; var bou = el("span", "position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:" + GRIS + ";transition:left .15s,background .15s"); sw.appendChild(bou); sw.onclick = function () { basculer(d); }; droite.appendChild(sw); inter[d[0]] = { sw: sw, bou: bou, d: d }; }
+      else if (d[0] === "Indicateur de captation") droite.appendChild(el("span", "font-size:13px;color:" + GRIS, "🔒 toujours actif"));
+      r.appendChild(droite); lignes[d[0]] = v; carte.appendChild(r);
+    });
     function etat(n, txt, ton) { var v = lignes[n]; v.textContent = txt; v.style.color = ton === "v" ? VERT : ton === "o" ? OR : GRIS; }
-    carte.appendChild(el("div", "height:1px;background:" + SEP + ";margin:22px 0 18px"));
+    carte.appendChild(el("div", "height:1px;background:" + SEP + ";margin:18px 0 12px"));
+    var dernier = el("div", "font-size:15px;line-height:1.5;margin-bottom:6px"), capt = el("div", "font-size:15px;line-height:1.5");
+    carte.appendChild(dernier); carte.appendChild(capt);
+    carte.appendChild(el("div", "height:1px;background:" + SEP + ";margin:18px 0 18px"));
     // ---- commandes ----
     var zone = el("div"); carte.appendChild(zone);
-    var msgG = el("div", "min-height:20px;font-size:14px;color:" + OR + ";margin:6px 0"); msgG.setAttribute("role", "status");
     function btn(txt, fn, style) { var b = h("button", { type: "button", t: txt }); b.style.cssText = "font:inherit;font-weight:700;border-radius:14px;padding:13px 14px;border:1px solid " + SEP + ";background:#1d2a42;color:" + BLANC + ";cursor:pointer;margin:0 8px 8px 0;" + (style || ""); b.onclick = function () { fn(b); }; return b; }
-    function api(arg, cb) { appel("adminGuardian", arg, function (r) { cb(r || { ok: false, msg: "Réponse vide." }); }); }
-    var code = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Votre code de sécurité", maxlength: "21" }); code.style.cssText = "width:100%;max-width:340px;font:inherit;padding:12px 14px;border-radius:12px;border:1px solid " + SEP + ";background:#0A111D;color:" + BLANC + ";margin:4px 0 10px";
-    var bLabo = btn("", function (b) { if (!code.value) { msgG.textContent = "Saisissez votre code de sécurité."; return; } b.disabled = true; api({ action: "laboratoire", actif: !ET.labo, code: code.value }, function (r) { b.disabled = false; code.value = ""; if (!r.ok) msgG.textContent = r.msg || "Échec."; else { if (!r.labo) arreterVue(); msgG.textContent = r.labo ? "Mode laboratoire activé." : "Mode laboratoire désactivé."; sonde(); } }); }, "background:" + OR + ";color:#131D2E;border-color:" + OR);
-    var bJum = btn("Jumeler un appareil", function (b) { if (!code.value) { msgG.textContent = "Saisissez votre code de sécurité."; return; } b.disabled = true; api({ action: "jumeler", code: code.value }, function (r) { b.disabled = false; code.value = ""; if (!r.ok) msgG.textContent = r.msg || "Échec."; else { msgG.textContent = "Sur le téléphone d’essai, ouvrez la page « …/iris-pointage/guardian/ » et saisissez ce code (valable " + r.minutes + " min) : " + r.code.replace(/(\d{4})(\d{4})/, "$1 $2"); } }); });
-    var bOubli = btn("Oublier l’appareil", function (b) { if (!code.value) { msgG.textContent = "Saisissez votre code de sécurité."; return; } b.disabled = true; api({ action: "oublier", code: code.value }, function (r) { b.disabled = false; code.value = ""; arreterVue(); msgG.textContent = r.ok ? "Appareil oublié." : (r.msg || "Échec."); sonde(); }); });
+    var code = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Code Guardian", maxlength: "12" }); code.style.cssText = "width:100%;max-width:340px;font:inherit;padding:12px 14px;border-radius:12px;border:1px solid " + SEP + ";background:#0A111D;color:" + BLANC + ";margin:4px 0 10px";
+    function exigeCode(b, action, extra, apres) { if (!code.value) { msgG.textContent = "Saisissez le code Guardian."; return; } b.disabled = true; var o = { action: action, code: code.value }; for (var k in extra) o[k] = extra[k]; api(o, function (r) { b.disabled = false; code.value = ""; apres(r); }); }
+    var bLabo = btn("", function (b) { exigeCode(b, "laboratoire", { actif: !(ET && ET.labo) }, function (r) { if (!r.ok) msgG.textContent = r.msg || "Échec."; else { if (!r.labo) arreterVue(); msgG.textContent = r.labo ? "Mode laboratoire activé." : "Mode laboratoire désactivé."; sonde(); } }); }, "background:" + OR + ";color:#131D2E;border-color:" + OR);
+    var bJum = btn("Jumeler un appareil", function (b) { exigeCode(b, "jumeler", {}, function (r) { if (!r.ok) msgG.textContent = r.msg || "Échec."; else msgG.textContent = "Sur le téléphone d’essai, ouvrez « …/iris-pointage/guardian/ » et saisissez ce code (valable " + r.minutes + " min) : " + r.code.replace(/(\d{4})(\d{4})/, "$1 $2"); }); });
+    var bOubli = btn("Oublier l’appareil", function (b) { exigeCode(b, "oublier", {}, function (r) { arreterVue(); msgG.textContent = r.ok ? "Appareil oublié." : (r.msg || "Échec."); sonde(); }); });
+    var bTout = btn("Tout activer", function () { if (!window.confirm("Tout activer, y compris l’enregistrement (fichier sur cet ordinateur pendant les vues) ?")) return; api({ action: "commande", cmd: "tout", valeur: true }, function (r) { msgG.textContent = r.ok ? "Tout est activé." : (r.msg || "Échec."); sonde(); }); });
+    var bRien = btn("Tout désactiver", function () { api({ action: "commande", cmd: "tout", valeur: false }, function (r) { if (r.ok) arreterVue(true); msgG.textContent = r.ok ? "Tout est désactivé." : (r.msg || "Échec."); sonde(); }); });
     var bVue = btn("Voir en direct", function () { if (vue) arreterVue(true); else demarrerVue(); });
     var bArret = btn("ARRÊT IMMÉDIAT À DISTANCE", function () { arreterVue(); api({ action: "commande", cmd: "arret" }, function (r) { msgG.textContent = r.ok ? "Arrêt envoyé à l’appareil." : (r.msg || "Échec."); }); }, "background:#d92d3a;color:#fff;border-color:#d92d3a");
     var bParler = btn("Parler (maintenir)", function () { }); bParler.style.display = "none";
     function parler(on) { if (micTrack) micTrack.enabled = on; bParler.style.background = on ? OR : "#1d2a42"; bParler.style.color = on ? "#131D2E" : BLANC; }
     bParler.onmousedown = bParler.ontouchstart = function (e) { e.preventDefault(); parler(true); }; bParler.onmouseup = bParler.onmouseleave = bParler.ontouchend = function () { parler(false); };
     var bCam = btn("Caméra : …", function () { api({ action: "commande", cmd: "camera", valeur: ET && ET.camera === "avant" ? "arriere" : "avant" }, function (r) { if (r.ok) sonde(); else msgG.textContent = r.msg || "Échec."; }); });
-    var bAuto = btn("Activation automatique : …", function () { api({ action: "commande", cmd: "auto", valeur: !(ET && ET.auto) }, function (r) { if (r.ok) sonde(); else msgG.textContent = r.msg || "Échec."; }); });
-    var sens = h("input", { type: "range", min: "1", max: "10", step: "1" }); sens.style.cssText = "width:100%;max-width:340px;accent-color:" + OR; var sensT = el("div", "font-size:14px;color:" + GRIS + ";margin:6px 0 2px", "Sensibilité de détection");
-    sens.onchange = function () { api({ action: "commande", cmd: "sensibilite", valeur: Number(sens.value) }, function (r) { msgG.textContent = r.ok ? "Sensibilité réglée sur " + r.sensibilite + "/10." : (r.msg || "Échec."); }); };
+    // sensibilité propre à chaque mode
+    var modes = [["mvt", "Mouvement (caméra)"], ["son", "Son (niveau sonore seulement)"], ["vib", "Vibrations (chocs, déplacements)"]], MB = {};
+    var blocModes = el("div", "margin:10px 0"); modes.forEach(function (mo) {
+      var cl = mo[0], b = el("div", "border:1px solid " + SEP + ";border-radius:14px;padding:10px 12px;margin-bottom:8px"); var t = el("div", "font-size:15px;font-weight:700;margin-bottom:4px", "Sensibilité — " + mo[1]);
+      var s = h("input", { type: "range", min: "1", max: "10", step: "1" }); s.style.cssText = "width:100%;accent-color:" + OR; var st = el("div", "font-size:13px;color:" + GRIS);
+      s.onchange = function () { api({ action: "commande", cmd: "sens", mode: cl, valeur: Number(s.value) }, function (r) { msgG.textContent = r.ok ? "Sensibilité « " + mo[1] + " » : " + s.value + "/10." : (r.msg || "Échec."); sonde(); }); };
+      b.appendChild(t); b.appendChild(st); b.appendChild(s); blocModes.appendChild(b); MB[cl] = { s: s, st: st };
+    });
+    var duree = h("input", { type: "number", min: "5", max: "240", step: "5" }); duree.style.cssText = "width:90px;font:inherit;padding:8px 10px;border-radius:10px;border:1px solid " + SEP + ";background:#0A111D;color:" + BLANC; var dT = el("div", "font-size:14px;color:" + GRIS + ";margin:6px 0", "Durée maximale d’une session (minutes) : ");
+    duree.onchange = function () { api({ action: "commande", cmd: "duree", valeur: Number(duree.value) }, function (r) { msgG.textContent = r.ok ? "Durée maximale : " + r.duree + " min." : (r.msg || "Échec."); }); };
     var bJour = btn("Journal : afficher", function (b) { journalOuvert = !journalOuvert; b.textContent = "Journal : " + (journalOuvert ? "masquer" : "afficher"); jz.style.display = journalOuvert ? "block" : "none"; if (journalOuvert) chargerJournal(); });
     var jz = el("div", "display:none;margin-top:8px;font-size:13px;color:" + GRIS + ";max-height:260px;overflow:auto");
     [bLabo, code, bJum, bOubli].forEach(function (x) { zone.appendChild(x); }); zone.appendChild(el("div", "height:6px"));
-    [bVue, bArret, bParler, bCam, bAuto].forEach(function (x) { zone.appendChild(x); }); zone.appendChild(sensT); zone.appendChild(sens); zone.appendChild(el("div", "height:8px")); zone.appendChild(bJour); zone.appendChild(jz); zone.appendChild(msgG);
+    [bTout, bRien].forEach(function (x) { zone.appendChild(x); }); zone.appendChild(el("div", "height:2px"));
+    [bVue, bArret, bParler, bCam].forEach(function (x) { zone.appendChild(x); }); zone.appendChild(blocModes); dT.appendChild(duree); zone.appendChild(dT); zone.appendChild(el("div", "height:8px")); zone.appendChild(bJour); zone.appendChild(jz); zone.appendChild(msgG);
     carte.appendChild(el("div", "height:1px;background:" + SEP + ";margin:16px 0 12px"));
-    carte.appendChild(el("p", "font-size:13px;line-height:1.5;color:" + GRIS + ";margin:0", "Réservé aux essais à domicile avec des participants informés et consentants. Un voyant rouge est toujours visible sur l’appareil, la personne peut tout arrêter à tout moment, et rien n’est enregistré. Avant tout usage hors essai : information des salariés, consultation du CSE ; le son est à éviter."));
+    carte.appendChild(el("p", "font-size:13px;line-height:1.5;color:" + GRIS + ";margin:0", "Réservé aux essais à domicile avec des participants informés et consentants. Le voyant rouge de l’appareil ne peut pas être désactivé, la personne peut tout arrêter à tout moment. L’enregistrement, s’il est activé, crée un fichier sur cet ordinateur seulement. Le téléphone n’a pas de capteur de distance exploitable : aucune distance d’un mètre n’est mesurée. Avant tout usage hors essai : information des salariés, consultation du CSE."));
     c.appendChild(carte);
+    // ---- enregistrement local (fichier créé sur cet ordinateur, jamais envoyé) ----
+    function debutRec() {
+      try { var st = video.srcObject; if (!st || !window.MediaRecorder) throw new Error("x"); var opt = window.MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus") ? { mimeType: "video/webm;codecs=vp8,opus" } : {};
+        rec = new MediaRecorder(st, opt); recMorceaux = []; rec.ondataavailable = function (e) { if (e.data && e.data.size) recMorceaux.push(e.data); };
+        rec.onstop = function () { var blob = new Blob(recMorceaux, { type: "video/webm" }), a = document.createElement("a"), d = new Date(), z = function (n) { return (n < 10 ? "0" : "") + n; }; a.href = URL.createObjectURL(blob); a.download = "guardian-" + d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + "-" + z(d.getHours()) + z(d.getMinutes()) + z(d.getSeconds()) + ".webm"; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 15000); recMorceaux = []; };
+        rec.start(1000); pastille.style.display = ""; api({ action: "note", type: "Enregistrement", detail: "Début (fichier sur l’ordinateur de l’administrateur)" }, function () { });
+      } catch (e) { rec = null; msgG.textContent = "L’enregistrement n’est pas possible dans ce navigateur."; }
+    }
+    function finRec() { pastille.style.display = "none"; if (rec) { try { rec.stop(); } catch (e) { } rec = null; api({ action: "note", type: "Enregistrement", detail: "Fin (fichier téléchargé)" }, function () { }); } }
     // ---- état réel ----
+    var NOMS = { mouvement: "Mouvement détecté", son: "Bruit anormal détecté", vibration: "Choc / déplacement détecté", multisensoriel: "Détection combinée" };
     function chargerJournal() { api({ action: "journal" }, function (r) { jz.textContent = ""; if (!r.ok || !r.lignes.length) { jz.textContent = "Aucun événement."; return; } r.lignes.forEach(function (l) { jz.appendChild(el("div", "padding:3px 0;border-bottom:1px solid " + SEP, l[0] + " " + l[1] + " · " + l[2] + " · " + l[3] + (l[4] ? " · " + l[4] : ""))); }); }); }
     function maj() {
-      if (!ET) return; var vu = ET.vu || {}, lab = ET.labo;
+      if (!ET) return; var vu = ET.vu || {}, lab = ET.labo, en = lab && ET.enLigne, cp = vu.caps || {}, md = ET.modes || {}, sn = ET.sens || {}, f = ET.f || {};
       bLabo.textContent = lab ? "Désactiver le mode laboratoire" : "Activer le mode laboratoire"; bLabo.style.background = lab ? "#1d2a42" : OR; bLabo.style.color = lab ? BLANC : "#131D2E";
-      [bJum, bOubli, bVue, bArret, bCam, bAuto].forEach(function (b) { b.disabled = !lab; b.style.opacity = lab ? "1" : ".45"; }); bOubli.style.display = ET.jumele ? "" : "none";
-      etat("Connexion à distance", !lab ? "Non active" : ET.enLigne ? "Activée" : ET.jumele ? "Appareil hors ligne" : "Aucun appareil jumelé", ET.enLigne && lab ? "v" : ET.jumele && lab ? "o" : "");
-      etat("Détection de mouvement", lab && ET.enLigne && vu.mvt ? "Activée" : "Désactivée", lab && ET.enLigne && vu.mvt ? "v" : "");
+      [bJum, bOubli, bVue, bArret, bCam, bTout, bRien].forEach(function (b) { b.disabled = !lab; b.style.opacity = lab ? "1" : ".45"; }); bOubli.style.display = ET.jumele ? "" : "none";
+      var nb = (vu.mvt ? 1 : 0) + (vu.son ? 1 : 0) + (vu.vib ? 1 : 0);
+      etat("Connexion à distance", !lab ? "Non active" : !f.remote ? "Désactivée" : ET.enLigne ? "Activée" : ET.jumele ? "Appareil hors ligne" : "Aucun appareil jumelé", lab && f.remote && en ? "v" : lab && f.remote && ET.jumele ? "o" : "");
+      etat("Détection de mouvement", !md.mvt ? "Désactivée" : en && vu.mvt ? "Activée" : "En attente", md.mvt && en && vu.mvt ? "v" : md.mvt ? "o" : "");
+      etat("Détection sonore", !md.son ? "Désactivée" : en && vu.son ? "Activée" : en && vu.mic === "refuse" ? "Micro refusé" : "En attente", md.son && en && vu.son ? "v" : md.son ? "o" : "");
+      etat("Détection de vibrations", !md.vib ? "Désactivée" : en && vu.vib ? "Activée" : en && cp && !cp.accel ? "Capteur indisponible" : "En attente", md.vib && en && vu.vib ? "v" : md.vib ? "o" : "");
+      etat("Détection multisensorielle", !f.multi ? "Désactivée" : en && nb >= 2 ? "Activée (" + nb + " modes)" : "En attente", f.multi && en && nb >= 2 ? "v" : f.multi ? "o" : "");
+      etat("Distance cible", en && cp.dist ? "1 mètre" : "Non mesurable", "o");
       etat("Activation automatique", lab && ET.auto ? "Activée" : "Désactivée", lab && ET.auto ? "v" : "");
-      etat("Microphone", !ET.enLigne ? "Inconnu" : vu.mic === "ok" ? "Autorisé" : vu.mic === "refuse" ? "Refusé" : "Non demandé", ET.enLigne && vu.mic === "ok" ? "v" : vu.mic === "refuse" ? "o" : "");
-      etat("Transmission audio", lab && ET.enLigne && vu.mic === "ok" ? "Autorisée" : "Désactivée", lab && ET.enLigne && vu.mic === "ok" ? "v" : "");
-      etat("Vision nocturne", ET.enLigne && vu.torche === "non" ? "Non disponible" : ET.enLigne && (vu.torche === "dispo" || vu.torche === "on") ? "Lampe disponible" : "Selon matériel", ET.enLigne && (vu.torche === "dispo" || vu.torche === "on") ? "v" : "o");
-      etat("Indicateur de captation", ET.enLigne && vu.capt ? "Actif" : "Inactif", ET.enLigne && vu.capt ? "v" : "");
-      etat("Enregistrement", "Désactivé", "");
-      bCam.textContent = "Caméra : " + (ET.camera === "avant" ? "avant" : "arrière") + " (changer)"; bAuto.textContent = "Activation automatique : " + (ET.auto ? "oui" : "non"); sens.value = ET.sensibilite; sensT.textContent = "Sensibilité de détection : " + ET.sensibilite + "/10";
+      etat("Microphone", !f.micro ? "Non autorisé" : !ET.enLigne ? "Autorisé" : vu.mic === "ok" ? "Autorisé" : vu.mic === "refuse" ? "Refusé" : "Non demandé", f.micro && ET.enLigne && vu.mic === "ok" ? "v" : f.micro && vu.mic === "refuse" ? "o" : f.micro ? "o" : "");
+      etat("Transmission audio", !f.audio || !f.micro ? "Non autorisée" : "Autorisée", f.audio && f.micro ? "v" : "");
+      etat("Vision nocturne", !f.nuit ? "Désactivée" : ET.enLigne && vu.torche === "non" ? "Non disponible" : ET.enLigne && (vu.torche === "dispo" || vu.torche === "on") ? "Lampe activée" : "Selon matériel", f.nuit ? "o" : "");
+      etat("Indicateur de captation", ET.enLigne && (vu.capt || vu.micActif) ? "Actif" : "Actif en cas de captation", ET.enLigne && (vu.capt || vu.micActif) ? "v" : "");
+      etat("Enregistrement", !f.rec ? "Désactivé" : rec ? "En cours" : "Activé (pendant les vues)", f.rec ? "o" : "");
+      Object.keys(inter).forEach(function (n) { var I = inter[n], on = valeurConfig(I.d); I.sw.setAttribute("aria-checked", on ? "true" : "false"); I.sw.style.background = on ? OR : "#1d2a42"; I.bou.style.left = on ? "22px" : "2px"; I.bou.style.background = on ? "#131D2E" : GRIS; I.sw.disabled = !lab; I.sw.style.opacity = lab ? "1" : ".45"; });
+      var d = ET.dernier; dernier.textContent = ""; dernier.appendChild(el("span", "color:" + GRIS, "Dernier événement détecté : ")); dernier.appendChild(el("b", "color:" + (d ? OR : GRIS), d ? (NOMS[d.type] || d.type) + " — " + new Date(d.t).toLocaleTimeString("fr-FR") + (d.detail ? " (" + d.detail + ")" : "") : "aucun"));
+      var l2 = []; if (en) { l2.push("caméra" + (cp.cam ? " ×" + cp.cam : "")); if (cp.mic) l2.push("micro"); l2.push(cp.accel ? "accéléromètre ✔" : "accéléromètre ✘"); l2.push(cp.gyro ? "gyroscope ✔" : "gyroscope ✘"); l2.push("proximité ✘ (non lisible par le navigateur)"); l2.push("distance ✘"); }
+      capt.textContent = ""; capt.appendChild(el("span", "color:" + GRIS, "État des capteurs : ")); capt.appendChild(el("b", "color:" + (en ? BLANC : GRIS), en ? l2.join(" · ") : "appareil hors ligne"));
+      bCam.textContent = "Caméra : " + (ET.camera === "avant" ? "avant" : "arrière") + " (changer)";
+      modes.forEach(function (mo) { var cl = mo[0], B = MB[cl]; B.s.value = sn[cl] || 5; B.st.textContent = (sn[cl] || 5) + "/10 (plus haut = plus sensible)"; });
+      if (document.activeElement !== duree) duree.value = ET.duree;
       bVue.textContent = vue ? "Arrêter la vue" : "Voir en direct"; bParler.style.display = vue && micTrack ? "" : "none";
-      v1.textContent = vue ? "Vue en direct" : (ET.enLigne && vu.capt ? "Caméra en marche" : "Caméra en veille"); v2.textContent = vue ? "Connexion…" : "En attente de détection";
+      v1.textContent = vue ? "Vue en direct" : (en && vu.capt ? "Caméra en marche" : "Caméra en veille"); v2.textContent = vue ? "Connexion…" : "En attente de détection";
+      if (f.rec && vue && video.srcObject && !rec) debutRec(); else if ((!f.rec || !vue) && rec) finRec();
     }
     function sonde() { appel("adminGuardian", { action: "etat" }, function (r) { if (!carte.isConnected) { arreterVue(); if (sondeur) clearInterval(sondeur); return; } if (r && r.ok) { ET = r; maj(); } }); }
     // ---- vue en direct (WebRTC, chiffré, de l'appareil vers cette page) ----
     function arreterVue(avertir) {
-      if (repTimer) clearInterval(repTimer); repTimer = null; var etait = vue; vue = false;
+      if (repTimer) clearInterval(repTimer); repTimer = null; var etait = vue; vue = false; finRec();
       if (pc) { try { pc.close(); } catch (e) { } pc = null; } if (micStream) { micStream.getTracks().forEach(function (t) { t.stop(); }); micStream = null; micTrack = null; }
       video.srcObject = null; video.style.display = "none"; audio.srcObject = null; veille.style.display = ""; bParler.style.display = "none";
       if (etait && avertir) api({ action: "fin" }, function () { }); if (ET) maj();
     }
     function demarrerVue() {
       if (!ET || !ET.labo || !ET.enLigne) { msgG.textContent = "L’appareil d’essai doit être en ligne (page ouverte, consentement donné)."; return; }
+      if (!ET.f || !ET.f.remote) { msgG.textContent = "La connexion à distance est désactivée : activez-la d’abord."; return; }
       if (!window.RTCPeerConnection) { msgG.textContent = "Ce navigateur ne gère pas la vue en direct."; return; }
       vue = true; msgG.textContent = "Connexion à l’appareil…"; maj();
       var p = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] }); pc = p;
-      p.ontrack = function (ev) { if (ev.track.kind === "video") { video.srcObject = ev.streams[0] || new MediaStream([ev.track]); video.style.display = "block"; veille.style.display = "none"; video.play().catch(function () { }); msgG.textContent = "Vue en direct établie."; } else { audio.srcObject = ev.streams[0] || new MediaStream([ev.track]); audio.play().catch(function () { }); } };
+      p.ontrack = function (ev) { if (ev.track.kind === "video") { video.srcObject = ev.streams[0] || new MediaStream([ev.track]); video.style.display = "block"; veille.style.display = "none"; video.play().catch(function () { }); msgG.textContent = "Vue en direct établie."; if (ET && ET.f && ET.f.rec && !rec) debutRec(); } else { audio.srcObject = ev.streams[0] || new MediaStream([ev.track]); audio.play().catch(function () { }); } };
       p.onconnectionstatechange = function () { if (pc === p && (p.connectionState === "failed" || p.connectionState === "disconnected" || p.connectionState === "closed")) { msgG.textContent = "Connexion perdue."; arreterVue(true); } };
       p.addTransceiver("video", { direction: "recvonly" });
-      var micP = navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? navigator.mediaDevices.getUserMedia({ audio: true }).then(function (m) { micStream = m; micTrack = m.getAudioTracks()[0]; micTrack.enabled = false; p.addTrack(micTrack, m); }).catch(function () { p.addTransceiver("audio", { direction: "recvonly" }); }) : Promise.resolve(p.addTransceiver("audio", { direction: "recvonly" }));
+      var voixOk = ET.f.micro && ET.f.audio, micP = voixOk && navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? navigator.mediaDevices.getUserMedia({ audio: true }).then(function (m) { micStream = m; micTrack = m.getAudioTracks()[0]; micTrack.enabled = false; p.addTrack(micTrack, m); }).catch(function () { p.addTransceiver("audio", { direction: "recvonly" }); }) : Promise.resolve(voixOk ? p.addTransceiver("audio", { direction: "recvonly" }) : null);
       micP.then(function () { return p.createOffer(); }).then(function (o) { return p.setLocalDescription(o); }).then(function () {
-        return new Promise(function (ok) { if (p.iceGatheringState === "complete") return ok(); var f = setTimeout(ok, 4500); p.onicegatheringstatechange = function () { if (p.iceGatheringState === "complete") { clearTimeout(f); ok(); } }; });
+        return new Promise(function (ok) { if (p.iceGatheringState === "complete") return ok(); var f2 = setTimeout(ok, 4500); p.onicegatheringstatechange = function () { if (p.iceGatheringState === "complete") { clearTimeout(f2); ok(); } }; });
       }).then(function () {
         api({ action: "offre", sdp: p.localDescription.sdp }, function (r) {
           if (!r.ok) { msgG.textContent = r.msg || "Demande refusée."; arreterVue(); return; }
@@ -3284,7 +3345,7 @@ hmaj();setInterval(hmaj,120000);</script><div id="vk" style="position:fixed;top:
     var run = google.script.run.withSuccessHandler(function (r) {
       bt.disabled = false;
       if (r && r.ok && r.etape2) { defi = r.defi; pw.value = ""; pw.type = "text"; pw.setAttribute("inputmode", "numeric"); pw.setAttribute("autocomplete", "one-time-code"); pw.placeholder = "Code à 6 chiffres reçu par e-mail"; bt.textContent = "Valider le code"; er.textContent = r.msg || ""; pw.focus(); return; }
-      if (r && r.ok) { retourMdp(); CLE = r.jeton; derAct = derRen = Date.now(); vk.style.display = "none"; pw.value = ""; if (r.role === "paie" && window.ouvrirPaie) { ouvrirPaie(); return; } if (window.charge) charge(); if (window.maj) maj(); }
+      if (r && r.ok) { retourMdp(); CLE = r.jeton; derAct = derRen = Date.now(); vk.style.display = "none"; pw.value = ""; if (r.role === "paie" && window.ouvrirPaie) { ouvrirPaie(); return; } if (location.search.indexOf("guardian=1") >= 0 && window.ouvrirGuardian) { ouvrirGuardian(); return; } if (window.charge) charge(); if (window.maj) maj(); }
       else { er.textContent = (r && r.msg) || "Connexion impossible."; if (defi && /expiré|essais/.test(er.textContent)) { retourMdp(); pw.value = ""; } }
     }).withFailureHandler(function () { bt.disabled = false; er.textContent = "Connexion impossible, réessayez."; });
     if (defi) run.connexionCode(LIEN, defi, m); else run.connexion(LIEN, m);

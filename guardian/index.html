@@ -10,7 +10,7 @@ h1{margin:0;font-size:26px;font-weight:800;letter-spacing:.02em;color:#D4B77E}.s
 .cam{background:#0A111D;border-radius:20px;padding:12px;text-align:center;margin-bottom:14px;min-height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center}
 video{width:100%;max-height:260px;border-radius:14px;background:#000;display:none;object-fit:cover}
 .ligne{display:flex;justify-content:space-between;align-items:center;padding:8px 0;font-size:16px}.ligne b{font-weight:700;color:#A3AFBF}.ok{color:#63D9A0!important}.or{color:#D4B77E!important}
-.voy{display:none;align-items:center;gap:10px;background:#3a0f14;border:1px solid #ff4d5a;color:#ffd7da;border-radius:14px;padding:12px 14px;font-weight:800;letter-spacing:.04em;margin-bottom:12px}.voy i{width:14px;height:14px;border-radius:50%;background:#ff3b4a;box-shadow:0 0 0 0 rgba(255,59,74,.7);animation:p 1.4s infinite}
+.voy{display:none;align-items:center;gap:10px;background:#3a0f14;border:1px solid #ff4d5a;color:#ffd7da;border-radius:14px;padding:12px 14px;font-weight:800;letter-spacing:.04em;margin-bottom:12px}.voy i{flex:0 0 14px;height:14px;border-radius:50%;background:#ff3b4a;box-shadow:0 0 0 0 rgba(255,59,74,.7);animation:p 1.4s infinite}
 @keyframes p{70%{box-shadow:0 0 0 12px rgba(255,59,74,0)}100%{box-shadow:0 0 0 0 rgba(255,59,74,0)}}
 button{font:inherit;font-weight:800;border:0;border-radius:14px;padding:14px 16px;width:100%;margin-top:10px;background:#D4B77E;color:#131D2E;cursor:pointer}button.s{background:#1d2a42;color:#E1E7F0;border:1px solid #35445A}button.stop{background:#d92d3a;color:#fff;font-size:22px;padding:20px}
 input{width:100%;font:inherit;font-size:24px;letter-spacing:.2em;text-align:center;padding:14px;border-radius:12px;border:1px solid #35445A;background:#0A111D;color:#E1E7F0}
@@ -18,7 +18,7 @@ p.n{font-size:13px;line-height:1.5;color:#A3AFBF}.msg{min-height:20px;margin:8px
 </style></head><body><div class="pg">
 <div class="th"><div><h1>IRIS GUARDIAN</h1><div class="sub">APPAREIL D’ESSAI — MODE LABORATOIRE</div></div>
 <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="#D4B77E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg></div><hr>
-<div class="voy" id="voy"><i></i><span>CAPTATION ACTIVE — la caméra est en marche</span></div>
+<div class="voy" id="voy"><i></i><span id="voyt">CAPTATION ACTIVE</span></div>
 <div class="cam"><video id="vid" playsinline muted></video><div id="vide"><svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="#D4B77E" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="M16 10l5-3v10l-5-3z"/></svg><div style="font-size:22px;font-weight:800;color:#fff;margin-top:8px" id="t1">Caméra en veille</div><div style="font-size:14px;color:#A3AFBF;margin-top:4px" id="t2">En attente</div></div></div>
 <div id="ecran"></div><div class="msg" id="msg" role="status"></div>
 <audio id="aud" autoplay playsinline></audio>
@@ -28,16 +28,29 @@ p.n{font-size:13px;line-height:1.5;color:#A3AFBF}.msg{min-height:20px;margin:8px
 "use strict";
 var URL_APP = "https://script.google.com/macros/s/AKfycbzAc5Ge9XGmOE5bBbOxkN528oSBNvgw3MZEGRZVH15HxMZnVB_MwputipQMebgHXAxO/exec";
 var $ = function (i) { return document.getElementById(i); };
-var S = { jeton: localStorage.getItem("gd-jeton") || "", consent: false, vstream: null, astream: null, pc: null, offreId: "", cfg: { sensibilite: 5, camera: "arriere", auto: false }, mic: "attente", mvt: false, torche: false, timer: null, mTimer: null, prev: null, mCpt: 0, mDernier: 0, enLigne: true, wake: null, flux: false };
+var S = { jeton: localStorage.getItem("gd-jeton") || "", consent: false, vstream: null, astream: null, pc: null, offreId: "", cfg: { camera: "arriere", auto: true, f: { remote: true, multi: true, micro: true, audio: true, nuit: false, rec: false }, modes: { mvt: true, son: true, vib: true }, sens: { mvt: 5, son: 5, vib: 5 }, duree: 60 },
+  mic: "attente", mvt: false, son: false, vib: false, torche: false, timer: null, mTimer: null, prev: null, mCpt: 0, enLigne: true, wake: null, flux: false,
+  caps: { cam: 0, mic: false, accel: false, gyro: false, prox: false, dist: false, lum: false }, capsFait: false, trig: {}, dernMulti: 0, fin: 0, finTimer: null,
+  micStream: null, actx: null, sTimer: null, base: 0, sCpt: 0, vHandler: null, vPrev: null, vCpt: 0 };
 function msg(t) { $("msg").textContent = t || ""; }
 function api(f, a) {
   return fetch(URL_APP, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ f: f, a: a }) }).then(function (r) { return r.json(); }).then(function (j) { if (j && j.e !== undefined) throw new Error("serveur"); return j.r; });
 }
 function evt(type, detail) { if (!S.jeton) return; api("guardianEvenement", [S.jeton, type, detail || ""]).catch(function () { }); }
+// ---- analyse RÉELLE des capteurs (rien n'est déclaré sans vérification) ----
+function analyserCapteurs() {
+  if (S.capsFait) return; S.capsFait = true;
+  try { if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) navigator.mediaDevices.enumerateDevices().then(function (l) { S.caps.cam = l.filter(function (d) { return d.kind === "videoinput"; }).length; S.caps.mic = l.some(function (d) { return d.kind === "audioinput"; }); majEtat(); }).catch(function () { }); } catch (e) { }
+  // accéléromètre / gyroscope : vérifiés en recevant de vraies mesures pendant 2 s
+  var vu = { a: false, g: false };
+  function lecteur(ev) { var a = ev.acceleration, ag = ev.accelerationIncludingGravity, r = ev.rotationRate; if ((a && a.x !== null) || (ag && ag.x !== null)) vu.a = true; if (r && r.alpha !== null && r.beta !== null) vu.g = true; }
+  try { window.addEventListener("devicemotion", lecteur); } catch (e) { }
+  setTimeout(function () { try { window.removeEventListener("devicemotion", lecteur); } catch (e) { } S.caps.accel = vu.a; S.caps.gyro = vu.g; S.caps.prox = false; S.caps.dist = false; S.caps.lum = false; majEtat(); }, 2200);
+}
 // ---- écrans ----
 function ecranJumelage() {
   var e = $("ecran"); e.innerHTML = "";
-  e.insertAdjacentHTML("beforeend", '<p class="n">Cet appareil n’est pas jumelé. Dans l’espace administrateur d’IRIS (Paramètres &gt; IRIS Guardian), activez le mode laboratoire puis choisissez « Jumeler un appareil » : un code à 8 chiffres s’affiche pour 10 minutes.</p><input id="code" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="Code à 8 chiffres" aria-label="Code de jumelage"><button id="bj">Jumeler cet appareil</button>');
+  e.insertAdjacentHTML("beforeend", '<p class="n">Cet appareil n’est pas jumelé. Dans l’espace administrateur d’IRIS (menu IRIS Guardian), activez le mode laboratoire puis choisissez « Jumeler un appareil » : un code à 8 chiffres s’affiche pour 10 minutes.</p><input id="code" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="Code à 8 chiffres" aria-label="Code de jumelage"><button id="bj">Jumeler cet appareil</button>');
   $("bj").onclick = function () {
     var c = $("code").value.replace(/\D/g, ""); if (c.length !== 8) { msg("Le code fait 8 chiffres."); return; }
     $("bj").disabled = true; msg("Jumelage…");
@@ -46,22 +59,28 @@ function ecranJumelage() {
 }
 function ecranConsentement() {
   var e = $("ecran"); e.innerHTML = "";
-  e.insertAdjacentHTML("beforeend", '<p class="n"><b style="color:#E1E7F0">Essai à domicile — participants informés et consentants.</b><br>En touchant « J’accepte », ce téléphone pourra utiliser sa <b>caméra</b> (et son <b>micro</b> pendant une vue en direct) à la demande de l’administrateur, tant que cette page reste ouverte. Un <b>voyant rouge</b> est toujours visible quand la caméra fonctionne. <b>Rien n’est enregistré.</b> Vous pouvez tout arrêter à tout moment avec le bouton ARRÊT.</p><button id="ba">J’accepte et je démarre</button><button class="s" id="bo">Oublier le jumelage de cet appareil</button>');
+  e.insertAdjacentHTML("beforeend", '<p class="n"><b style="color:#E1E7F0">Essai à domicile — participants informés et consentants.</b><br>Si l’administrateur l’active, la vue peut aussi être <b>enregistrée sur son ordinateur</b> : un message rouge l’indique alors à l’écran. En touchant « J’accepte », ce téléphone pourra utiliser sa <b>caméra</b>, ses <b>capteurs de mouvement</b> et, si l’administrateur l’active, son <b>micro pour mesurer le niveau sonore</b> (sans rien enregistrer), tant que cette page reste ouverte et pendant la durée maximale de la session. Pendant une vue en direct, le micro transmet aussi le son. Un <b>voyant rouge</b> est toujours visible quand la caméra ou le micro fonctionne. <b>Rien n’est enregistré.</b> Vous pouvez tout arrêter à tout moment avec le bouton ARRÊT.</p><button id="ba">J’accepte et je démarre</button><button class="s" id="bo">Oublier le jumelage de cet appareil</button>');
   $("ba").onclick = demarrerCaptation; $("bo").onclick = function () { arreterTout("arret_local", "Jumelage oublié"); localStorage.removeItem("gd-jeton"); S.jeton = ""; ecranJumelage(); };
   majEtat();
 }
 function ecranActif() {
   var e = $("ecran"); e.innerHTML = "";
-  e.insertAdjacentHTML("beforeend", '<div class="ligne"><span>Connexion à distance</span><b id="s1"></b></div><div class="ligne"><span>Détection de mouvement</span><b id="s2"></b></div><div class="ligne"><span>Microphone</span><b id="s3"></b></div><div class="ligne"><span>Vue en direct</span><b id="s4"></b></div><button class="s" id="bt" style="display:none">Lampe (vision nocturne) : éteinte</button><button class="s" id="bc">Changer de caméra</button><button class="stop" id="bs">ARRÊT</button>');
+  e.insertAdjacentHTML("beforeend", '<div class="ligne"><span>Connexion à distance</span><b id="s1"></b></div><div class="ligne"><span>Détection de mouvement</span><b id="s2"></b></div><div class="ligne"><span>Détection sonore</span><b id="s5"></b></div><div class="ligne"><span>Détection de vibrations</span><b id="s6"></b></div><div class="ligne"><span>Microphone</span><b id="s3"></b></div><div class="ligne"><span>Vue en direct</span><b id="s4"></b></div><div class="ligne"><span>Capteurs vérifiés</span><b id="s7"></b></div><div class="ligne"><span>Fin de session dans</span><b id="s8"></b></div><button class="s" id="bt" style="display:none">Lampe (vision nocturne) : éteinte</button><button class="s" id="bc">Changer de caméra</button><button class="stop" id="bs">ARRÊT</button>');
   $("bs").onclick = function () { arreterTout("arret_local", "Bouton ARRÊT sur l’appareil"); ecranConsentement(); msg("Tout est arrêté."); };
   $("bc").onclick = function () { S.cfg.camera = S.cfg.camera === "avant" ? "arriere" : "avant"; relancerCamera(); };
   $("bt").onclick = basculerTorche; majEtat();
 }
 function majEtat() {
   var g = function (i, t, c) { var el = $(i); if (el) { el.textContent = t; el.className = c || ""; } };
-  var actif = !!S.vstream;
-  $("voy").style.display = actif ? "flex" : "none";
-  g("s1", S.enLigne ? "Activée" : "Interrompue", S.enLigne ? "ok" : "or"); g("s2", S.mvt ? "Activée" : "Désactivée", S.mvt ? "ok" : ""); g("s3", S.mic === "ok" ? "Autorisé" : S.mic === "refuse" ? "Refusé" : "Non demandé", S.mic === "ok" ? "ok" : S.mic === "refuse" ? "or" : ""); g("s4", S.flux ? "En cours" : "Aucune", S.flux ? "ok" : "");
+  var actif = !!S.vstream, micOn = !!S.micStream;
+  $("voy").style.display = actif || micOn ? "flex" : "none";
+  $("voyt").textContent = (actif && micOn ? "CAPTATION ACTIVE — caméra et micro (niveau sonore seulement) en marche" : actif ? "CAPTATION ACTIVE — la caméra est en marche" : "MICRO ACTIF — niveau sonore seulement") + (S.cfg.f.rec ? " — ENREGISTREMENT ACTIVÉ par l’administrateur (fichier sur son ordinateur)" : " — rien n’est enregistré");
+  g("s1", S.enLigne ? "Activée" : "Interrompue", S.enLigne ? "ok" : "or"); g("s2", S.mvt ? "Activée" : "Désactivée", S.mvt ? "ok" : "");
+  g("s5", S.son ? "Activée" : S.cfg.modes.son ? (S.mic === "refuse" ? "Micro refusé" : "En attente") : "Désactivée", S.son ? "ok" : ""); g("s6", S.vib ? "Activée" : !S.caps.accel && S.capsFait ? "Capteur indisponible" : "Désactivée", S.vib ? "ok" : "");
+  g("s3", S.mic === "ok" ? "Autorisé" : S.mic === "refuse" ? "Refusé" : "Non demandé", S.mic === "ok" ? "ok" : S.mic === "refuse" ? "or" : ""); g("s4", S.flux ? "En cours" : "Aucune", S.flux ? "ok" : "");
+  var cp = S.caps, liste = []; if (cp.cam) liste.push("caméra ×" + cp.cam); if (cp.mic) liste.push("micro"); if (cp.accel) liste.push("accéléromètre"); if (cp.gyro) liste.push("gyroscope");
+  g("s7", (liste.join(", ") || "analyse…") + (S.capsFait ? " · pas de capteur de distance" : ""), "or");
+  if (S.fin) { var rest = Math.max(0, Math.round((S.fin - Date.now()) / 60000)); g("s8", rest + " min", "or"); }
   $("t1").textContent = actif ? "Caméra en marche" : "Caméra en veille"; $("t2").textContent = actif ? (S.flux ? "Vue en direct en cours" : "En attente de détection") : "En attente";
 }
 // ---- caméra ----
@@ -72,35 +91,77 @@ function demarrerCaptation() {
   navigator.mediaDevices.getUserMedia(contraintes()).then(function (st) {
     S.vstream = st; S.consent = true; var v = $("vid"); v.srcObject = st; v.style.display = "block"; $("vide").style.display = "none"; v.play().catch(function () { });
     ecranActif(); msg(""); evt("consentement", "Caméra autorisée par la personne"); evt("demarrage", S.cfg.camera);
-    demanderWakeLock(); lancerMouvement(); verifierTorche();
-    // l'autorisation du micro est demandée tout de suite (en présence de la personne) puis le micro est relâché ; il ne reste ouvert que pendant une vue en direct
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (a) { a.getTracks().forEach(function (t) { t.stop(); }); S.mic = "ok"; majEtat(); }).catch(function () { S.mic = "refuse"; evt("permission_refusee", "micro"); majEtat(); });
+    try { localStorage.setItem("gd-ok", String(Date.now())); } catch (e) { } S.fin = Date.now() + S.cfg.duree * 60000; if (S.finTimer) clearInterval(S.finTimer); S.finTimer = setInterval(function () { if (S.consent && Date.now() >= S.fin) { arreterTout("session_expiree", "Durée maximale de session atteinte"); ecranConsentement(); msg("La session est terminée (durée maximale atteinte)."); } else majEtat(); }, 15000);
+    demanderWakeLock(); appliquerModes(); verifierTorche();
+    // l'autorisation du micro est demandée tout de suite (en présence de la personne) puis le micro est relâché
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (a) { a.getTracks().forEach(function (t) { t.stop(); }); S.mic = "ok"; appliquerModes(); majEtat(); }).catch(function () { S.mic = "refuse"; evt("permission_refusee", "micro"); majEtat(); });
   }).catch(function (er) { msg(er && er.name === "NotAllowedError" ? "Caméra refusée : autorisez-la dans les réglages du navigateur." : "Caméra indisponible."); evt("permission_refusee", "camera"); });
 }
-function relancerCamera() { if (!S.consent) return; if (S.vstream) S.vstream.getTracks().forEach(function (t) { t.stop(); }); S.vstream = null; stopMouvement(); navigator.mediaDevices.getUserMedia(contraintes()).then(function (st) { S.vstream = st; var v = $("vid"); v.srcObject = st; v.play().catch(function () { }); lancerMouvement(); verifierTorche(); if (S.pc) { var snd = S.pc.getSenders().filter(function (x) { return x.track && x.track.kind === "video"; })[0]; if (snd) snd.replaceTrack(st.getVideoTracks()[0]); } majEtat(); }).catch(function () { msg("Cette caméra n’est pas disponible."); }); }
+function relancerCamera() { if (!S.consent) return; if (S.vstream) S.vstream.getTracks().forEach(function (t) { t.stop(); }); S.vstream = null; stopMouvement(); navigator.mediaDevices.getUserMedia(contraintes()).then(function (st) { S.vstream = st; var v = $("vid"); v.srcObject = st; v.play().catch(function () { }); appliquerModes(); verifierTorche(); if (S.pc) { var snd = S.pc.getSenders().filter(function (x) { return x.track && x.track.kind === "video"; })[0]; if (snd) snd.replaceTrack(st.getVideoTracks()[0]); } majEtat(); }).catch(function () { msg("Cette caméra n’est pas disponible."); }); }
 function verifierTorche() { var b = $("bt"); if (!b || !S.vstream) return; var t = S.vstream.getVideoTracks()[0], c = t && t.getCapabilities ? t.getCapabilities() : {}; S.torche = false; b.style.display = c && c.torch ? "block" : "none"; b.textContent = "Lampe (vision nocturne) : éteinte"; }
 function basculerTorche() { var t = S.vstream && S.vstream.getVideoTracks()[0]; if (!t) return; S.torche = !S.torche; t.applyConstraints({ advanced: [{ torch: S.torche }] }).then(function () { $("bt").textContent = "Lampe (vision nocturne) : " + (S.torche ? "allumée" : "éteinte"); }).catch(function () { S.torche = false; msg("La lampe n’est pas disponible sur cette caméra."); }); }
 function demanderWakeLock() { try { if (navigator.wakeLock) navigator.wakeLock.request("screen").then(function (w) { S.wake = w; }).catch(function () { }); } catch (e) { } }
-// ---- détection de mouvement (locale : aucune image n'est envoyée ni enregistrée) ----
+// ---- détections (toutes locales : aucune image ni aucun son n'est envoyé ni enregistré) ----
+function declencher(mode, detail) {
+  var maint = Date.now(), nom = { mvt: "mouvement", son: "son", vib: "vibration" }[mode]; S.trig[mode] = maint; evt(nom, detail);
+  var autres = Object.keys(S.trig).filter(function (k) { return k !== mode && maint - S.trig[k] < 6000; });
+  if (S.cfg.f.multi && autres.length && maint - S.dernMulti > 20000) { S.dernMulti = maint; evt("multisensoriel", [mode].concat(autres).join("+")); }
+}
+function appliquerModes() {
+  var m = S.cfg.modes;
+  if (S.vstream && m.mvt) { if (!S.mvt) lancerMouvement(); } else stopMouvement();
+  if (S.consent && m.son && S.cfg.f.micro && S.mic === "ok") { if (!S.son) lancerSon(); } else stopSon();
+  if (S.consent && m.vib && S.caps.accel) { if (!S.vib) lancerVibrations(); } else stopVibrations();
+  appliquerNuit(); majEtat();
+}
+function appliquerNuit() { var t = S.vstream && S.vstream.getVideoTracks()[0], vouloir = !!S.cfg.f.nuit; if (!t || !t.getCapabilities || !t.getCapabilities().torch || S.torche === vouloir) return; t.applyConstraints({ advanced: [{ torch: vouloir }] }).then(function () { S.torche = vouloir; var b = $("bt"); if (b) b.textContent = "Lampe (vision nocturne) : " + (vouloir ? "allumée" : "éteinte"); majEtat(); }).catch(function () { }); }
+// mouvement (caméra)
+var _cv = null, _cx = null;
 function lancerMouvement() {
-  stopMouvement(); var cv = document.createElement("canvas"); cv.width = 64; cv.height = 48; var cx = cv.getContext("2d", { willReadFrequently: true }); var v = $("vid"); S.prev = null; S.mCpt = 0; S.mvt = true;
+  stopMouvement(); _cv = document.createElement("canvas"); _cv.width = 64; _cv.height = 48; _cx = _cv.getContext("2d", { willReadFrequently: true }); var v = $("vid"); S.prev = null; S.mCpt = 0; S.mvt = true; var dern = 0;
   S.mTimer = setInterval(function () {
-    if (!S.vstream || v.readyState < 2) return; cx.drawImage(v, 0, 0, 64, 48); var d = cx.getImageData(0, 0, 64, 48).data, g = new Uint8Array(64 * 48);
+    if (!S.vstream || v.readyState < 2) return; _cx.drawImage(v, 0, 0, 64, 48); var d = _cx.getImageData(0, 0, 64, 48).data, g = new Uint8Array(64 * 48);
     for (var i = 0, j = 0; i < d.length; i += 4, j++) g[j] = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
-    if (S.prev) { var n = 0; for (var k = 0; k < g.length; k++) if (Math.abs(g[k] - S.prev[k]) > 28) n++; var seuil = 0.12 - 0.011 * S.cfg.sensibilite;
-      if (n / g.length > seuil) { S.mCpt++; if (S.mCpt >= 2 && Date.now() - S.mDernier > 20000) { S.mDernier = Date.now(); evt("mouvement", "Sensibilité " + S.cfg.sensibilite); } } else S.mCpt = 0; }
+    if (S.prev) { var n = 0; for (var k = 0; k < g.length; k++) if (Math.abs(g[k] - S.prev[k]) > 28) n++; var seuil = 0.12 - 0.011 * S.cfg.sens.mvt;
+      if (n / g.length > seuil) { S.mCpt++; if (S.mCpt >= 2 && Date.now() - dern > 20000) { dern = Date.now(); declencher("mvt", "Sensibilité " + S.cfg.sens.mvt); } } else S.mCpt = 0; }
     S.prev = g;
   }, 400); majEtat();
 }
 function stopMouvement() { if (S.mTimer) clearInterval(S.mTimer); S.mTimer = null; S.mvt = false; S.prev = null; }
+// son (niveau sonore ambiant seulement : on ne garde que des nombres, jamais d'audio)
+function lancerSon() {
+  stopSon(); S.son = true; navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }).then(function (a) {
+    if (!S.consent || !S.cfg.modes.son) { a.getTracks().forEach(function (t) { t.stop(); }); S.son = false; return; }
+    S.micStream = a; var AC = window.AudioContext || window.webkitAudioContext; S.actx = new AC(); var src = S.actx.createMediaStreamSource(a), an = S.actx.createAnalyser(); an.fftSize = 1024; src.connect(an); var buf = new Float32Array(an.fftSize), dern = 0; S.base = 0; S.sCpt = 0; var n = 0;
+    S.sTimer = setInterval(function () { an.getFloatTimeDomainData(buf); var s = 0; for (var i = 0; i < buf.length; i++) s += buf[i] * buf[i]; var db = 20 * Math.log10(Math.sqrt(s / buf.length) + 1e-8); n++;
+      if (n < 12) { S.base = S.base ? S.base * 0.8 + db * 0.2 : db; return; }
+      var delta = 18 - 1.5 * S.cfg.sens.son; // décibels au-dessus du bruit de fond habituel
+      if (db > S.base + delta) { S.sCpt++; if (S.sCpt >= 3 && Date.now() - dern > 20000) { dern = Date.now(); declencher("son", "+" + Math.round(db - S.base) + " dB au-dessus du bruit de fond"); } } else { S.sCpt = 0; S.base = S.base * 0.97 + db * 0.03; } }, 250);
+    majEtat();
+  }).catch(function () { S.son = false; S.mic = "refuse"; evt("permission_refusee", "micro"); majEtat(); });
+}
+function stopSon() { if (S.sTimer) clearInterval(S.sTimer); S.sTimer = null; if (S.micStream) S.micStream.getTracks().forEach(function (t) { t.stop(); }); S.micStream = null; try { if (S.actx) S.actx.close(); } catch (e) { } S.actx = null; S.son = false; }
+// vibrations (accéléromètre : chocs, manipulations, déplacements)
+function lancerVibrations() {
+  stopVibrations(); S.vib = true; S.vPrev = null; S.vCpt = 0; var dern = 0;
+  S.vHandler = function (ev) {
+    var a = ev.acceleration, m = null;
+    if (a && a.x !== null) m = Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
+    else { var ag = ev.accelerationIncludingGravity; if (ag && ag.x !== null) { if (S.vPrev) m = Math.sqrt(Math.pow(ag.x - S.vPrev[0], 2) + Math.pow(ag.y - S.vPrev[1], 2) + Math.pow(ag.z - S.vPrev[2], 2)); S.vPrev = [ag.x, ag.y, ag.z]; } }
+    if (m === null) return; var seuil = 4.5 - 0.4 * S.cfg.sens.vib;
+    if (m > seuil) { S.vCpt++; if (S.vCpt >= 2 && Date.now() - dern > 10000) { dern = Date.now(); declencher("vib", (m > 12 ? "Choc" : "Manipulation ou déplacement") + " (" + m.toFixed(1) + " m/s²)"); } } else S.vCpt = 0;
+  };
+  window.addEventListener("devicemotion", S.vHandler); majEtat();
+}
+function stopVibrations() { if (S.vHandler) window.removeEventListener("devicemotion", S.vHandler); S.vHandler = null; S.vib = false; }
 // ---- vue en direct (WebRTC : chiffré, de l'appareil vers l'administrateur) ----
 function fermerFlux(evenement) { if (S.pc) { try { S.pc.close(); } catch (e) { } S.pc = null; } if (S.astream) { S.astream.getTracks().forEach(function (t) { t.stop(); }); S.astream = null; } if (S.flux) { S.flux = false; if (evenement) evt("flux_termine", evenement); } $("aud").srcObject = null; majEtat(); }
 function traiterOffre(o) {
-  if (!S.consent || !S.vstream || S.offreId === o.id) return; S.offreId = o.id; fermerFlux("");
+  if (!S.consent || !S.vstream || !S.cfg.f.remote || S.offreId === o.id) return; S.offreId = o.id; fermerFlux("");
   var pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] }); S.pc = pc;
   pc.ontrack = function (ev) { if (ev.track.kind === "audio") { $("aud").srcObject = ev.streams[0] || new MediaStream([ev.track]); $("aud").play().catch(function () { }); } };
   pc.onconnectionstatechange = function () { if (pc.connectionState === "connected") { S.flux = true; evt("flux_connecte", ""); majEtat(); } else if (pc.connectionState === "failed" || pc.connectionState === "closed" || pc.connectionState === "disconnected") { if (S.pc === pc) fermerFlux("Connexion perdue"); } };
-  var pret = S.mic === "ok" ? navigator.mediaDevices.getUserMedia({ audio: true }).then(function (a) { S.astream = a; }).catch(function () { S.astream = null; }) : Promise.resolve();
+  var pret = S.mic === "ok" && S.cfg.f.micro && S.cfg.f.audio ? navigator.mediaDevices.getUserMedia({ audio: true }).then(function (a) { S.astream = a; }).catch(function () { S.astream = null; }) : Promise.resolve();
   pret.then(function () {
     S.vstream.getVideoTracks().forEach(function (t) { pc.addTrack(t, S.vstream); }); if (S.astream) S.astream.getAudioTracks().forEach(function (t) { pc.addTrack(t, S.astream); });
     return pc.setRemoteDescription({ type: "offer", sdp: o.sdp });
@@ -110,20 +171,23 @@ function traiterOffre(o) {
 }
 // ---- arrêt sûr ----
 function arreterTout(type, detail) {
-  S.consent = false; stopMouvement(); fermerFlux(""); if (S.vstream) S.vstream.getTracks().forEach(function (t) { t.stop(); }); S.vstream = null;
-  var v = $("vid"); v.srcObject = null; v.style.display = "none"; $("vide").style.display = ""; try { if (S.wake) S.wake.release(); } catch (e) { } S.wake = null; S.torche = false;
+  if (type) { try { localStorage.removeItem("gd-ok"); } catch (e) { } }
+  S.consent = false; stopMouvement(); stopSon(); stopVibrations(); fermerFlux(""); if (S.finTimer) clearInterval(S.finTimer); S.finTimer = null; S.fin = 0; if (S.vstream) S.vstream.getTracks().forEach(function (t) { t.stop(); }); S.vstream = null;
+  var v = $("vid"); v.srcObject = null; v.style.display = "none"; $("vide").style.display = ""; try { if (S.wake) S.wake.release(); } catch (e) { } S.wake = null; S.torche = false; S.trig = {};
   if (type) evt(type, detail); majEtat();
 }
+var _autoEssai = false;
+function autoReprise() { if (_autoEssai || S.consent || !S.cfg.auto) return; var t = Number(localStorage.getItem("gd-ok") || 0); if (!t || Date.now() - t > 12 * 3600 * 1000) return; _autoEssai = true; demarrerCaptation(); }
 // ---- dialogue avec le serveur ----
 function demarrerSonde() {
-  if (S.timer) return;
+  if (S.timer) return; analyserCapteurs();
   function tour() {
     if (!S.jeton) return;
     var tr = "non"; try { var t0 = S.vstream && S.vstream.getVideoTracks()[0]; if (t0 && t0.getCapabilities && t0.getCapabilities().torch) tr = S.torche ? "on" : "dispo"; } catch (e) { }
-    api("guardianSonde", [S.jeton, { mic: S.mic, capt: !!S.vstream, mvt: S.mvt, flux: S.flux, torche: tr, cam: S.cfg.camera, consent: S.consent }]).then(function (r) {
+    api("guardianSonde", [S.jeton, { mic: S.mic, capt: !!S.vstream, micActif: !!S.micStream, modes: { mvt: S.mvt, son: S.son, vib: S.vib }, flux: S.flux, torche: tr, cam: S.cfg.camera, consent: S.consent, caps: S.caps }]).then(function (r) {
       if (!S.enLigne) { S.enLigne = true; evt("reseau", "Connexion rétablie"); } if (!r) return;
       if (r.refuse) { localStorage.removeItem("gd-jeton"); S.jeton = ""; arreterTout("", ""); ecranJumelage(); msg("Ce jumelage n’est plus valide."); return; }
-      if (r.config) { var chg = r.config.camera !== S.cfg.camera; S.cfg = r.config; if (chg && S.vstream) relancerCamera(); }
+      if (r.config) { var chg = r.config.camera !== S.cfg.camera; S.cfg = r.config; if (!S.cfg.f.remote && S.pc) fermerFlux("Connexion à distance désactivée"); if (chg && S.vstream) relancerCamera(); else if (S.consent) appliquerModes(); else autoReprise(); }
       (r.commandes || []).forEach(function (c) { if (c === "arret") { var etait = S.consent; arreterTout("arret_distance", "Arrêt demandé à distance"); if (etait) { ecranConsentement(); msg("L’administrateur a arrêté la caméra."); } } else if (c === "fin_flux") fermerFlux("Fin demandée"); });
       if (r.offre && S.consent) traiterOffre(r.offre); majEtat();
     }).catch(function () { if (S.enLigne) { S.enLigne = false; majEtat(); } });
