@@ -1719,6 +1719,14 @@ var IrisVoix = (function () {
     };
     var bo = sure("Désactiver les notifications push", true, function () { if (!cd.value) { msg("Saisissez votre code de sécurité.", true); return; } var q = { action: "supprimer", code: cd.value }; cd.value = ""; appel("adminPush", q, function (r) { msg((r && r.msg) || "Échec.", !(r && r.ok)); majEtat(); }); });
     carte.appendChild(h("div", { c: "ed-row" }, [bs, bo]));
+    carte.appendChild(h("h4", { t: "Recevoir les alertes sur mon téléphone" })); carte.lastChild.style.cssText = "margin:16px 0 6px;font-size:15px";
+    carte.appendChild(h("p", { c: "ed-vide", t: "Choisissez votre propre profil d’agent : vous recevrez un avis court (sans nom ni détail) quand un agent dépose une demande de congé ou d’absence, signale un retard ou écrit dans les communications. Ce profil doit avoir activé les notifications sur votre téléphone. Saisissez votre code de sécurité ci-dessus avant de cliquer." }));
+    var cibEtat = h("p", { c: "ed-vide", t: "" }), selC = agentSelect(), bc = h("button", { c: "ed-b ed-p", t: "Définir ce profil comme destinataire", type: "button" });
+    function majCible() { appel("adminPushCible", { action: "etat" }, function (r) { cibEtat.textContent = r && r.ok ? (r.defini ? "Alertes vers votre téléphone : ACTIVES." : "Alertes vers votre téléphone : non définies.") : ""; }); }
+    majCible();
+    bc.onclick = function () { var a = DATA.agents[selC.selectedIndex]; if (!a) { msg("Choisissez un profil.", true); return; } if (!cd.value) { msg("Saisissez votre code de sécurité.", true); return; } var q = { action: "definir", nom: a.nom, prenom: a.prenom, code: cd.value }; cd.value = ""; appel("adminPushCible", q, function (r) { msg((r && r.msg) || "Échec.", !(r && r.ok)); majCible(); }); };
+    var bd = sure("Désactiver mes alertes", true, function () { if (!cd.value) { msg("Saisissez votre code de sécurité.", true); return; } var q = { action: "supprimer", code: cd.value }; cd.value = ""; appel("adminPushCible", q, function (r) { msg((r && r.msg) || "Échec.", !(r && r.ok)); majCible(); }); });
+    carte.appendChild(cibEtat); carte.appendChild(h("div", { c: "ed-row" }, [lab("Mon profil d’agent", selC)])); carte.appendChild(h("div", { c: "ed-row" }, [bc, bd]));
     carte.appendChild(h("h4", { t: "Envoyer un essai à un agent" })); carte.lastChild.style.cssText = "margin:16px 0 6px;font-size:15px";
     var sel = agentSelect(), be = h("button", { c: "ed-b", t: "Envoyer un essai", type: "button" });
     be.onclick = function () { var a = DATA.agents[sel.selectedIndex]; if (!a) { msg("Choisissez un agent.", true); return; } be.disabled = true; appel("adminPush", { action: "essai", nom: a.nom, prenom: a.prenom }, function (r) { be.disabled = false; msg((r && r.msg) || "Échec.", !(r && r.ok)); }); };
