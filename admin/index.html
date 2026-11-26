@@ -1702,6 +1702,28 @@ var IrisVoix = (function () {
     };
     carte.appendChild(h("div", { c: "ed-row" }, [be, bp])); carte.appendChild(sortie); c.appendChild(carte);
   }
+  // Notifications push (OneSignal, offre gratuite) : identifiant d'application (public) et clé d'API REST (secrète, jamais réaffichée)
+  function panePush(c) {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Notifications push (OneSignal)" })]), etat = h("p", { c: "ed-vide", t: "Chargement…" });
+    carte.appendChild(h("p", { c: "ed-vide", t: "Un avis sur le téléphone des agents quand vous répondez à une demande de congé, examinez un retard ou déposez un bulletin. Les messages sont courts et sans détail personnel ; chaque agent est désigné par un identifiant opaque (ni nom ni numéro). Il faut un compte gratuit OneSignal : l’identifiant d’application et la clé d’API REST se trouvent dans OneSignal, rubrique Réglages > Clés et identifiants. Sur iPhone, l’agent doit d’abord ajouter IRIS à son écran d’accueil." }));
+    carte.appendChild(etat);
+    function majEtat() { appel("adminPush", { action: "etat" }, function (r) { etat.textContent = r && r.ok ? (r.actif ? "Notifications push ACTIVES (identifiant d’application : " + r.appId.slice(0, 8) + "…)." : "Notifications push non configurées.") : "État indisponible."; }); }
+    majEtat();
+    var app = h("input", { type: "text", autocomplete: "off", placeholder: "Identifiant d’application OneSignal (36 caractères)" }), cl = h("input", { type: "password", autocomplete: "off", placeholder: "Clé d’API REST (secrète)" }), cd = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Votre code de sécurité" });
+    carte.appendChild(h("div", { c: "ed-row" }, [lab("Identifiant d’application", app), lab("Clé d’API REST", cl)])); carte.appendChild(h("div", { c: "ed-row" }, [lab("Votre code de sécurité", cd)]));
+    var bs = h("button", { c: "ed-b ed-p", t: "Enregistrer la configuration", type: "button" });
+    bs.onclick = function () {
+      if (!app.value || !cl.value || !cd.value) { msg("Remplissez les trois champs.", true); return; }
+      var q = { action: "enregistrer", appId: app.value, cle: cl.value, code: cd.value }; cl.value = ""; cd.value = "";
+      appel("adminPush", q, function (r) { msg((r && r.msg) || "Échec.", !(r && r.ok)); majEtat(); });
+    };
+    var bo = sure("Désactiver les notifications push", true, function () { if (!cd.value) { msg("Saisissez votre code de sécurité.", true); return; } var q = { action: "supprimer", code: cd.value }; cd.value = ""; appel("adminPush", q, function (r) { msg((r && r.msg) || "Échec.", !(r && r.ok)); majEtat(); }); });
+    carte.appendChild(h("div", { c: "ed-row" }, [bs, bo]));
+    carte.appendChild(h("h4", { t: "Envoyer un essai à un agent" })); carte.lastChild.style.cssText = "margin:16px 0 6px;font-size:15px";
+    var sel = agentSelect(), be = h("button", { c: "ed-b", t: "Envoyer un essai", type: "button" });
+    be.onclick = function () { var a = DATA.agents[sel.selectedIndex]; if (!a) { msg("Choisissez un agent.", true); return; } be.disabled = true; appel("adminPush", { action: "essai", nom: a.nom, prenom: a.prenom }, function (r) { be.disabled = false; msg((r && r.msg) || "Échec.", !(r && r.ok)); }); };
+    carte.appendChild(h("div", { c: "ed-row" }, [lab("Agent", sel), be])); c.appendChild(carte);
+  }
   function paneParam(c) {
     paneMdpAgents(c);
     paneRapport(c);
@@ -1715,6 +1737,7 @@ var IrisVoix = (function () {
     paneQrAge(c);
     paneResume(c);
     paneRgpd(c);
+    panePush(c);
     paneDeuxFacteurs(c);
     paneJournal(c);
     var an = h("input", { type: "password", autocomplete: "current-password", placeholder: "Ancien mot de passe" }), nv = h("input", { type: "password", autocomplete: "new-password", placeholder: "Nouveau mot de passe (10 caractères minimum, lettre + chiffre)" }), cf = h("input", { type: "password", autocomplete: "new-password", placeholder: "Confirmer le nouveau mot de passe" }), cd = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Code de sécurité (obligatoire)" });
