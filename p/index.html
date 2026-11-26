@@ -375,10 +375,11 @@ var IrisVoix = (function () {
   function valeur(c) { return c.value || ''; }
   function inserer(c, t) { var v = valeur(c), sep = v && !/\s$/.test(v) ? ' ' : ''; c.value = v + sep + t; try { c.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) { } c.focus(); }
   // Barre d'outils sous un champ : opts = { corriger(texte, cb(err, nouveauTexte)), reformuler(texte, cb), lire:true, dicter:true }
+  window.IRIS_LANGUES = window.IRIS_LANGUES || [['fr', 'Français', 'fr-FR'], ['ar', 'العربية · Arabe', 'ar-SA'], ['pt', 'Português', 'pt-PT'], ['es', 'Español', 'es-ES'], ['en', 'English', 'en-GB'], ['ro', 'Română', 'ro-RO'], ['it', 'Italiano', 'it-IT'], ['tr', 'Türkçe', 'tr-TR'], ['ht', 'Kreyòl ayisyen · Créole haïtien', ''], ['bm', 'Bamanankan · Bambara', ''], ['snk', 'Sooninkanxanne · Soninké', ''], ['ff', 'Fulfulde · Peul', ''], ['gp', 'Kréyòl Gwadloup · Créole guadeloupéen', ''], ['mq', 'Kréyòl Matinik · Créole martiniquais', ''], ['tl', 'Filipino · Philippin (tagalog)', 'fil-PH']];
   function barre(champ, opts) {
     opts = opts || {}; var bar = document.createElement('div'); bar.className = 'iv-bar'; bar.setAttribute('data-iv', '1'); var note = document.createElement('div'); note.className = 'iv-note'; note.setAttribute('role', 'status');
     function msg(t) { note.textContent = t || ''; }
-    var LANGUES = [['fr', 'Français', 'fr-FR'], ['ar', 'العربية · Arabe', 'ar-SA'], ['pt', 'Português', 'pt-PT'], ['es', 'Español', 'es-ES'], ['en', 'English', 'en-GB'], ['ro', 'Română', 'ro-RO'], ['it', 'Italiano', 'it-IT'], ['tr', 'Türkçe', 'tr-TR'], ['ht', 'Kreyòl ayisyen · Créole haïtien', ''], ['bm', 'Bamanankan · Bambara', ''], ['snk', 'Sooninkanxanne · Soninké', ''], ['ff', 'Fulfulde · Peul', ''], ['gp', 'Kréyòl Gwadloup · Créole guadeloupéen', ''], ['mq', 'Kréyòl Matinik · Créole martiniquais', '']], code = 'fr', btrad = null;
+    var LANGUES = window.IRIS_LANGUES, code = 'fr', btrad = null;
     function langueRec() { for (var i = 0; i < LANGUES.length; i++) if (LANGUES[i][0] === code) return LANGUES[i][2]; return 'fr-FR'; }
     var IA_APPROX = { bm: 1, snk: 1, ff: 1, gp: 1, mq: 1 };
     function langueNom() { for (var i = 0; i < LANGUES.length; i++) if (LANGUES[i][0] === code) return LANGUES[i][1].split(' · ').pop(); return ''; }
@@ -1482,13 +1483,15 @@ function cmaMessages(pm) {
 
   /* Outils d'écriture */
   var v = cmaVoix();
+  var langMsg = "fr";
+  function locMsg() { var L = window.IRIS_LANGUES || []; for (var i = 0; i < L.length; i++) if (L[i][0] === langMsg) return L[i][2]; return "fr-FR"; }
   if (cmaPeutLire()) { var bl = cmaBtn("Écouter", "", function () { if (!ta.value.trim()) { note("Rien à écouter pour le moment."); return; } note(""); bl.classList.add("on"); if (!cmaLit(ta.value, function () { bl.classList.remove("on"); }, bl)) bl.classList.remove("on"); }); out.appendChild(bl); tools.push(bl); }
   if (cmaPeutDicter()) {
     var bd = cmaBtn("Dicter", ""), ec = false; tools.push(bd);
     CMA.dict = v.dicter(function (t) { var s0 = ta.value, sep = s0 && !/\s$/.test(s0) ? " " : ""; ta.value = s0 + sep + t; }, function (e, m) {
       if (e === "ecoute") { ec = true; bd.classList.add("on"); bd.textContent = "J’écoute… (appuyez pour arrêter)"; note(""); } else { ec = false; bd.classList.remove("on"); bd.textContent = "Dicter"; if (e === "erreur") note(m, true); }
-    });
-    bd.onclick = function () { if (!CMA.dict) return; if (ec) CMA.dict.arreter(); else CMA.dict.demarrer(); }; out.appendChild(bd);
+    }, function () { return locMsg(); });
+    bd.onclick = function () { if (!CMA.dict) return; if (!ec && !locMsg()) { note("La dictée n’existe pas pour cette langue sur le téléphone : écrivez votre texte, puis touchez « Traduire en français »."); return; } if (ec) CMA.dict.arreter(); else CMA.dict.demarrer(); }; out.appendChild(bd);
   }
   function ferme() { ap.style.display = "none"; ap.textContent = ""; env.disabled = M.env || M.lect > 0; }
   function reecrire(mode, libelle) {
@@ -1504,7 +1507,8 @@ function cmaMessages(pm) {
   // Aperçu avant remplacement : rien n'est modifié tant que l'agent n'a pas choisi
   function propose(avant, apres, mode) {
     note(""); ap.textContent = ""; ap.style.display = "block"; env.disabled = true;
-    ap.appendChild(cmaDiv("lb", mode === "corriger" ? "Proposition corrigée (votre texte n’est pas encore remplacé)" : "Proposition reformulée (votre texte n’est pas encore remplacé)"));
+    ap.appendChild(cmaDiv("lb", mode === "traduire" ? "Traduction en français (votre texte n’est pas encore remplacé)" : mode === "corriger" ? "Proposition corrigée (votre texte n’est pas encore remplacé)" : "Proposition reformulée (votre texte n’est pas encore remplacé)"));
+    if (mode === "traduire" && { bm: 1, snk: 1, ff: 1, gp: 1, mq: 1 }[langMsg]) ap.appendChild(cmaDiv("av", "Traduction automatique approximative pour cette langue : relisez bien. Votre texte d’origine sera conservé avec le message."));
     var pp = cmaDiv("pp", apres); ap.appendChild(pp);
     var dif = cmaDifferences(avant, apres);
     if (dif.length) ap.appendChild(cmaDiv("av", "Attention : une date, une heure ou un nombre est différent (" + dif.join(", ") + "). Vérifiez avant d’utiliser ce texte."));
@@ -1519,6 +1523,19 @@ function cmaMessages(pm) {
   }
   var bc = cmaBtn("Corriger", "", function () { reecrire("corriger", "Correction en cours…"); }); out.appendChild(bc); tools.push(bc);
   var br = cmaBtn("Reformuler", "", function () { reecrire("reformuler", "Reformulation en cours…"); }); out.appendChild(br); tools.push(br);
+  // Traduction : l'agent écrit dans sa langue, IRIS propose la traduction française, le texte d'origine est conservé avec le message
+  var slm = document.createElement("select"); slm.setAttribute("aria-label", "Langue dans laquelle vous écrivez"); slm.setAttribute("dir", "auto");
+  slm.style.cssText = "padding:9px 12px;font-size:15px;font-weight:600;border-radius:12px;border:1px solid #d9b15f;background:#fff;color:#07152e;max-width:100%;margin:0";
+  (window.IRIS_LANGUES || [["fr", "Français", "fr-FR"]]).forEach(function (l) { var o = document.createElement("option"); o.value = l[0]; o.textContent = l[1]; slm.appendChild(o); });
+  var btm = cmaBtn("Traduire en français", "", function () {
+    if (M.rew || M.env) return;
+    var t = ta.value.trim(); if (t.length < 2) { note("Écrivez d’abord quelques mots dans votre langue.", true); return; }
+    M.rew = true; bloque(true); env.disabled = true; note("Traduction en cours…");
+    traduireIA(t, langMsg, function (err, fr) { M.rew = false; bloque(false); env.disabled = M.env || M.lect > 0 || ap.style.display !== "none"; if (err || !fr) { note(err || "Traduction impossible.", true); return; } propose(t, fr, "traduire"); });
+  });
+  btm.style.display = "none"; tools.push(btm);
+  slm.onchange = function () { langMsg = slm.value; btm.style.display = langMsg === "fr" ? "none" : ""; note(langMsg === "fr" ? "" : "Écrivez ou dictez dans votre langue, puis touchez « Traduire en français »."); };
+  tools.push(slm); out.appendChild(slm); out.appendChild(btm);
   ta.addEventListener("input", function () { if (!ta.value.trim()) M.orig = ""; });
 
   /* Envoi : un seul envoi à la fois ; après une coupure réseau on vérifie d'abord que le message n'est pas déjà parti */
