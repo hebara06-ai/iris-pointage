@@ -1176,10 +1176,13 @@ var IrisVoix = (function () {
     c.appendChild(so); c.appendChild(tout);
   }
   function carteAg(a, neuf) {
-    var f = {}, g = h("div", { c: "ed-g" }), cb = [], low = String(a.jours || "").toLowerCase(), ch = h("div", { c: "ed-ch" });
+    if (!document.getElementById("ed-g6css")) { var stg = document.createElement("style"); stg.id = "ed-g6css"; stg.textContent = ".ed-g6{grid-template-columns:repeat(6,minmax(0,1fr))}@media(max-width:1100px){.ed-g6{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}}"; document.head.appendChild(stg); }
+    var f = {}, g = h("div", { c: "ed-g ed-g6" }), cb = [], low = String(a.jours || "").toLowerCase(), ch = h("div", { c: "ed-ch" });
     function champ(k, l, typ, v) { var i = h("input", { type: typ || "text" }); i.value = v || ""; f[k] = i; g.appendChild(lab(l, i)); }
     champ("nom", "Nom", "text", a.nom); champ("prenom", "Prénom", "text", a.prenom); champ("tel", "Téléphone", "tel", a.tel); champ("email", "Adresse e-mail (facultatif)", "email", a.email);
-    champ("service", "Service dédié", "text", a.service || "Samsic Propreté"); champ("codeServeur", "Matricule", "text", a.secteur || ""); f.codeServeur.autocomplete = "off"; f.codeServeur.setAttribute("inputmode", "numeric"); f.codeServeur.placeholder = "Non renseigné"; champ("badge", "N° de badge", "text", a.badge); champ("carte", "N° d’accès", "text", a.carte);
+    champ("service", "Service dédié", "text", a.service || "Samsic Propreté");
+    var ssOk = !!SSM[a.l], cs = h("input", { type: "text", maxlength: "21", inputmode: "numeric", autocomplete: "off", placeholder: neuf ? "Après ajout" : (ssOk ? "Enregistré (masqué)" : "À remplir") }); cs.disabled = !!neuf; g.appendChild(lab("Sécurité sociale", cs));
+    champ("codeServeur", "Matricule", "text", a.secteur || ""); f.codeServeur.autocomplete = "off"; f.codeServeur.setAttribute("inputmode", "numeric"); f.codeServeur.placeholder = "Non renseigné"; champ("badge", "N° de badge", "text", a.badge); champ("carte", "N° d’accès", "text", a.carte);
     champ("debut", "Début", "time", hm(a.debut)); champ("fin", "Fin", "time", hm(a.fin));
     NJ.forEach(function (n, i) { var x = h("input", { type: "checkbox" }); x.checked = a.jours ? low.indexOf(n.toLowerCase()) >= 0 : i < 5; cb.push(x); ch.appendChild(h("label", { c: "ed-cj" }, [x, h("span", { t: n })])); });
     function vals() { return { nom: f.nom.value, prenom: f.prenom.value, tel: f.tel.value, email: f.email.value, codeServeur: f.codeServeur.value, service: f.service.value, badge: f.badge.value, carte: f.carte.value, debut: f.debut.value, fin: f.fin.value, jours: NJ.filter(function (n, i) { return cb[i].checked; }).join(" ") }; }
@@ -1187,7 +1190,16 @@ var IrisVoix = (function () {
     var bar = h("div", { c: "ed-row" }), av = [a.nom, a.prenom];
     if (neuf) { var ad = h("button", { c: "ed-b ed-p", t: "Ajouter l’agent", type: "button" }); ad.onclick = function () { action("adminAgent", avec({ action: "ajout" })); }; bar.appendChild(ad); }
     else {
-      var sv = h("button", { c: "ed-b ed-p", t: "Enregistrer", type: "button" }); sv.onclick = function () { sv.disabled = true; sv.textContent = "Enregistrement…"; action("adminAgent", avec({ action: "maj", l: a.l, av: av })); setTimeout(function () { if (sv.isConnected) { sv.disabled = false; sv.textContent = "Enregistrer les changements"; } }, 8000); }; bar.appendChild(sv);
+      var sv = h("button", { c: "ed-b ed-p", t: "Enregistrer", type: "button" }); sv.onclick = function () {
+        function suite() { sv.disabled = true; sv.textContent = "Enregistrement…"; action("adminAgent", avec({ action: "maj", l: a.l, av: av })); }
+        function enregSS(force) { appel("adminSecu", { action: "definir", l: a.l, av: av, valeur: cs.value, force: force }, function (r) { if (r && r.ok) { cs.value = ""; SSM[a.l] = true; suite(); } else if (r && r.cle && window.confirm((r.msg || "La clé de contrôle ne correspond pas.") + " Enregistrer quand même ?")) enregSS(true); else msg((r && r.msg) || "Échec.", true); }); }
+        if (cs.value.trim()) { enregSS(false); return; }
+        suite(); setTimeout(function () { if (sv.isConnected) { sv.disabled = false; sv.textContent = "Enregistrer les changements"; } }, 8000); }; bar.appendChild(sv);
+      if (ssOk) {
+        var visSS = false, bvoir = h("button", { c: "ed-b", t: "Afficher la sécurité sociale", type: "button" });
+        bvoir.onclick = function () { if (visSS) { visSS = false; cs.value = ""; bvoir.textContent = "Afficher la sécurité sociale"; return; } appel("adminSecu", { action: "voir", l: a.l, av: av }, function (r) { if (r && r.ok) { visSS = true; cs.value = r.valeur; bvoir.textContent = "Masquer la sécurité sociale"; } else msg((r && r.msg) || "Échec.", true); }); };
+        bar.appendChild(bvoir); bar.appendChild(sure("Effacer la sécurité sociale", true, function () { appel("adminSecu", { action: "effacer", l: a.l, av: av }, function (r) { if (r && r.ok) { SSM[a.l] = false; msg(r.msg || "Effacé."); cs.value = ""; cs.placeholder = "À remplir"; } else msg((r && r.msg) || "Échec.", true); }); }));
+      }
       if (a.appareil) bar.appendChild(sure("Libérer le téléphone", false, function () { action("adminAgent", { action: "liberer", l: a.l, av: av }); }));
       bar.appendChild(sure("Supprimer l’agent", true, function () { action("adminAgent", { action: "sup", l: a.l, av: av }); }));
       if (a.email) { var ev = h("button", { c: "ed-b", t: a.emailOk ? "Retirer la vérification de l’e-mail" : "Marquer l’e-mail comme vérifié", type: "button" }); ev.onclick = function () { action("adminEmailVerifie", { l: a.l, av: av, oui: !a.emailOk }); }; bar.appendChild(ev); }
@@ -1343,6 +1355,11 @@ var IrisVoix = (function () {
   // Journal d'activité : opérations sensibles de l'administration, les plus récentes d'abord, avec recherche
   function paneJournal(c) {
     var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Journal d’activité" })]), liste = h("div", {}), q = h("input", { type: "search", placeholder: "Rechercher (nom, action, date…)" });
+    var corpsJ = h("div", {}), bascule = h("button", { c: "ed-b", t: "Afficher", type: "button" }), ouvertJ = false, charge0 = false;
+    corpsJ.style.display = "none";
+    carte.firstChild.style.display = "inline-block"; carte.firstChild.style.marginRight = "14px"; carte.appendChild(bascule);
+    carte.appendChild(corpsJ);
+    var carteTete = carte; carte = corpsJ;
     carte.appendChild(h("p", { c: "ed-vide", t: "Qui a fait quoi et quand : suppressions, corrections, exports, rapports, sécurité. Les 300 plus récentes lignes." }));
     function charge() {
       liste.textContent = ""; liste.appendChild(h("p", { c: "ed-vide", t: "Chargement…" }));
@@ -1359,7 +1376,8 @@ var IrisVoix = (function () {
     }
     var bt = h("button", { c: "ed-b", t: "Rechercher", type: "button" }); bt.onclick = charge;
     q.onkeydown = function (e) { if (e.key === "Enter") charge(); };
-    carte.appendChild(h("div", { c: "ed-row" }, [q, bt])); carte.appendChild(liste); c.appendChild(carte); charge();
+    carte.appendChild(h("div", { c: "ed-row" }, [q, bt])); carte.appendChild(liste); c.appendChild(carteTete);
+    bascule.onclick = function () { ouvertJ = !ouvertJ; corpsJ.style.display = ouvertJ ? "" : "none"; bascule.textContent = ouvertJ ? "Masquer" : "Afficher"; if (ouvertJ && !charge0) { charge0 = true; charge(); } };
   }
   // Profil Paie : vue réduite (export seul) pour la personne qui prépare les paies
   window.ouvrirPaie = function () {
@@ -1745,7 +1763,6 @@ var IrisVoix = (function () {
     paneRgpd(c);
     panePush(c);
     paneDeuxFacteurs(c);
-    paneJournal(c);
     var an = h("input", { type: "password", autocomplete: "current-password", placeholder: "Ancien mot de passe" }), nv = h("input", { type: "password", autocomplete: "new-password", placeholder: "Nouveau mot de passe (10 caractères minimum, lettre + chiffre)" }), cf = h("input", { type: "password", autocomplete: "new-password", placeholder: "Confirmer le nouveau mot de passe" }), cd = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Code de sécurité (obligatoire)" });
     var ok = h("button", { c: "ed-b ed-p", t: "Modifier mon mot de passe", type: "button" });
     ok.onclick = function () {
@@ -1757,6 +1774,9 @@ var IrisVoix = (function () {
     };
     c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Modifier mon mot de passe" }), h("p", { c: "ed-vide", t: "Vous pouvez le changer à tout moment. Il faut saisir l’ancien mot de passe ET votre code de sécurité. Une alerte est envoyée par e-mail et toutes les sessions sont fermées." }), lab("Ancien mot de passe", an), lab("Nouveau mot de passe", nv), lab("Confirmer", cf), lab("Code de sécurité", cd), h("div", { c: "ed-row", style: "margin-top:14px" }, [ok])]));
     carteCodeSecu(c);
+    // Mot de passe et code de sécurité en haut de la page ; journal d’activité tout en bas
+    var dm = c.children.length - 2, hautEl = [c.children[dm], c.children[dm + 1]]; hautEl.reverse().forEach(function (e) { if (e) c.insertBefore(e, c.firstChild); });
+    paneJournal(c);
   }
   // Changement du code de sécurité (ajout isolé) : on demande un code par e-mail, puis on saisit le code reçu, le nouveau code et le portable
   function carteCodeSecu(c) {
@@ -1816,10 +1836,17 @@ var IrisVoix = (function () {
     carte.appendChild(h("div", { c: "ed-row" }, [bp, bc, bs])); carte.appendChild(titre); carte.appendChild(corps); aller(0);
     return carte;
   }
+  var SSM = {};
   function paneAg(c) {
     c.appendChild(cartePlanning());
-    c.appendChild(carteAg({ nom: "", prenom: "", tel: "", jours: "" }, true));
-    DATA.agents.forEach(function (a) { c.appendChild(carteAg(a, false)); });
+    var zone = h("div", {}); c.appendChild(zone);
+    function dessin() {
+      zone.textContent = "";
+      zone.appendChild(carteAg({ nom: "", prenom: "", tel: "", jours: "" }, true));
+      DATA.agents.forEach(function (a) { zone.appendChild(carteAg(a, false)); });
+    }
+    dessin();
+    appel("adminCodesLire", {}, function (r) { if (r && r.ok) { SSM = {}; r.agents.forEach(function (x) { if (x.ssSet) SSM[x.l] = true; }); if (zone.isConnected && !enEdition()) dessin(); } });
     c.appendChild(h("p", { c: "ed-vide", t: "Modifier un nom met aussi à jour son historique de pointages et de justificatifs." }));
     c.appendChild(carteRecup()); c.appendChild(carteImport());
   }
