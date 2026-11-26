@@ -1965,7 +1965,7 @@ var IrisVoix = (function () {
   function carteBulletins() {
     var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Bulletins de paie" })]), sel = agentSelect(), mois = h("input", { type: "month" }), fic = h("input", { type: "file", accept: "application/pdf,.pdf" }), suivi = h("div", {});
     var d0 = new Date(); d0.setMonth(d0.getMonth() - 1); mois.value = d0.getFullYear() + "-" + ("0" + (d0.getMonth() + 1)).slice(-2);
-    carte.appendChild(h("p", { c: "ed-vide", t: "Déposez le bulletin PDF d’un agent pour un mois : seul cet agent le verra, dans son espace (onglet Gestion administrative). Le fichier est rangé dans un dossier Drive privé. Un bulletin déjà déposé ne peut pas être remplacé ni supprimé ici. 5 Mo au plus, PDF uniquement." }));
+    carte.appendChild(h("p", { c: "ed-vide", t: "Déposez le bulletin PDF d’un agent pour un mois : seul cet agent le verra, dans son espace (onglet Gestion administrative). Le fichier est rangé dans un dossier Drive privé. Pour remplacer un bulletin déposé par erreur, supprimez-le d’abord (le PDF reste 30 jours dans la corbeille Drive), puis déposez le bon. 5 Mo au plus, PDF uniquement." }));
     carte.appendChild(h("div", { c: "ed-row" }, [lab("Agent", sel), lab("Mois du bulletin", mois)])); carte.appendChild(h("div", { c: "ed-row" }, [lab("Fichier PDF", fic)]));
     var go = h("button", { c: "ed-b ed-p", t: "Déposer le bulletin", type: "button" });
     function majSuivi() {
@@ -1974,7 +1974,7 @@ var IrisVoix = (function () {
         suivi.textContent = "";
         if (!(r && r.ok)) { suivi.appendChild(h("p", { c: "ed-vide", t: (r && r.msg) || "Suivi indisponible." })); return; }
         suivi.appendChild(h("p", { c: "ed-vide", t: r.deposes + " bulletin(s) déposé(s) sur " + r.agents.length + " agent(s) pour " + r.periode + " :" }));
-        r.agents.forEach(function (a) { suivi.appendChild(h("div", { c: "sg-m", t: (a.depose ? "✔ " : "✖ ") + a.nom + " " + a.prenom + (a.depose ? (a.lu ? " — consulté le " + a.lu : " — pas encore consulté") : " — pas de bulletin") })); });
+        r.agents.forEach(function (a) { var l = h("div", { c: "sg-m", t: (a.depose ? "✔ " : "✖ ") + a.nom + " " + a.prenom + (a.depose ? (a.lu ? " — consulté le " + a.lu : " — pas encore consulté") : " — pas de bulletin") }); if (a.depose) { var bsup = sure("Supprimer", true, function () { appel("adminBulletinSupprimer", { nom: a.nom, prenom: a.prenom, periode: mois.value }, function (r2) { msg((r2 && r2.msg) || "Échec.", !(r2 && r2.ok)); majSuivi(); }); }); l.appendChild(document.createTextNode(" ")); l.appendChild(bsup); } suivi.appendChild(l); });
       });
     }
     mois.onchange = majSuivi;
@@ -2523,6 +2523,7 @@ var IrisVoix = (function () {
     L.forEach(function (x) {
       var acts = [cmBtn("Ouvrir", function () { cmOuvrirDetail(x.id); })];
       if (x.statut !== "Archivée") { acts.push(cmBtn("Modifier", function () { cmNouveau(x); })); acts.push(sure("Archiver", true, function () { cmAppel("cmAdminArchiver", [x.id], function (r) { if (r && r.ok) { msg(r.msg); CM.liste = null; cmDess(); } else msg((r && r.msg) || "Échec.", true); }); })); }
+      else acts.push(sure("Supprimer définitivement", true, function () { cmAppel("cmAdminSupprimer", [x.id], function (r) { if (r && r.ok) { msg(r.msg); CM.liste = null; cmDess(); } else msg((r && r.msg) || "Suppression impossible.", true); }); }));
       var nbp = (x.pieces || []).length, meta = (nbp ? nbp + " pièce(s) jointe(s) · " : "") + (x.statut === "Brouillon" ? "Brouillon" : x.statut === "Programmée" ? "Programmée pour le " + cmQuand(x.publication) : x.nbLus + " lu(s) sur " + x.nbDest + " destinataire(s)");
       var tags = [cmTag(x.statut), cmTag(x.categorie)]; if (x.priorite !== "Normale") tags.push(cmTag(x.priorite)); if (x.confidentiel) tags.push(cmTag("Confidentiel")); if (x.version > 1) tags.push(cmTag("Version " + x.version));
       var st = [];
@@ -2564,6 +2565,7 @@ var IrisVoix = (function () {
     (x.rappels || []).forEach(function (r) { opts.push(cmTag("Rappel " + cmDelai(r.h) + (r.cible === "tous" ? " (tous)" : " (sans réponse)"))); });
     var acts = []; var ec = null; try { ec = window.IrisVoix && IrisVoix.boutonLire ? IrisVoix.boutonLire(x.message || "", "Écouter le message") : null; } catch (e) { } if (ec) acts.push(ec);
     if (x.statut !== "Archivée") { acts.push(cmBtn("Modifier", function () { cmNouveau(x); })); acts.push(cmSure("Archiver", true, function (b) { cmAction(b, "cmAdminArchiver", [x.id], function (r) { if (r.ok) { msg(r.msg); CM.liste = null; cmRetour(); } else msg(r.msg || "Échec.", true); }); })); }
+    else acts.push(cmSure("Supprimer définitivement", true, function (b) { cmAction(b, "cmAdminSupprimer", [x.id], function (r) { if (r.ok) { msg(r.msg); CM.liste = null; cmRetour(); } else msg(r.msg || "Suppression impossible.", true); }); }));
     if (opts.length) c.appendChild(h("div", { c: "ed-row" }, opts)); if (acts.length) c.appendChild(cmLigne(acts.map(cmGros)));
     if ((x.pieces || []).length) c.appendChild(h("div", { c: "ed-card" }, [h("h3", { t: "Pièces jointes" })].concat(x.pieces.map(function (pj, n) { return h("div", { c: "ed-la" }, [h("span", { t: pj.nom + " (" + cmOctets(pj.taille) + ")" }), cmBtn("Télécharger", function (b) { cmAction(b, "cmAdminPiece", [x.id, n], function (r) { if (r.ok) cmTelecharger(r); else msg(r.msg || "Téléchargement impossible.", true); }); })]); }))));
     var lus = D.filter(function (d) { return d.lu; }).length, acc = D.filter(function (d) { return d.accuseLe; }).length;
