@@ -50,17 +50,17 @@ function analyserCapteurs() {
 // ---- écrans ----
 function ecranJumelage() {
   var e = $("ecran"); e.innerHTML = "";
-  e.insertAdjacentHTML("beforeend", '<p class="n">Cet appareil n’est pas jumelé. Dans l’espace administrateur d’IRIS (menu IRIS Guardian), activez le mode laboratoire puis choisissez « Jumeler un appareil » : un code à 8 chiffres s’affiche pour 10 minutes.</p><input id="code" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="Code à 8 chiffres" aria-label="Code de jumelage"><button id="bj">Jumeler cet appareil</button>');
+  e.insertAdjacentHTML("beforeend", '<p class="n">Cet appareil n’est pas connecté. Dans l’espace administrateur d’IRIS (menu IRIS Guardian), activez le mode laboratoire puis choisissez « Connecter un appareil » : un code à 8 chiffres s’affiche pour 10 minutes.</p><input id="code" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="Code à 8 chiffres" aria-label="Code de connexion"><button id="bj">Connecter cet appareil</button>');
   $("bj").onclick = function () {
     var c = $("code").value.replace(/\D/g, ""); if (c.length !== 8) { msg("Le code fait 8 chiffres."); return; }
-    $("bj").disabled = true; msg("Jumelage…");
-    api("guardianJumeler", [c, "Téléphone d’essai"]).then(function (r) { if (r && r.ok && r.jeton) { S.jeton = r.jeton; localStorage.setItem("gd-jeton", r.jeton); msg("Appareil jumelé."); ecranConsentement(); demarrerSonde(); } else { msg((r && r.msg) || "Jumelage impossible."); $("bj").disabled = false; } }).catch(function () { msg("Connexion impossible. Réessayez."); $("bj").disabled = false; });
+    $("bj").disabled = true; msg("Connexion…");
+    api("guardianJumeler", [c, "Téléphone d’essai"]).then(function (r) { if (r && r.ok && r.jeton) { S.jeton = r.jeton; localStorage.setItem("gd-jeton", r.jeton); msg("Appareil connecté."); ecranConsentement(); demarrerSonde(); } else { msg((r && r.msg) || "Connexion impossible."); $("bj").disabled = false; } }).catch(function () { msg("Connexion impossible. Réessayez."); $("bj").disabled = false; });
   };
 }
 function ecranConsentement() {
   var e = $("ecran"); e.innerHTML = "";
-  e.insertAdjacentHTML("beforeend", '<p class="n"><b style="color:#E1E7F0">Essai à domicile — participants informés et consentants.</b><br>Si l’administrateur l’active, la vue peut aussi être <b>enregistrée sur son ordinateur</b> : un message rouge l’indique alors à l’écran. En touchant « J’accepte », ce téléphone pourra utiliser sa <b>caméra</b>, ses <b>capteurs de mouvement</b> et, si l’administrateur l’active, son <b>micro pour mesurer le niveau sonore</b> (sans rien enregistrer), tant que cette page reste ouverte et pendant la durée maximale de la session. Pendant une vue en direct, le micro transmet aussi le son. Un <b>voyant rouge</b> est toujours visible quand la caméra ou le micro fonctionne. <b>Rien n’est enregistré.</b> Vous pouvez tout arrêter à tout moment avec le bouton ARRÊT.</p><button id="ba">J’accepte et je démarre</button><button class="s" id="bo">Oublier le jumelage de cet appareil</button>');
-  $("ba").onclick = demarrerCaptation; $("bo").onclick = function () { arreterTout("arret_local", "Jumelage oublié"); localStorage.removeItem("gd-jeton"); S.jeton = ""; ecranJumelage(); };
+  e.insertAdjacentHTML("beforeend", '<p class="n"><b style="color:#E1E7F0">Essai à domicile — participants informés et consentants.</b><br>Si l’administrateur l’active, la vue peut aussi être <b>enregistrée sur son ordinateur</b> : un message rouge l’indique alors à l’écran. En touchant « J’accepte », ce téléphone pourra utiliser sa <b>caméra</b>, ses <b>capteurs de mouvement</b> et, si l’administrateur l’active, son <b>micro pour mesurer le niveau sonore</b> (sans rien enregistrer), tant que cette page reste ouverte et pendant la durée maximale de la session. Pendant une vue en direct, le micro transmet aussi le son. Un <b>voyant rouge</b> est toujours visible quand la caméra ou le micro fonctionne. <b>Rien n’est enregistré.</b> Vous pouvez tout arrêter à tout moment avec le bouton ARRÊT.</p><button id="ba">J’accepte et je démarre</button><button class="s" id="bo">Déconnecter cet appareil</button>');
+  $("ba").onclick = demarrerCaptation; $("bo").onclick = function () { arreterTout("arret_local", "Appareil déconnecté"); localStorage.removeItem("gd-jeton"); S.jeton = ""; ecranJumelage(); };
   majEtat();
 }
 function ecranActif() {
@@ -186,7 +186,7 @@ function demarrerSonde() {
     var tr = "non"; try { var t0 = S.vstream && S.vstream.getVideoTracks()[0]; if (t0 && t0.getCapabilities && t0.getCapabilities().torch) tr = S.torche ? "on" : "dispo"; } catch (e) { }
     api("guardianSonde", [S.jeton, { mic: S.mic, capt: !!S.vstream, micActif: !!S.micStream, modes: { mvt: S.mvt, son: S.son, vib: S.vib }, flux: S.flux, torche: tr, cam: S.cfg.camera, consent: S.consent, caps: S.caps }]).then(function (r) {
       if (!S.enLigne) { S.enLigne = true; evt("reseau", "Connexion rétablie"); } if (!r) return;
-      if (r.refuse) { localStorage.removeItem("gd-jeton"); S.jeton = ""; arreterTout("", ""); ecranJumelage(); msg("Ce jumelage n’est plus valide."); return; }
+      if (r.refuse) { localStorage.removeItem("gd-jeton"); S.jeton = ""; arreterTout("", ""); ecranJumelage(); msg("Cette connexion n’est plus valide."); return; }
       if (r.config) { var chg = r.config.camera !== S.cfg.camera; S.cfg = r.config; if (!S.cfg.f.remote && S.pc) fermerFlux("Connexion à distance désactivée"); if (chg && S.vstream) relancerCamera(); else if (S.consent) appliquerModes(); else autoReprise(); }
       (r.commandes || []).forEach(function (c) { if (c === "arret") { var etait = S.consent; arreterTout("arret_distance", "Arrêt demandé à distance"); if (etait) { ecranConsentement(); msg("L’administrateur a arrêté la caméra."); } } else if (c === "fin_flux") fermerFlux("Fin demandée"); });
       if (r.offre && S.consent) traiterOffre(r.offre); majEtat();
