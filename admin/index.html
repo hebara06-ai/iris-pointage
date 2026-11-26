@@ -1610,6 +1610,98 @@ var IrisVoix = (function () {
     var bf = sure("Désactiver le résumé", true, function () { envoi("desactiver"); });
     carte.appendChild(h("div", { c: "ed-row" }, [bo, be, bf])); c.appendChild(carte);
   }
+  // Données personnelles (RGPD) : registre des traitements, notice d'information, note CSE (projets à faire valider), droit d'accès et aperçu d'effacement
+  function rgpdEchap(s) { return String(s === null || s === undefined ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+  function rgpdPage(titre, corps) {
+    return '<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' + rgpdEchap(titre) + '</title><style>@page{size:A4;margin:16mm}*{box-sizing:border-box}body{margin:0;background:#fff;color:#0b1a2b;font:14.5px/1.55 -apple-system,"Segoe UI",Helvetica,Arial,sans-serif}.p{max-width:860px;margin:0 auto;padding:36px 24px}' +
+      'h1{font:400 30px/1.2 Georgia,"Times New Roman",serif;text-align:center;margin:6px 0}h2{font:600 18px Georgia,serif;margin:26px 0 6px;border-bottom:2px solid #cdb88a;padding-bottom:4px}.s{color:#6e6a60;text-align:center;font-size:13px}.fil{height:2px;width:90px;background:#cdb88a;margin:14px auto}' +
+      '.av{background:#fbf3dc;border:1px solid #cdb88a;border-radius:10px;padding:10px 14px;margin:16px 0;font-size:13.5px}.cp{background:#fff3b0;padding:0 3px;border-radius:3px}table{width:100%;border-collapse:collapse;margin:10px 0 18px;font-size:13px}th{background:#0b1a2b;color:#fff;padding:7px;text-align:left}td{padding:7px;border-bottom:1px solid #e7e2d6;vertical-align:top}@media print{.p{padding:0}}</style></head><body><div class="p"><div class="s">IRIS · Gestion du personnel de propreté</div><h1>' + rgpdEchap(titre) + '</h1><div class="fil"></div>' +
+      '<div class="av"><b>Projet de travail.</b> Ce document est un modèle préparé à partir du fonctionnement réel d’IRIS. Il doit être relu, complété (zones surlignées) et validé par un juriste ou le délégué à la protection des données avant toute diffusion. Il ne constitue pas un avis juridique.</div>' + corps + '</div></body></html>';
+  }
+  var RGPD_TRAITEMENTS = [
+    ["Pointage des présences par QR code", "Enregistrer les heures d’arrivée et de départ pour décompter le temps de travail et préparer la paie.", "Exécution du contrat de travail ; obligation légale de décompte de la durée du travail.", "Nom, prénom, numéro de téléphone, date et heure d’arrivée et de départ, identifiant technique du téléphone. Pas de biométrie ni de géolocalisation.", "Responsables habilités ; personne chargée de la paie (profil Paie, export de chiffres).", "5 ans (durée retenue), puis suppression ou anonymisation.", "QR code tournant signé à usage unique, un téléphone par agent, scellés quotidiens des pointages, accès administrateur par mot de passe, code de sécurité et second facteur."],
+    ["Congés, absences et retards", "Traiter les demandes, justifier les absences et les retards, calculer les soldes de congés.", "Exécution du contrat de travail ; obligations légales relatives aux congés.", "Dates, motifs, décisions et commentaires ; justificatifs éventuels, qui peuvent révéler des informations de santé (données sensibles).", "Responsables habilités.", "Décisions : 5 ans. Justificatifs médicaux : durée la plus courte possible, <span class=\"cp\">à fixer</span>.", "Accès réservé aux responsables, séparation des pièces justificatives, journal d’activité."],
+    ["Bulletins de paie", "Mettre à disposition de chaque agent ses bulletins de paie.", "Obligation légale (remise du bulletin de paie).", "Bulletin PDF (rémunération, cotisations).", "L’agent concerné ; le responsable qui dépose les fichiers.", "5 ans.", "Dossier privé non partagé ; chaque agent ne voit que ses bulletins ; consultations journalisées."],
+    ["Communications, questions et gestion administrative", "Échanger avec les agents (messages, questions, dossiers et pièces administratives).", "Exécution du contrat de travail ; intérêt légitime de l’employeur.", "Messages, questions, pièces déposées par l’agent.", "Responsables habilités.", "<span class=\"cp\">À fixer</span> (proposition : 3 ans après la clôture).", "Accès par rôle, pièces non publiques."],
+    ["Sécurité, journal d’activité et sauvegardes", "Protéger les données, tracer les opérations sensibles, pouvoir restaurer en cas d’incident.", "Obligation de sécurité (article 32 du RGPD) ; intérêt légitime.", "Journal des opérations sensibles, empreintes des pointages, copies du classeur.", "Responsable et administrateur.", "Journal : <span class=\"cp\">12 mois (proposition)</span>. Copies hebdomadaires : 12 conservées. Sauvegarde externe chiffrée : détenue par le responsable.", "Copies chiffrées hors de Google sur demande, phrase secrète connue du seul administrateur."],
+    ["Aide à l’écriture et traduction", "Aider un agent à corriger, reformuler ou traduire un message qu’il rédige.", "Intérêt légitime ; utilisation volontaire par l’agent.", "Texte saisi ou dicté, envoyé au service de traduction de Google. IRIS ne le conserve que s’il est envoyé comme message.", "Google (sous-traitant).", "Aucune conservation spécifique par IRIS.", "Envoi chiffré (https), limitation du nombre d’appels."]
+  ];
+  function docRegistre() {
+    var t = '<p>Registre des activités de traitement (article 30 du RGPD). Responsable de traitement : <span class="cp">raison sociale, adresse</span>. Contact protection des données : <span class="cp">nom, e-mail</span>. Établi le ' + rgpdEchap(new Date().toLocaleDateString("fr-FR")) + '.</p>';
+    RGPD_TRAITEMENTS.forEach(function (x, i) {
+      t += '<h2>' + (i + 1) + '. ' + rgpdEchap(x[0]) + '</h2><table><tbody><tr><td width="28%"><b>Finalité</b></td><td>' + rgpdEchap(x[1]) + '</td></tr><tr><td><b>Base légale</b></td><td>' + rgpdEchap(x[2]) + '</td></tr><tr><td><b>Données</b></td><td>' + x[3] + '</td></tr><tr><td><b>Personnes concernées</b></td><td>Agents de propreté</td></tr><tr><td><b>Destinataires</b></td><td>' + rgpdEchap(x[4]) + '</td></tr><tr><td><b>Durée de conservation</b></td><td>' + x[5] + '</td></tr><tr><td><b>Mesures de sécurité</b></td><td>' + rgpdEchap(x[6]) + '</td></tr></tbody></table>';
+    });
+    t += '<h2>Sous-traitants et transferts</h2><table><tbody><tr><td width="28%"><b>Google (Workspace : Sheets, Drive, Apps Script, Gmail ; traduction)</b></td><td>Hébergement du classeur, des pièces et des e-mails ; service de traduction. Transferts hors Union européenne possibles : <span class="cp">garanties contractuelles à vérifier</span>.</td></tr><tr><td><b>GitHub (pages publiques)</b></td><td>Hébergement des pages de l’application, sans donnée personnelle.</td></tr></tbody></table>' +
+      '<h2>Précisions</h2><p>Aucune biométrie. Aucune géolocalisation continue : la météo affichée utilise une position approximative arrondie à environ 1 km, non conservée. Les agents peuvent exercer leurs droits (accès, rectification, effacement, limitation, opposition) auprès du contact indiqué ci-dessus.</p>';
+    return rgpdPage("Registre des traitements", t);
+  }
+  function docNotice() {
+    var t = '<p>Cette notice vous informe, conformément aux articles 13 et 14 du RGPD, de la façon dont vos données personnelles sont utilisées dans l’application IRIS.</p>' +
+      '<h2>Qui est responsable ?</h2><p><span class="cp">Raison sociale, adresse</span>. Contact pour toute question sur vos données : <span class="cp">nom, e-mail</span>.</p>' +
+      '<h2>Pourquoi vos données sont utilisées</h2><ul><li>Pointer votre arrivée et votre départ avec le QR code, pour décompter votre temps de travail et préparer votre paie.</li><li>Traiter vos demandes de congé, d’absence et vos retards.</li><li>Mettre vos bulletins de paie à votre disposition.</li><li>Échanger avec votre responsable (messages, questions, documents).</li><li>Assurer la sécurité de l’application et pouvoir restaurer les données en cas d’incident.</li></ul>' +
+      '<h2>Quelles données</h2><p>Nom, prénom, numéro de téléphone, heures d’arrivée et de départ, absences, congés, retards, messages et documents que vous déposez. <b>IRIS n’utilise ni biométrie ni suivi de votre position.</b> Si vous dictez ou traduisez un texte, ce texte est envoyé au service de traduction de Google pour être traduit.</p>' +
+      '<h2>Qui voit vos données</h2><p>Vos responsables habilités, et la personne chargée de la paie pour les chiffres de présence. Chaque agent ne voit que ses propres informations. Google héberge les données en tant que sous-traitant.</p>' +
+      '<h2>Combien de temps</h2><p>Les pointages et les bulletins de paie sont conservés 5 ans. Les autres durées sont indiquées dans le registre des traitements : <span class="cp">à compléter après validation</span>.</p>' +
+      '<h2>Vos droits</h2><p>Vous pouvez demander à accéder à vos données, les faire rectifier, demander leur effacement lorsque la loi le permet, limiter leur utilisation ou vous y opposer. Écrivez à <span class="cp">contact</span>. Vous pouvez aussi saisir la CNIL (www.cnil.fr).</p>' +
+      '<p>Date de remise : <span class="cp">date</span> · Signature (facultative) : ______________________</p>';
+    return rgpdPage("Information des salariés : vos données dans IRIS", t);
+  }
+  function docCse() {
+    var t = '<p>Note destinée à l’information et à la consultation du comité social et économique avant la mise en place d’un dispositif de contrôle du temps de travail (articles L2312-38 et L1222-4 du Code du travail).</p>' +
+      '<h2>Le dispositif</h2><p>Pointage des arrivées et départs par QR code affiché sur une tablette sur site et scanné avec le téléphone de l’agent, via l’application IRIS. Un QR change toutes les 5 secondes, ne sert qu’une fois et ne fonctionne qu’avec le téléphone associé à l’agent.</p>' +
+      '<h2>Ce que le dispositif ne fait pas</h2><ul><li>Pas de biométrie.</li><li>Pas de géolocalisation ni de suivi des déplacements.</li><li>Pas de note, de score ni de classement des agents : les statistiques d’absentéisme et de retards sont des chiffres d’ensemble, par motif et par site.</li></ul>' +
+      '<h2>Garanties pour les agents</h2><ul><li>Information individuelle préalable (notice jointe).</li><li>Droit de contester un retard classé « non justifié » dans les 48 heures.</li><li>Un retard sans décision sous 24 heures est clôturé automatiquement et excusé ; le responsable peut le corriger.</li><li>Alertes de dépassement des durées légales (10 heures par jour, 48 heures par semaine, repos de 11 heures) à l’attention du responsable.</li><li>Accès par rôle, journal des opérations sensibles, sauvegardes chiffrées.</li></ul>' +
+      '<h2>Données et durées</h2><p>Voir le registre des traitements joint. Pointages et bulletins : 5 ans.</p>' +
+      '<h2>Points à soumettre au comité</h2><ol><li>Avis sur le dispositif et sur la notice d’information.</li><li>Durées de conservation proposées pour les justificatifs et les messages : <span class="cp">à compléter</span>.</li><li>Modalités de contestation et de correction d’un pointage.</li></ol>' +
+      '<p>Date de présentation : <span class="cp">date</span> · Avis du comité : <span class="cp">à compléter</span></p>';
+    return rgpdPage("Note d’information du comité social et économique", t);
+  }
+  function rgpdTelecharger(nom, texte, type) {
+    var blob = new Blob([texte], { type: type + ";charset=utf-8" }), a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = nom; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+  }
+  function rgpdCsv(r) {
+    var lignes = [];
+    function cel(x) { var s = String(x === null || x === undefined ? "" : x); if (/^[=+@\t\r]/.test(s) || /^-(?![0-9])/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; }
+    lignes.push(cel("Données de l’agent : " + r.agent) + ";" + cel("Exportées le " + new Date().toLocaleDateString("fr-FR")));
+    r.sections.forEach(function (s) {
+      lignes.push(""); lignes.push(cel(s.titre + " (" + s.lignes.length + " ligne(s))"));
+      if (s.lignes.length) { lignes.push(s.entetes.map(cel).join(";")); s.lignes.forEach(function (l) { lignes.push(l.map(cel).join(";")); }); }
+    });
+    return "﻿" + lignes.join("\r\n");
+  }
+  function paneRgpd(c) {
+    var carte = h("div", { c: "ed-card" }, [h("h3", { t: "Données personnelles (RGPD)" })]);
+    carte.appendChild(h("p", { c: "ed-vide", t: "Trois documents de travail prêts à compléter (zones surlignées) et à faire valider par un juriste ou le délégué à la protection des données avant diffusion : le registre des traitements, la notice d’information des agents et la note pour le comité social et économique. Plus, le droit d’accès d’un agent et l’aperçu de ce qu’un effacement toucherait." }));
+    var b1 = h("button", { c: "ed-b ed-p", t: "Registre des traitements", type: "button" }), b2 = h("button", { c: "ed-b ed-p", t: "Notice d’information des agents", type: "button" }), b3 = h("button", { c: "ed-b ed-p", t: "Note pour le CSE", type: "button" });
+    b1.onclick = function () { rgpdTelecharger("IRIS-registre-des-traitements.html", docRegistre(), "text/html"); msg("Document téléchargé : ouvrez-le, complétez-le puis imprimez-le en PDF."); };
+    b2.onclick = function () { rgpdTelecharger("IRIS-notice-information-agents.html", docNotice(), "text/html"); msg("Document téléchargé : ouvrez-le, complétez-le puis imprimez-le en PDF."); };
+    b3.onclick = function () { rgpdTelecharger("IRIS-note-CSE.html", docCse(), "text/html"); msg("Document téléchargé : ouvrez-le, complétez-le puis imprimez-le en PDF."); };
+    carte.appendChild(h("div", { c: "ed-row" }, [b1, b2, b3]));
+    carte.appendChild(h("h4", { t: "Droit d’accès et effacement d’un agent" })); carte.lastChild.style.cssText = "margin:18px 0 6px;font-size:15px";
+    var sel = agentSelect(), cd = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Votre code de sécurité" }), sortie = h("div", {});
+    carte.appendChild(h("div", { c: "ed-row" }, [lab("Agent", sel), lab("Code de sécurité (pour l’export)", cd)]));
+    var be = h("button", { c: "ed-b ed-p", t: "Exporter les données de l’agent (CSV)", type: "button" }), bp = h("button", { c: "ed-b", t: "Voir ce qu’un effacement toucherait", type: "button" });
+    be.onclick = function () {
+      var a = DATA.agents[sel.selectedIndex]; if (!a) { msg("Choisissez un agent.", true); return; } if (!cd.value) { msg("Saisissez votre code de sécurité.", true); return; }
+      be.disabled = true; var q = { nom: a.nom, prenom: a.prenom, code: cd.value }; cd.value = "";
+      appel("adminDonneesAgent", q, function (r) {
+        be.disabled = false; if (!(r && r.ok)) { msg((r && r.msg) || "Export impossible.", true); return; }
+        rgpdTelecharger("IRIS-donnees-" + (a.nom + "-" + a.prenom).replace(/[^A-Za-z0-9-]/g, "_") + ".csv", rgpdCsv(r), "text/csv"); msg("Export des données téléchargé (CSV pour Excel). L’export est noté dans le journal d’activité.");
+      });
+    };
+    bp.onclick = function () {
+      var a = DATA.agents[sel.selectedIndex]; if (!a) { msg("Choisissez un agent.", true); return; }
+      sortie.textContent = ""; sortie.appendChild(h("p", { c: "ed-vide", t: "Calcul…" }));
+      appel("adminEffacementPlan", { nom: a.nom, prenom: a.prenom }, function (r) {
+        sortie.textContent = ""; if (!(r && r.ok)) { sortie.appendChild(h("p", { c: "ed-vide", t: (r && r.msg) || "Indisponible." })); return; }
+        sortie.appendChild(h("p", { t: "Lignes concernant " + r.agent + " :" })); sortie.lastChild.style.fontWeight = "700";
+        r.plan.forEach(function (x) { sortie.appendChild(h("div", { c: "sg-m", t: "• " + x.titre + " : " + x.lignes + " ligne(s)" })); });
+        sortie.appendChild(h("p", { c: "ed-vide", t: r.remarque + " IRIS ne propose volontairement aucun bouton de suppression : une suppression de données se décide et se fait avec le responsable de traitement." }));
+      });
+    };
+    carte.appendChild(h("div", { c: "ed-row" }, [be, bp])); carte.appendChild(sortie); c.appendChild(carte);
+  }
   function paneParam(c) {
     paneMdpAgents(c);
     paneRapport(c);
@@ -1622,6 +1714,7 @@ var IrisVoix = (function () {
     paneSauvegardeExterne(c);
     paneQrAge(c);
     paneResume(c);
+    paneRgpd(c);
     paneDeuxFacteurs(c);
     paneJournal(c);
     var an = h("input", { type: "password", autocomplete: "current-password", placeholder: "Ancien mot de passe" }), nv = h("input", { type: "password", autocomplete: "new-password", placeholder: "Nouveau mot de passe (10 caractères minimum, lettre + chiffre)" }), cf = h("input", { type: "password", autocomplete: "new-password", placeholder: "Confirmer le nouveau mot de passe" }), cd = h("input", { type: "password", autocomplete: "off", inputmode: "numeric", placeholder: "Code de sécurité (obligatoire)" });
