@@ -378,13 +378,14 @@ var IrisVoix = (function () {
   function barre(champ, opts) {
     opts = opts || {}; var bar = document.createElement('div'); bar.className = 'iv-bar'; bar.setAttribute('data-iv', '1'); var note = document.createElement('div'); note.className = 'iv-note'; note.setAttribute('role', 'status');
     function msg(t) { note.textContent = t || ''; }
-    var LANGUES = [['fr', 'Français', 'fr-FR'], ['ar', 'العربية · Arabe', 'ar-SA'], ['pt', 'Português', 'pt-PT'], ['es', 'Español', 'es-ES'], ['en', 'English', 'en-GB'], ['ro', 'Română', 'ro-RO'], ['it', 'Italiano', 'it-IT'], ['tr', 'Türkçe', 'tr-TR']], code = 'fr', btrad = null;
+    var LANGUES = [['fr', 'Français', 'fr-FR'], ['ar', 'العربية · Arabe', 'ar-SA'], ['pt', 'Português', 'pt-PT'], ['es', 'Español', 'es-ES'], ['en', 'English', 'en-GB'], ['ro', 'Română', 'ro-RO'], ['it', 'Italiano', 'it-IT'], ['tr', 'Türkçe', 'tr-TR'], ['ht', 'Kreyòl ayisyen · Créole haïtien', ''], ['bm', 'Bamanankan · Bambara', ''], ['snk', 'Sooninkanxanne · Soninké', ''], ['ff', 'Fulfulde · Peul', ''], ['gp', 'Kréyòl Gwadloup · Créole guadeloupéen', ''], ['mq', 'Kréyòl Matinik · Créole martiniquais', '']], code = 'fr', btrad = null;
     function langueRec() { for (var i = 0; i < LANGUES.length; i++) if (LANGUES[i][0] === code) return LANGUES[i][2]; return 'fr-FR'; }
+    var IA_APPROX = { bm: 1, snk: 1, ff: 1, gp: 1, mq: 1 };
     function langueNom() { for (var i = 0; i < LANGUES.length; i++) if (LANGUES[i][0] === code) return LANGUES[i][1].split(' · ').pop(); return ''; }
     if (opts.lire !== false && dispoLecture()) { var bl = bouton(SVG_HP, 'Écouter'); bl.onclick = function () { var t = valeur(champ); if (!t.trim()) { msg('Rien à lire pour le moment.'); return; } msg(''); bl.classList.add('on'); if (!lire(t, function () { bl.classList.remove('on'); }, champ)) bl.classList.remove('on'); }; bar.appendChild(bl); }
     if (opts.dicter !== false && dispoDictee()) {
       var bd = bouton(SVG_MIC, 'Dicter'), d = dicter(function (t) { inserer(champ, t); if (code !== 'fr' && opts.traduire) { traduireChamp(); } else if (opts.corrigerApresDictee && opts.corriger) { avec(opts.corriger, 'Correction…'); } }, function (e, m) { if (e === 'ecoute') { bd.classList.add('ec', 'on'); bd.lastChild.textContent = 'J’écoute…'; msg(''); } else { bd.classList.remove('ec', 'on'); bd.lastChild.textContent = 'Dicter'; if (e === 'erreur') msg(m); } }, langueRec), ecoute = false;
-      bd.onclick = function () { if (ecoute) { ecoute = false; d.arreter(); } else { ecoute = true; d.demarrer(); } }; bar.appendChild(bd);
+      bd.onclick = function () { if (!langueRec() && !ecoute) { msg('La dictée n’existe pas pour cette langue sur le téléphone : écrivez votre texte, puis touchez « Traduire en français ».'); return; } if (ecoute) { ecoute = false; d.arreter(); } else { ecoute = true; d.demarrer(); } }; bar.appendChild(bd);
     }
     function avec(f, texteAttente) { var t = valeur(champ); if (t.trim().length < 3) { msg('Écrivez d’abord quelques mots.'); return; } msg(texteAttente); Array.prototype.forEach.call(bar.querySelectorAll('button'), function (b) { b.disabled = true; }); f(t, function (err, nv) { Array.prototype.forEach.call(bar.querySelectorAll('button'), function (b) { b.disabled = false; }); if (err || !nv) { msg(err || 'Aucune proposition.'); return; } champ.value = nv; try { champ.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) { } msg('Texte mis à jour.'); }); }
     if (opts.corriger) { var bc = bouton(SVG_PLUME, 'Corriger'); bc.onclick = function () { avec(opts.corriger, 'Correction en cours…'); }; bar.appendChild(bc); }
@@ -399,7 +400,7 @@ var IrisVoix = (function () {
         if (err || !fr) { msg(err || 'Traduction impossible.'); return; }
         var plein = fr + '\n— Texte d’origine (' + langueNom() + ') : ' + tx.trim();
         if (champ.maxLength > 0 && plein.length > champ.maxLength) { plein = fr; msg('Traduit en français. Le texte d’origine n’a pas pu être conservé (champ trop court). Relisez avant d’envoyer.'); }
-        else msg('Traduit en français. Relisez avant d’envoyer.');
+        else msg(IA_APPROX[code] ? 'Traduction automatique approximative pour cette langue. Le texte d’origine est conservé : relisez avant d’envoyer.' : 'Traduit en français. Relisez avant d’envoyer.');
         champ.value = plein; try { champ.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) { }
       });
     }
@@ -1692,7 +1693,7 @@ function cmaEnvOuvre(box) {
     function champ(libelle, el) { var l = document.createElement("label"); l.textContent = libelle; w.appendChild(l); w.appendChild(el); return el; }
     var type = document.createElement("select"); (cat.categories || []).forEach(function (c) { var o = document.createElement("option"); o.value = o.textContent = c; type.appendChild(o); });
     champ("Type d’information", type);
-    var OPT = { corrigerApresDictee: true,
+    var OPT = { corrigerApresDictee: true, traduire: function (tx, code, cb) { traduireIA(tx, code, cb); },
       corriger: function (tx, cb) { cmaAppel("corrigerTexte", [CMENV.tok, tx], function (r) { if (r && r.ok && r.texte) cb(null, r.texte); else cb((r && r.msg) || "Correction indisponible."); }, function () { cb("Connexion interrompue : réessayez."); }); },
       reformuler: function (tx, cb) { cmaAppel("reformulerTexte", [CMENV.tok, tx], function (r) { if (r && r.ok && r.texte) cb(null, r.texte); else cb((r && r.msg) || "Reformulation indisponible."); }, function () { cb("Connexion interrompue : réessayez."); }); } };
     function barreVoix(ch) { ch.setAttribute("data-iv-no", "1"); try { var v = cmaVoix(); if (v && v.barre) { var bar = v.barre(ch, OPT); if (bar) w.appendChild(bar); } } catch (e) { } }

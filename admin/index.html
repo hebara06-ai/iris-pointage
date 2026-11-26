@@ -2827,7 +2827,14 @@ var IrisVoix = (function () {
       (m.pieces || []).forEach(function (pj, n) { k.push(cmBtn("Télécharger " + pj.nom + " (" + cmOctets(pj.taille) + ")", function (b) { cmAction(b, "cmAdminPieceMessage", [m.id, n], function (r) { if (r.ok) cmTelecharger(r); else msg(r.msg || "Téléchargement impossible.", true); }); })); });
       var acts = []; try { var ec = window.IrisVoix && IrisVoix.boutonLire ? IrisVoix.boutonLire(m.texte, "Écouter") : null; if (ec) acts.push(ec); } catch (e) { }
       if (m.commId && !mien) acts.push(cmBtn("Répondre à ce sujet", function () { CM.rep.commId = m.commId; msg("Votre réponse sera liée à : " + (m.commTitre || m.commId)); }));
-      var carte = h("div", { c: "ed-card cm-msg" }, []), bl = null;
+      var carte = h("div", { c: "ed-card cm-msg" }, []);
+      if (mien) acts.push(cmBtn("Modifier", function (b0) {
+        var ta = h("textarea", { rows: "3", maxlength: "2000", "data-iv-no": "1" }); ta.value = m.texte || ""; ta.style.cssText = "width:100%;font-size:18px";
+        t.parentNode.replaceChild(ta, t); b0.disabled = true;
+        carte.appendChild(cmLigne([cmGros(cmBtn("Enregistrer la modification", function (b) { cmAction(b, "cmAdminModifierMessage", [m.id, ta.value], function (r) { if (r.ok) { msg("Message modifié."); cmOuvrirFil(CM.cle); } else msg(r.msg || "Modification impossible.", true); }); }, true)), cmGros(cmBtn("Annuler", function () { cmOuvrirFil(CM.cle); }))]));
+      }));
+      acts.push(cmSure("Supprimer", true, function (b) { cmAction(b, "cmAdminSupprimerMessage", [m.id], function (r) { if (r.ok) { msg("Message supprimé."); CM.nonLus = Number(r.nonLus) || 0; cmMajPastilleOnglet(); cmOuvrirFil(CM.cle); } else msg(r.msg || "Suppression impossible.", true); }); }));
+      var bl = null;
       if (nonLu) { bl = cmGros(cmBtn("Marquer comme lu", function () { cmMarquerLu(m, carte, [nouveau, bl]); })); acts.push(bl); }
       if (acts.length) k.push(cmLigne(acts));
       k.forEach(function (e) { if (e) carte.appendChild(e); });
