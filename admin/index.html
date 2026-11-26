@@ -1777,7 +1777,38 @@ var IrisVoix = (function () {
     carteCodeSecu(c);
     // Mot de passe et code de sécurité en haut de la page ; journal d’activité tout en bas
     var dm = c.children.length - 2, hautEl = [c.children[dm], c.children[dm + 1]]; hautEl.reverse().forEach(function (e) { if (e) c.insertBefore(e, c.firstChild); });
+    paneGuardian(c);
     paneJournal(c);
+  }
+  // IRIS Guardian — APERÇU (mode laboratoire) : aucun flux, aucun micro, aucun enregistrement n'est actif ; l'état affiché est l'état réel
+  function paneGuardian(c) {
+    var carte = h("div", { c: "ed-card" });
+    carte.style.cssText = "background:#141c2e;color:#e8ecf4;border:1px solid #2a3350";
+    var tete = h("div", {}); tete.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:12px";
+    var titre = h("div", {}, [h("div", { t: "IRIS GUARDIAN" }), h("div", { t: "MODE LABORATOIRE — APERÇU" })]);
+    titre.firstChild.style.cssText = "font-size:24px;font-weight:800;letter-spacing:.02em;color:#d9b88a"; titre.lastChild.style.cssText = "margin-top:6px;font-size:13px;font-weight:600;letter-spacing:.08em;color:#8d97ad";
+    var bouclier = document.createElementNS("http://www.w3.org/2000/svg", "svg"); bouclier.setAttribute("viewBox", "0 0 24 24"); bouclier.setAttribute("width", "34"); bouclier.setAttribute("height", "34"); bouclier.setAttribute("fill", "none"); bouclier.setAttribute("stroke", "#d9b88a"); bouclier.setAttribute("stroke-width", "1.8"); bouclier.setAttribute("stroke-linecap", "round"); bouclier.setAttribute("stroke-linejoin", "round"); bouclier.innerHTML = '<path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/>';
+    tete.appendChild(titre); tete.appendChild(bouclier); carte.appendChild(tete);
+    var ligne0 = h("div", {}); ligne0.style.cssText = "height:1px;background:#2a3350;margin:14px 0"; carte.appendChild(ligne0);
+    var cam = h("div", {}); cam.style.cssText = "background:#0a0f1a;border-radius:20px;padding:34px 12px;text-align:center;margin-bottom:16px";
+    var ic = document.createElementNS("http://www.w3.org/2000/svg", "svg"); ic.setAttribute("viewBox", "0 0 24 24"); ic.setAttribute("width", "44"); ic.setAttribute("height", "44"); ic.setAttribute("fill", "none"); ic.setAttribute("stroke", "#d9b88a"); ic.setAttribute("stroke-width", "1.6"); ic.setAttribute("stroke-linejoin", "round"); ic.innerHTML = '<rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="M16 10l5-3v10l-5-3z"/>';
+    var t1 = h("div", { t: "Caméra en veille" }), t2 = h("div", { t: "Aucune détection : cette fonction n’est pas encore active" });
+    t1.style.cssText = "font-size:22px;font-weight:800;color:#fff;margin-top:10px"; t2.style.cssText = "font-size:14px;color:#9aa3b8;margin-top:6px";
+    cam.appendChild(ic); cam.appendChild(t1); cam.appendChild(t2); carte.appendChild(cam);
+    var lignes = [
+      ["Connexion à distance", "Non active", 0], ["Détection de mouvement", "Non active", 0], ["Activation automatique", "Non active", 0],
+      ["Microphone", "Désactivé", 0], ["Transmission audio", "Désactivée", 0], ["Vision nocturne", "Selon matériel", 1],
+      ["Indicateur de captation", "Voyant prévu", 1], ["Enregistrement", "Désactivé", 0]
+    ];
+    lignes.forEach(function (l) {
+      var r = h("div", {}); r.style.cssText = "display:flex;justify-content:space-between;align-items:center;padding:9px 0;font-size:16px";
+      var v = h("span", { t: l[1] }); v.style.cssText = "font-weight:700;color:" + (l[2] ? "#d9b88a" : "#9aa3b8");
+      r.appendChild(h("span", { t: l[0] })); r.appendChild(v); carte.appendChild(r);
+    });
+    var ligne1 = h("div", {}); ligne1.style.cssText = "height:1px;background:#2a3350;margin:12px 0"; carte.appendChild(ligne1);
+    var note = h("p", { t: "Aperçu de l’écran : la caméra et le micro du téléphone ne sont PAS utilisés. Avant toute activation réelle, les salariés doivent être informés (affichage, information individuelle, consultation du CSE) ; le son est à éviter. Rien n’est enregistré ni envoyé." });
+    note.style.cssText = "font-size:13px;line-height:1.5;color:#8d97ad;margin:0"; carte.appendChild(note);
+    c.appendChild(carte);
   }
   // Changement du code de sécurité (ajout isolé) : on demande un code par e-mail, puis on saisit le code reçu, le nouveau code et le portable
   function carteCodeSecu(c) {
