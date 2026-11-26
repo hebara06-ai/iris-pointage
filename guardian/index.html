@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src https://script.google.com https://script.googleusercontent.com; media-src 'self' blob: mediastream:; img-src 'self' data: blob:">
+<meta name="robots" content="noindex,nofollow"><title>IRIS Guardian — appareil d’essai</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#131D2E;color:#E1E7F0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+.pg{max-width:520px;margin:0 auto;padding:18px 18px 28px}
+h1{margin:0;font-size:26px;font-weight:800;letter-spacing:.02em;color:#D4B77E}.sub{margin-top:6px;font-size:13px;font-weight:600;letter-spacing:.08em;color:#A3AFBF}
+.th{display:flex;justify-content:space-between;align-items:center;gap:12px}hr{border:0;height:1px;background:#35445A;margin:14px 0}
+.cam{background:#0A111D;border-radius:20px;padding:12px;text-align:center;margin-bottom:14px;min-height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+video{width:100%;max-height:260px;border-radius:14px;background:#000;display:none;object-fit:cover}
+.ligne{display:flex;justify-content:space-between;align-items:center;padding:8px 0;font-size:16px}.ligne b{font-weight:700;color:#A3AFBF}.ok{color:#63D9A0!important}.or{color:#D4B77E!important}
+.voy{display:none;align-items:center;gap:10px;background:#3a0f14;border:1px solid #ff4d5a;color:#ffd7da;border-radius:14px;padding:12px 14px;font-weight:800;letter-spacing:.04em;margin-bottom:12px}.voy i{width:14px;height:14px;border-radius:50%;background:#ff3b4a;box-shadow:0 0 0 0 rgba(255,59,74,.7);animation:p 1.4s infinite}
+@keyframes p{70%{box-shadow:0 0 0 12px rgba(255,59,74,0)}100%{box-shadow:0 0 0 0 rgba(255,59,74,0)}}
+button{font:inherit;font-weight:800;border:0;border-radius:14px;padding:14px 16px;width:100%;margin-top:10px;background:#D4B77E;color:#131D2E;cursor:pointer}button.s{background:#1d2a42;color:#E1E7F0;border:1px solid #35445A}button.stop{background:#d92d3a;color:#fff;font-size:22px;padding:20px}
+input{width:100%;font:inherit;font-size:24px;letter-spacing:.2em;text-align:center;padding:14px;border-radius:12px;border:1px solid #35445A;background:#0A111D;color:#E1E7F0}
+p.n{font-size:13px;line-height:1.5;color:#A3AFBF}.msg{min-height:20px;margin:8px 0;font-size:14px;color:#D4B77E}
+</style></head><body><div class="pg">
+<div class="th"><div><h1>IRIS GUARDIAN</h1><div class="sub">APPAREIL D’ESSAI — MODE LABORATOIRE</div></div>
+<svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="#D4B77E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg></div><hr>
+<div class="voy" id="voy"><i></i><span>CAPTATION ACTIVE — la caméra est en marche</span></div>
+<div class="cam"><video id="vid" playsinline muted></video><div id="vide"><svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="#D4B77E" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="M16 10l5-3v10l-5-3z"/></svg><div style="font-size:22px;font-weight:800;color:#fff;margin-top:8px" id="t1">Caméra en veille</div><div style="font-size:14px;color:#A3AFBF;margin-top:4px" id="t2">En attente</div></div></div>
+<div id="ecran"></div><div class="msg" id="msg" role="status"></div>
+<audio id="aud" autoplay playsinline></audio>
+</div>
+<script>
+(function () {
+"use strict";
+var URL_APP = "https://script.google.com/macros/s/AKfycbzAc5Ge9XGmOE5bBbOxkN528oSBNvgw3MZEGRZVH15HxMZnVB_MwputipQMebgHXAxO/exec";
+var $ = function (i) { return document.getElementById(i); };
+var S = { jeton: localStorage.getItem("gd-jeton") || "", consent: false, vstream: null, astream: null, pc: null, offreId: "", cfg: { sensibilite: 5, camera: "arriere", auto: false }, mic: "attente", mvt: false, torche: false, timer: null, mTimer: null, prev: null, mCpt: 0, mDernier: 0, enLigne: true, wake: null, flux: false };
+function msg(t) { $("msg").textContent = t || ""; }
+function api(f, a) {
+  return fetch(URL_APP, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ f: f, a: a }) }).then(function (r) { return r.json(); }).then(function (j) { if (j && j.e !== undefined) throw new Error("serveur"); return j.r; });
+}
+function evt(type, detail) { if (!S.jeton) return; api("guardianEvenement", [S.jeton, type, detail || ""]).catch(function () { }); }
+// ---- écrans ----
+function ecranJumelage() {
+  var e = $("ecran"); e.innerHTML = "";
+  e.insertAdjacentHTML("beforeend", '<p class="n">Cet appareil n’est pas jumelé. Dans l’espace administrateur d’IRIS (Paramètres &gt; IRIS Guardian), activez le mode laboratoire puis choisissez « Jumeler un appareil » : un code à 8 chiffres s’affiche pour 10 minutes.</p><input id="code" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="Code à 8 chiffres" aria-label="Code de jumelage"><button id="bj">Jumeler cet appareil</button>');
+  $("bj").onclick = function () {
+    var c = $("code").value.replace(/\D/g, ""); if (c.length !== 8) { msg("Le code fait 8 chiffres."); return; }
+    $("bj").disabled = true; msg("Jumelage…");
+    api("guardianJumeler", [c, "Téléphone d’essai"]).then(function (r) { if (r && r.ok && r.jeton) { S.jeton = r.jeton; localStorage.setItem("gd-jeton", r.jeton); msg("Appareil jumelé."); ecranConsentement(); demarrerSonde(); } else { msg((r && r.msg) || "Jumelage impossible."); $("bj").disabled = false; } }).catch(function () { msg("Connexion impossible. Réessayez."); $("bj").disabled = false; });
+  };
+}
+function ecranConsentement() {
+  var e = $("ecran"); e.innerHTML = "";
+  e.insertAdjacentHTML("beforeend", '<p class="n"><b style="color:#E1E7F0">Essai à domicile — participants informés et consentants.</b><br>En touchant « J’accepte », ce téléphone pourra utiliser sa <b>caméra</b> (et son <b>micro</b> pendant une vue en direct) à la demande de l’administrateur, tant que cette page reste ouverte. Un <b>voyant rouge</b> est toujours visible quand la caméra fonctionne. <b>Rien n’est enregistré.</b> Vous pouvez tout arrêter à tout moment avec le bouton ARRÊT.</p><button id="ba">J’accepte et je démarre</button><button class="s" id="bo">Oublier le jumelage de cet appareil</button>');
+  $("ba").onclick = demarrerCaptation; $("bo").onclick = function () { arreterTout("arret_local", "Jumelage oublié"); localStorage.removeItem("gd-jeton"); S.jeton = ""; ecranJumelage(); };
+  majEtat();
+}
+function ecranActif() {
+  var e = $("ecran"); e.innerHTML = "";
+  e.insertAdjacentHTML("beforeend", '<div class="ligne"><span>Connexion à distance</span><b id="s1"></b></div><div class="ligne"><span>Détection de mouvement</span><b id="s2"></b></div><div class="ligne"><span>Microphone</span><b id="s3"></b></div><div class="ligne"><span>Vue en direct</span><b id="s4"></b></div><button class="s" id="bt" style="display:none">Lampe (vision nocturne) : éteinte</button><button class="s" id="bc">Changer de caméra</button><button class="stop" id="bs">ARRÊT</button>');
+  $("bs").onclick = function () { arreterTout("arret_local", "Bouton ARRÊT sur l’appareil"); ecranConsentement(); msg("Tout est arrêté."); };
+  $("bc").onclick = function () { S.cfg.camera = S.cfg.camera === "avant" ? "arriere" : "avant"; relancerCamera(); };
+  $("bt").onclick = basculerTorche; majEtat();
+}
+function majEtat() {
+  var g = function (i, t, c) { var el = $(i); if (el) { el.textContent = t; el.className = c || ""; } };
+  var actif = !!S.vstream;
+  $("voy").style.display = actif ? "flex" : "none";
+  g("s1", S.enLigne ? "Activée" : "Interrompue", S.enLigne ? "ok" : "or"); g("s2", S.mvt ? "Activée" : "Désactivée", S.mvt ? "ok" : ""); g("s3", S.mic === "ok" ? "Autorisé" : S.mic === "refuse" ? "Refusé" : "Non demandé", S.mic === "ok" ? "ok" : S.mic === "refuse" ? "or" : ""); g("s4", S.flux ? "En cours" : "Aucune", S.flux ? "ok" : "");
+  $("t1").textContent = actif ? "Caméra en marche" : "Caméra en veille"; $("t2").textContent = actif ? (S.flux ? "Vue en direct en cours" : "En attente de détection") : "En attente";
+}
+// ---- caméra ----
+function contraintes() { return { video: { facingMode: S.cfg.camera === "avant" ? "user" : "environment", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false }; }
+function demarrerCaptation() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { msg("Ce navigateur ne permet pas d’utiliser la caméra."); return; }
+  msg("Autorisation de la caméra…");
+  navigator.mediaDevices.getUserMedia(contraintes()).then(function (st) {
+    S.vstream = st; S.consent = true; var v = $("vid"); v.srcObject = st; v.style.display = "block"; $("vide").style.display = "none"; v.play().catch(function () { });
+    ecranActif(); msg(""); evt("consentement", "Caméra autorisée par la personne"); evt("demarrage", S.cfg.camera);
+    demanderWakeLock(); lancerMouvement(); verifierTorche();
+    // l'autorisation du micro est demandée tout de suite (en présence de la personne) puis le micro est relâché ; il ne reste ouvert que pendant une vue en direct
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (a) { a.getTracks().forEach(function (t) { t.stop(); }); S.mic = "ok"; majEtat(); }).catch(function () { S.mic = "refuse"; evt("permission_refusee", "micro"); majEtat(); });
+  }).catch(function (er) { msg(er && er.name === "NotAllowedError" ? "Caméra refusée : autorisez-la dans les réglages du navigateur." : "Caméra indisponible."); evt("permission_refusee", "camera"); });
+}
+function relancerCamera() { if (!S.consent) return; if (S.vstream) S.vstream.getTracks().forEach(function (t) { t.stop(); }); S.vstream = null; stopMouvement(); navigator.mediaDevices.getUserMedia(contraintes()).then(function (st) { S.vstream = st; var v = $("vid"); v.srcObject = st; v.play().catch(function () { }); lancerMouvement(); verifierTorche(); if (S.pc) { var snd = S.pc.getSenders().filter(function (x) { return x.track && x.track.kind === "video"; })[0]; if (snd) snd.replaceTrack(st.getVideoTracks()[0]); } majEtat(); }).catch(function () { msg("Cette caméra n’est pas disponible."); }); }
+function verifierTorche() { var b = $("bt"); if (!b || !S.vstream) return; var t = S.vstream.getVideoTracks()[0], c = t && t.getCapabilities ? t.getCapabilities() : {}; S.torche = false; b.style.display = c && c.torch ? "block" : "none"; b.textContent = "Lampe (vision nocturne) : éteinte"; }
+function basculerTorche() { var t = S.vstream && S.vstream.getVideoTracks()[0]; if (!t) return; S.torche = !S.torche; t.applyConstraints({ advanced: [{ torch: S.torche }] }).then(function () { $("bt").textContent = "Lampe (vision nocturne) : " + (S.torche ? "allumée" : "éteinte"); }).catch(function () { S.torche = false; msg("La lampe n’est pas disponible sur cette caméra."); }); }
+function demanderWakeLock() { try { if (navigator.wakeLock) navigator.wakeLock.request("screen").then(function (w) { S.wake = w; }).catch(function () { }); } catch (e) { } }
+// ---- détection de mouvement (locale : aucune image n'est envoyée ni enregistrée) ----
+function lancerMouvement() {
+  stopMouvement(); var cv = document.createElement("canvas"); cv.width = 64; cv.height = 48; var cx = cv.getContext("2d", { willReadFrequently: true }); var v = $("vid"); S.prev = null; S.mCpt = 0; S.mvt = true;
+  S.mTimer = setInterval(function () {
+    if (!S.vstream || v.readyState < 2) return; cx.drawImage(v, 0, 0, 64, 48); var d = cx.getImageData(0, 0, 64, 48).data, g = new Uint8Array(64 * 48);
+    for (var i = 0, j = 0; i < d.length; i += 4, j++) g[j] = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
+    if (S.prev) { var n = 0; for (var k = 0; k < g.length; k++) if (Math.abs(g[k] - S.prev[k]) > 28) n++; var seuil = 0.12 - 0.011 * S.cfg.sensibilite;
+      if (n / g.length > seuil) { S.mCpt++; if (S.mCpt >= 2 && Date.now() - S.mDernier > 20000) { S.mDernier = Date.now(); evt("mouvement", "Sensibilité " + S.cfg.sensibilite); } } else S.mCpt = 0; }
+    S.prev = g;
+  }, 400); majEtat();
+}
+function stopMouvement() { if (S.mTimer) clearInterval(S.mTimer); S.mTimer = null; S.mvt = false; S.prev = null; }
+// ---- vue en direct (WebRTC : chiffré, de l'appareil vers l'administrateur) ----
+function fermerFlux(evenement) { if (S.pc) { try { S.pc.close(); } catch (e) { } S.pc = null; } if (S.astream) { S.astream.getTracks().forEach(function (t) { t.stop(); }); S.astream = null; } if (S.flux) { S.flux = false; if (evenement) evt("flux_termine", evenement); } $("aud").srcObject = null; majEtat(); }
+function traiterOffre(o) {
+  if (!S.consent || !S.vstream || S.offreId === o.id) return; S.offreId = o.id; fermerFlux("");
+  var pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] }); S.pc = pc;
+  pc.ontrack = function (ev) { if (ev.track.kind === "audio") { $("aud").srcObject = ev.streams[0] || new MediaStream([ev.track]); $("aud").play().catch(function () { }); } };
+  pc.onconnectionstatechange = function () { if (pc.connectionState === "connected") { S.flux = true; evt("flux_connecte", ""); majEtat(); } else if (pc.connectionState === "failed" || pc.connectionState === "closed" || pc.connectionState === "disconnected") { if (S.pc === pc) fermerFlux("Connexion perdue"); } };
+  var pret = S.mic === "ok" ? navigator.mediaDevices.getUserMedia({ audio: true }).then(function (a) { S.astream = a; }).catch(function () { S.astream = null; }) : Promise.resolve();
+  pret.then(function () {
+    S.vstream.getVideoTracks().forEach(function (t) { pc.addTrack(t, S.vstream); }); if (S.astream) S.astream.getAudioTracks().forEach(function (t) { pc.addTrack(t, S.astream); });
+    return pc.setRemoteDescription({ type: "offer", sdp: o.sdp });
+  }).then(function () { return pc.createAnswer(); }).then(function (an) { return pc.setLocalDescription(an); }).then(function () {
+    return new Promise(function (ok) { if (pc.iceGatheringState === "complete") return ok(); var fin = setTimeout(ok, 4500); pc.onicegatheringstatechange = function () { if (pc.iceGatheringState === "complete") { clearTimeout(fin); ok(); } }; });
+  }).then(function () { return api("guardianReponse", [S.jeton, o.id, pc.localDescription.sdp]); }).then(function (r) { if (!r || !r.ok) { msg((r && r.msg) || "Réponse non acceptée."); fermerFlux("Réponse refusée"); } }).catch(function () { msg("La vue en direct n’a pas pu démarrer."); fermerFlux("Échec de la connexion"); });
+}
+// ---- arrêt sûr ----
+function arreterTout(type, detail) {
+  S.consent = false; stopMouvement(); fermerFlux(""); if (S.vstream) S.vstream.getTracks().forEach(function (t) { t.stop(); }); S.vstream = null;
+  var v = $("vid"); v.srcObject = null; v.style.display = "none"; $("vide").style.display = ""; try { if (S.wake) S.wake.release(); } catch (e) { } S.wake = null; S.torche = false;
+  if (type) evt(type, detail); majEtat();
+}
+// ---- dialogue avec le serveur ----
+function demarrerSonde() {
+  if (S.timer) return;
+  function tour() {
+    if (!S.jeton) return;
+    var tr = "non"; try { var t0 = S.vstream && S.vstream.getVideoTracks()[0]; if (t0 && t0.getCapabilities && t0.getCapabilities().torch) tr = S.torche ? "on" : "dispo"; } catch (e) { }
+    api("guardianSonde", [S.jeton, { mic: S.mic, capt: !!S.vstream, mvt: S.mvt, flux: S.flux, torche: tr, cam: S.cfg.camera, consent: S.consent }]).then(function (r) {
+      if (!S.enLigne) { S.enLigne = true; evt("reseau", "Connexion rétablie"); } if (!r) return;
+      if (r.refuse) { localStorage.removeItem("gd-jeton"); S.jeton = ""; arreterTout("", ""); ecranJumelage(); msg("Ce jumelage n’est plus valide."); return; }
+      if (r.config) { var chg = r.config.camera !== S.cfg.camera; S.cfg = r.config; if (chg && S.vstream) relancerCamera(); }
+      (r.commandes || []).forEach(function (c) { if (c === "arret") { var etait = S.consent; arreterTout("arret_distance", "Arrêt demandé à distance"); if (etait) { ecranConsentement(); msg("L’administrateur a arrêté la caméra."); } } else if (c === "fin_flux") fermerFlux("Fin demandée"); });
+      if (r.offre && S.consent) traiterOffre(r.offre); majEtat();
+    }).catch(function () { if (S.enLigne) { S.enLigne = false; majEtat(); } });
+  }
+  tour(); S.timer = setInterval(tour, 2000);
+}
+window.addEventListener("pagehide", function () { arreterTout("", ""); });
+if (S.jeton) { ecranConsentement(); demarrerSonde(); } else ecranJumelage();
+})();
+</script></body></html>
