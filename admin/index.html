@@ -1794,7 +1794,7 @@ var IrisVoix = (function () {
     var OR = "#D4B77E", VERT = "#63D9A0", BLANC = "#E1E7F0", GRIS = "#A3AFBF", SEP = "#35445A";
     var carte = h("div", { c: "ed-card" });
     carte.style.cssText = "background:#131D2E;color:" + BLANC + ";border:1px solid " + SEP + ";padding:24px;border-radius:26px";
-    var ET = null, pc = null, micStream = null, micTrack = null, vue = false, sondeur = null, repTimer = null, journalOuvert = false, rec = null, recMorceaux = [];
+    var ET = null, pc = null, micStream = null, micTrack = null, vue = false, vueConnexion = false, sondeur = null, repTimer = null, journalOuvert = false, rec = null, recMorceaux = [];
     function el(tag, st, txt) { var e = h(tag, txt ? { t: txt } : {}); if (st) e.style.cssText = st; return e; }
     function svg(vb, w, trait, inner) { var s = document.createElementNS("http://www.w3.org/2000/svg", "svg"); s.setAttribute("viewBox", vb); s.setAttribute("width", w); s.setAttribute("height", w); s.setAttribute("fill", "none"); s.setAttribute("stroke", OR); s.setAttribute("stroke-width", trait); s.setAttribute("stroke-linecap", "round"); s.setAttribute("stroke-linejoin", "round"); s.innerHTML = inner; return s; }
     // ---- en-tête (reproduction de la capture) ----
@@ -1884,7 +1884,7 @@ var IrisVoix = (function () {
     function maj() {
       if (!ET) return; var vu = ET.vu || {}, lab = ET.labo, en = lab && ET.enLigne, cp = vu.caps || {}, md = ET.modes || {}, sn = ET.sens || {}, f = ET.f || {};
       bLabo.textContent = lab ? "Désactiver le mode laboratoire" : "Activer le mode laboratoire"; bLabo.style.background = lab ? "#1d2a42" : OR; bLabo.style.color = lab ? BLANC : "#131D2E";
-      [bJum, bOubli, bVue, bArret, bCam, bTout, bRien].forEach(function (b) { b.disabled = !lab; b.style.opacity = lab ? "1" : ".45"; }); bOubli.style.display = ET.jumele ? "" : "none";
+      [bJum, bOubli, bArret, bCam, bTout, bRien].forEach(function (b) { b.disabled = !lab; b.style.opacity = lab ? "1" : ".45"; }); bVue.disabled = !lab || vueConnexion; bVue.style.opacity = lab ? "1" : ".45"; bOubli.style.display = ET.jumele ? "" : "none";
       var nb = (vu.mvt ? 1 : 0) + (vu.son ? 1 : 0) + (vu.vib ? 1 : 0);
       etat("Connexion à distance", !lab ? "Non active" : !f.remote ? "Désactivée" : ET.enLigne ? "Activée" : ET.jumele ? "Appareil hors ligne" : "Aucun appareil connecté", lab && f.remote && en ? "v" : lab && f.remote && ET.jumele ? "o" : "");
       etat("Détection de mouvement", !md.mvt ? "Désactivée" : en && vu.mvt ? "Activée" : "En attente", md.mvt && en && vu.mvt ? "v" : md.mvt ? "o" : "");
@@ -1904,14 +1904,14 @@ var IrisVoix = (function () {
       capt.textContent = ""; capt.appendChild(el("span", "color:" + GRIS, "État des capteurs : ")); capt.appendChild(el("b", "color:" + (en ? BLANC : GRIS), en ? l2.join(" · ") : "appareil hors ligne"));
       bCam.textContent = "Caméra : " + (ET.camera === "avant" ? "avant" : "arrière") + " (changer)";
       modes.forEach(function (mo) { var cl = mo[0], B = MB[cl]; B.s.value = sn[cl] || 5; B.st.textContent = (sn[cl] || 5) + "/10 (plus haut = plus sensible)"; });
-            bVue.textContent = vue ? "Arrêter la vue" : "Voir en direct"; bParler.style.display = vue && micTrack ? "" : "none";
+            bVue.textContent = vueConnexion ? "Connexion…" : vue ? "Arrêter la vue" : "Voir en direct"; bParler.style.display = vue && micTrack ? "" : "none";
       v1.textContent = vue ? "Vue en direct" : (en && vu.capt ? "Caméra en marche" : "Caméra en veille"); v2.textContent = vue ? "Connexion…" : "En attente de détection";
       if (f.rec && vue && video.srcObject && !rec) debutRec(); else if ((!f.rec || !vue) && rec) finRec();
     }
     var dernierVu = null, dernierVuInit = false; function sonde() { appel("adminGuardian", { action: "etat" }, function (r) { if (!carte.isConnected) { arreterVue(); if (sondeur) clearInterval(sondeur); return; } if (r && r.ok) { var t = r.dernier && r.dernier.t; if (!dernierVuInit) { dernierVu = t; dernierVuInit = true; } else if (t && t !== dernierVu) { dernierVu = t; if (!vue && r.labo && r.f && r.f.remote && r.enLigne) { msgG.textContent = "Détection — ouverture automatique de la vue en direct."; demarrerVue(); } } ET = r; maj(); } }); }
     // ---- vue en direct (WebRTC, chiffré, de l'appareil vers cette page) ----
     function arreterVue(avertir) {
-      if (repTimer) clearInterval(repTimer); repTimer = null; var etait = vue; vue = false; finRec();
+      if (repTimer) clearInterval(repTimer); repTimer = null; var etait = vue; vue = false; vueConnexion = false; finRec();
       if (pc) { try { pc.close(); } catch (e) { } pc = null; } if (micStream) { micStream.getTracks().forEach(function (t) { t.stop(); }); micStream = null; micTrack = null; }
       video.srcObject = null; video.style.display = "none"; audio.srcObject = null; veille.style.display = ""; bParler.style.display = "none";
       if (etait && avertir) api({ action: "fin" }, function () { }); if (ET) maj();
@@ -1920,9 +1920,9 @@ var IrisVoix = (function () {
       if (!ET || !ET.labo || !ET.enLigne) { msgG.textContent = "L’appareil d’essai doit être en ligne (page ouverte, consentement donné)."; return; }
       if (!ET.f || !ET.f.remote) { msgG.textContent = "La connexion à distance est désactivée : activez-la d’abord."; return; }
       if (!window.RTCPeerConnection) { msgG.textContent = "Ce navigateur ne gère pas la vue en direct."; return; }
-      vue = true; msgG.textContent = "Connexion à l’appareil…"; maj();
+      vue = true; vueConnexion = true; msgG.textContent = "Connexion à l’appareil…"; maj();
       var p = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] }); pc = p;
-      p.ontrack = function (ev) { if (ev.track.kind === "video") { video.srcObject = ev.streams[0] || new MediaStream([ev.track]); video.style.display = "block"; veille.style.display = "none"; video.play().catch(function () { }); msgG.textContent = "Vue en direct établie."; if (ET && ET.f && ET.f.rec && !rec) debutRec(); } else { audio.srcObject = ev.streams[0] || new MediaStream([ev.track]); audio.play().catch(function () { }); } };
+      p.ontrack = function (ev) { if (ev.track.kind === "video") { video.srcObject = ev.streams[0] || new MediaStream([ev.track]); video.style.display = "block"; veille.style.display = "none"; video.play().catch(function () { }); vueConnexion = false; msgG.textContent = "Vue en direct établie."; maj(); if (ET && ET.f && ET.f.rec && !rec) debutRec(); } else { audio.srcObject = ev.streams[0] || new MediaStream([ev.track]); audio.play().catch(function () { }); } };
       var gracePerte = null; p.onconnectionstatechange = function () { if (pc !== p) return; var st = p.connectionState; if (st === "connected") { if (gracePerte) { clearTimeout(gracePerte); gracePerte = null; } return; } if (st === "closed") { arreterVue(true); return; } if (st === "failed" && p.restartIce) { try { p.restartIce(); } catch (e) { } } if ((st === "disconnected" || st === "failed") && !gracePerte) { msgG.textContent = "Connexion instable… nouvelle tentative (la vue reste active)."; gracePerte = setTimeout(function () { gracePerte = null; if (pc === p && (p.connectionState === "disconnected" || p.connectionState === "failed")) { msgG.textContent = "Connexion perdue."; arreterVue(true); } }, 15000); } };
       p.addTransceiver("video", { direction: "recvonly" });
       var voixOk = ET.f.micro && ET.f.audio, micP = voixOk && navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? navigator.mediaDevices.getUserMedia({ audio: true }).then(function (m) { micStream = m; micTrack = m.getAudioTracks()[0]; micTrack.enabled = false; p.addTrack(micTrack, m); }).catch(function () { p.addTransceiver("audio", { direction: "recvonly" }); }) : Promise.resolve(voixOk ? p.addTransceiver("audio", { direction: "recvonly" }) : null);
