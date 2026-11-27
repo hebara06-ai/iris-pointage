@@ -1908,7 +1908,7 @@ var IrisVoix = (function () {
       v1.textContent = vue ? "Vue en direct" : (en && vu.capt ? "Caméra en marche" : "Caméra en veille"); v2.textContent = vue ? "Connexion…" : "En attente de détection";
       if (f.rec && vue && video.srcObject && !rec) debutRec(); else if ((!f.rec || !vue) && rec) finRec();
     }
-    function sonde() { appel("adminGuardian", { action: "etat" }, function (r) { if (!carte.isConnected) { arreterVue(); if (sondeur) clearInterval(sondeur); return; } if (r && r.ok) { ET = r; maj(); } }); }
+    var dernierVu = null, dernierVuInit = false; function sonde() { appel("adminGuardian", { action: "etat" }, function (r) { if (!carte.isConnected) { arreterVue(); if (sondeur) clearInterval(sondeur); return; } if (r && r.ok) { var t = r.dernier && r.dernier.t; if (!dernierVuInit) { dernierVu = t; dernierVuInit = true; } else if (t && t !== dernierVu) { dernierVu = t; if (!vue && r.labo && r.f && r.f.remote && r.enLigne) { msgG.textContent = "Détection — ouverture automatique de la vue en direct."; demarrerVue(); } } ET = r; maj(); } }); }
     // ---- vue en direct (WebRTC, chiffré, de l'appareil vers cette page) ----
     function arreterVue(avertir) {
       if (repTimer) clearInterval(repTimer); repTimer = null; var etait = vue; vue = false; finRec();
