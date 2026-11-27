@@ -65,7 +65,7 @@ function ecranConsentement() {
 }
 function ecranActif() {
   var e = $("ecran"); e.innerHTML = "";
-  e.insertAdjacentHTML("beforeend", '<div class="ligne"><span>Connexion à distance</span><b id="s1"></b></div><div class="ligne"><span>Détection de mouvement</span><b id="s2"></b></div><div class="ligne"><span>Détection sonore</span><b id="s5"></b></div><div class="ligne"><span>Détection de vibrations</span><b id="s6"></b></div><div class="ligne"><span>Microphone</span><b id="s3"></b></div><div class="ligne"><span>Vue en direct</span><b id="s4"></b></div><div class="ligne"><span>Capteurs vérifiés</span><b id="s7"></b></div><div class="ligne"><span>Fin de session dans</span><b id="s8"></b></div><button class="s" id="bt" style="display:none">Lampe (vision nocturne) : éteinte</button><button class="s" id="bc">Changer de caméra</button><button class="stop" id="bs">ARRÊT</button>');
+  e.insertAdjacentHTML("beforeend", '<div class="ligne"><span>Connexion à distance</span><b id="s1"></b></div><div class="ligne"><span>Détection de mouvement</span><b id="s2"></b></div><div class="ligne"><span>Détection sonore</span><b id="s5"></b></div><div class="ligne"><span>Détection de vibrations</span><b id="s6"></b></div><div class="ligne"><span>Microphone</span><b id="s3"></b></div><div class="ligne"><span>Vue en direct</span><b id="s4"></b></div><div class="ligne"><span>Capteurs vérifiés</span><b id="s7"></b></div><div class="ligne"><span>Session</span><b id="s8"></b></div><button class="s" id="bt" style="display:none">Lampe (vision nocturne) : éteinte</button><button class="s" id="bc">Changer de caméra</button><button class="stop" id="bs">ARRÊT</button>');
   $("bs").onclick = function () { arreterTout("arret_local", "Bouton ARRÊT sur l’appareil"); ecranConsentement(); msg("Tout est arrêté."); };
   $("bc").onclick = function () { S.cfg.camera = S.cfg.camera === "avant" ? "arriere" : "avant"; relancerCamera(); };
   $("bt").onclick = basculerTorche; majEtat();
@@ -80,7 +80,7 @@ function majEtat() {
   g("s3", S.mic === "ok" ? "Autorisé" : S.mic === "refuse" ? "Refusé" : "Non demandé", S.mic === "ok" ? "ok" : S.mic === "refuse" ? "or" : ""); g("s4", S.flux ? "En cours" : "Aucune", S.flux ? "ok" : "");
   var cp = S.caps, liste = []; if (cp.cam) liste.push("caméra ×" + cp.cam); if (cp.mic) liste.push("micro"); if (cp.accel) liste.push("accéléromètre"); if (cp.gyro) liste.push("gyroscope");
   g("s7", (liste.join(", ") || "analyse…") + (S.capsFait ? " · pas de capteur de distance" : ""), "or");
-  if (S.fin) { var rest = Math.max(0, Math.round((S.fin - Date.now()) / 60000)); g("s8", rest + " min", "or"); }
+  g("s8", "Illimitée (vous décidez quand arrêter)", "ok");
   $("t1").textContent = actif ? "Caméra en marche" : "Caméra en veille"; $("t2").textContent = actif ? (S.flux ? "Vue en direct en cours" : "En attente de détection") : "En attente";
 }
 // ---- caméra ----
@@ -91,7 +91,7 @@ function demarrerCaptation() {
   navigator.mediaDevices.getUserMedia(contraintes()).then(function (st) {
     S.vstream = st; S.consent = true; var v = $("vid"); v.srcObject = st; v.style.display = "block"; $("vide").style.display = "none"; v.play().catch(function () { });
     ecranActif(); msg(""); evt("consentement", "Caméra autorisée par la personne"); evt("demarrage", S.cfg.camera);
-    try { localStorage.setItem("gd-ok", String(Date.now())); } catch (e) { } S.fin = Date.now() + S.cfg.duree * 60000; if (S.finTimer) clearInterval(S.finTimer); S.finTimer = setInterval(function () { if (S.consent && Date.now() >= S.fin) { arreterTout("session_expiree", "Durée maximale de session atteinte"); ecranConsentement(); msg("La session est terminée (durée maximale atteinte)."); } else majEtat(); }, 15000);
+    try { localStorage.setItem("gd-ok", String(Date.now())); } catch (e) { } S.fin = 0; if (S.finTimer) clearInterval(S.finTimer); S.finTimer = setInterval(function () { majEtat(); }, 15000);
     demanderWakeLock(); appliquerModes(); verifierTorche();
     // l'autorisation du micro est demandée tout de suite (en présence de la personne) puis le micro est relâché
     navigator.mediaDevices.getUserMedia({ audio: true }).then(function (a) { a.getTracks().forEach(function (t) { t.stop(); }); S.mic = "ok"; appliquerModes(); majEtat(); }).catch(function () { S.mic = "refuse"; evt("permission_refusee", "micro"); majEtat(); });

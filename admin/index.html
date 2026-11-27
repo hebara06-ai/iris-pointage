@@ -1860,13 +1860,12 @@ var IrisVoix = (function () {
       s.onchange = function () { api({ action: "commande", cmd: "sens", mode: cl, valeur: Number(s.value) }, function (r) { msgG.textContent = r.ok ? "Sensibilité « " + mo[1] + " » : " + s.value + "/10." : (r.msg || "Échec."); sonde(); }); };
       b.appendChild(t); b.appendChild(st); b.appendChild(s); blocModes.appendChild(b); MB[cl] = { s: s, st: st };
     });
-    var duree = h("input", { type: "number", min: "5", max: "240", step: "5" }); duree.style.cssText = "width:90px;font:inherit;padding:8px 10px;border-radius:10px;border:1px solid " + SEP + ";background:#0A111D;color:" + BLANC; var dT = el("div", "font-size:14px;color:" + GRIS + ";margin:6px 0", "Durée maximale d’une session (minutes) : ");
-    duree.onchange = function () { api({ action: "commande", cmd: "duree", valeur: Number(duree.value) }, function (r) { msgG.textContent = r.ok ? "Durée maximale : " + r.duree + " min." : (r.msg || "Échec."); }); };
+    var dT = el("div", "font-size:14px;color:" + GRIS + ";margin:6px 0", "Durée de session : illimitée — vous décidez seul(e) quand arrêter (bouton ARRÊT, des deux côtés).");
     var bJour = btn("Journal : afficher", function (b) { journalOuvert = !journalOuvert; b.textContent = "Journal : " + (journalOuvert ? "masquer" : "afficher"); jz.style.display = journalOuvert ? "block" : "none"; if (journalOuvert) chargerJournal(); });
     var jz = el("div", "display:none;margin-top:8px;font-size:13px;color:" + GRIS + ";max-height:260px;overflow:auto");
     [bLabo, code, bJum, bOubli].forEach(function (x) { zone.appendChild(x); }); zone.appendChild(el("div", "height:6px"));
     [bTout, bRien].forEach(function (x) { zone.appendChild(x); }); zone.appendChild(el("div", "height:2px"));
-    [bVue, bArret, bParler, bCam].forEach(function (x) { zone.appendChild(x); }); zone.appendChild(blocModes); dT.appendChild(duree); zone.appendChild(dT); zone.appendChild(el("div", "height:8px")); zone.appendChild(bJour); zone.appendChild(jz); zone.appendChild(msgG);
+    [bVue, bArret, bParler, bCam].forEach(function (x) { zone.appendChild(x); }); zone.appendChild(blocModes); zone.appendChild(dT); zone.appendChild(el("div", "height:8px")); zone.appendChild(bJour); zone.appendChild(jz); zone.appendChild(msgG);
     carte.appendChild(el("div", "height:1px;background:" + SEP + ";margin:16px 0 12px"));
     carte.appendChild(el("p", "font-size:13px;line-height:1.5;color:" + GRIS + ";margin:0", "Réservé aux essais à domicile avec des participants informés et consentants. Le voyant rouge de l’appareil ne peut pas être désactivé, la personne peut tout arrêter à tout moment. L’enregistrement, s’il est activé, crée un fichier sur cet ordinateur seulement. Le téléphone n’a pas de capteur de distance exploitable : aucune distance d’un mètre n’est mesurée. Avant tout usage hors essai : information des salariés, consultation du CSE."));
     c.appendChild(carte);
@@ -1905,8 +1904,7 @@ var IrisVoix = (function () {
       capt.textContent = ""; capt.appendChild(el("span", "color:" + GRIS, "État des capteurs : ")); capt.appendChild(el("b", "color:" + (en ? BLANC : GRIS), en ? l2.join(" · ") : "appareil hors ligne"));
       bCam.textContent = "Caméra : " + (ET.camera === "avant" ? "avant" : "arrière") + " (changer)";
       modes.forEach(function (mo) { var cl = mo[0], B = MB[cl]; B.s.value = sn[cl] || 5; B.st.textContent = (sn[cl] || 5) + "/10 (plus haut = plus sensible)"; });
-      if (document.activeElement !== duree) duree.value = ET.duree;
-      bVue.textContent = vue ? "Arrêter la vue" : "Voir en direct"; bParler.style.display = vue && micTrack ? "" : "none";
+            bVue.textContent = vue ? "Arrêter la vue" : "Voir en direct"; bParler.style.display = vue && micTrack ? "" : "none";
       v1.textContent = vue ? "Vue en direct" : (en && vu.capt ? "Caméra en marche" : "Caméra en veille"); v2.textContent = vue ? "Connexion…" : "En attente de détection";
       if (f.rec && vue && video.srcObject && !rec) debutRec(); else if ((!f.rec || !vue) && rec) finRec();
     }
